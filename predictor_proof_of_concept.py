@@ -6,9 +6,10 @@ Required actions:
  - after basic population an additional analysis looking at the accuracy of the model to predict an up or down is required
  - change all mentions of close to "output"
 - rearrange method declaration as needed
+- actions about the drop NA needs to be done, this will unalign my data
 
 Dev notes:
- - None
+ - Cound potentially add the function to view the model parameters scores
 
 """
 #%% Import Modules and Basic Parameters
@@ -26,6 +27,12 @@ from sklearn.linear_model import ElasticNet
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import GridSearchCV
+import seaborn as sns
+
+#questionable modules
+#from sklearn import ignore_warnings
+from sklearn.exceptions import ConvergenceWarning
+import warnings
 
 
 ##basic parameters
@@ -35,15 +42,28 @@ Features = 6
 STEPS = 9
 time_series_split_qty = 5
 training_error_measure_main = 'neg_mean_squared_error'
-train_test_split=0.7 #the ratio of the time series used for training
+train_test_split = 0.7 #the ratio of the time series used for training
 CV_Reps=30
+time_step_notation_sting = "d" #day here is for a day, update as needed
 
 #file params
-close_str = "close"
+output_str = "close"
 date_str  ='date'
 target_file_name = 'Bitfinex_ETHUSD_d.csv'
 target_file_folder_path = ""
 feature_qty = 6
+outputs_folder_path = ".\\outputs\\"
+
+
+
+
+#Blank Variables (to remove problem messages)
+df = pd.DataFrame()
+tscv = ""
+bscv = ""
+
+#generic strings
+step_forward_string = "Fwd_Output"
 
 
 #%% methods definition
@@ -58,11 +78,12 @@ def import_data(target_file_folder_path, target_file_name, index_col=date_str):
 """create_step_responces methods"""
 #this method populates each row with the next X output results, this is done so that, each time step can be trained
 #to predict the value of the next X steps
-def create_step_responces(output_col_name=close_str, df=df, feature_qty=feature_qty, train_test_split=train_test_split):
+def create_step_responces(output_col_name=output_str, df=df, feature_qty=feature_qty, train_test_split=train_test_split):
     #create regressors
     for i in np.arange(1 ,STEPS):
-        col_name = '{}d_Fwd_Close'.format(i)
-        df[col_name] = df[close_str].shift(-i)
+        #col_name = '{}d_Fwd_Output'.format(i)
+        col_name = str(i) + "_" + time_step_notation_sting + "_" + step_forward_string
+        df[col_name] = df[output_str].shift(-i)
         
     df = df.dropna()
 
@@ -158,7 +179,7 @@ params = {
     'estimator__l1_ratio':(0.1, 0.3, 0.5, 0.7, 0.9)
 }
 
-def return_best_scores_from_CV_snalysis(CV_Reps=CV_Reps, cv=tscv): #CV_snalysis_script
+def return_best_scores_from_CV_snalysis(CV_Reps=CV_Reps, cv=bscv): #CV_snalysis_script
     btscv = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
     scores = []
     for i in range(CV_Reps):
@@ -172,26 +193,29 @@ def return_best_scores_from_CV_snalysis(CV_Reps=CV_Reps, cv=tscv): #CV_snalysis_
             #iid=False,
             refit=True,
             cv=cv,  # change this to the splitter subject to test
-            verbose=1,
+            verbose=-1,
             pre_dispatch=8,
             error_score=-999,
             return_train_score=True
             )
 
+    #warnings.filterwarnings("ignore", category=ConvergenceWarning)
     finder.fit(X_train, y_train)
+    #warnings.filterwarnings("default", category=ConvergenceWarning)
 
     best_params = finder.best_params_
     best_score = round(finder.best_score_,4)
     scores.append(best_score)
     
-    return scores
-
-
-
+    return scores, best_params, finder
 
 
 
 """training methods"""
+
+
+
+
 
 
 
@@ -220,7 +244,7 @@ models_list                      = create_model(list_of_model_types)
 btscv                            = time_series_blocking(n_splits=time_series_split_qty)
 
 ##This object scans all the modelling parameters to fine the best combo for fit
-best_params                      = CV_Analysis(models_list, model_params_list)
+scores, best_params, finder      = return_best_scores_from_CV_snalysis(models_list, model_params_list)
 
 ##this trains and tests the models
 response_models_list             = training(X, Y, models_list, best_params)
@@ -230,8 +254,45 @@ void                             = print_results(testing_results)
 """
 
 df                               = import_data(target_file_folder_path, target_file_name, index_col=date_str)
-X_train, y_train, X_test, y_test = create_step_responces(output_col_name=close_str, df=df, feature_qty=feature_qty, train_test_split=train_test_split)
+X_train, y_train, X_test, y_test = create_step_responces(output_col_name=output_str, df=df, feature_qty=feature_qty, train_test_split=train_test_split)
+btscv                            = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
+#warnings.filterwarnings("ignore", category=ConvergenceWarning)
+warnings.filterwarnings("ignore")
+scores, best_params, finder      = return_best_scores_from_CV_snalysis(CV_Reps=CV_Reps, cv=btscv)
+#FG_Question: what is a finder
+#Final Training
+preds                            = pd.DataFrame(finder.predict(X_test), columns=df.iloc[:, Features:].columns)
+
+def visualiser_up_down_confidence_tester(preds, y_test, STEPS, output_str, outputs_folder_path = ".//outputs//", figure_name = "test_output", make_relative=True):
+    
+    column_names = [output_str]
+    col_name = 'pred_{}_' + time_step_notation_sting + '_before'
+    for i in np.arange(1 ,STEPS):
+        column_names = column_names + [col_name.format(i)]
+    
+    df_realigned = pd.DataFrame(columns=column_names)
+    for y_test_index, pred_index in zip(y_test.index[STEPS:], preds.index[STEPS:]): #FG_Action, the preditions and the real data must use the same index
+        df_realigned.loc[pred_index, output_str] = y_test[output_str][y_test_index]
+        for step_backs in range(1, STEPS+1):
+            df_realigned.loc[pred_index, col_name.format(i)] = preds[output_str][pred_index - step_backs]
+    
+    fig, ax3 = plt.subplots(nrows=1, ncols=1, figsize=(9,5))
+    #sns.heatmap(df_realigned, cmap="vlag_r", annot=True, center=0.00, ax=ax3, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
+    sns.heatmap(df_realigned, cmap="vlag_r", annot=True, center=0.00, ax=ax3)#, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
+    fig.suptitle("Realigned Fig_FG_Action: Change")
+    fig.savefig('books_read.png')
+    df_realigned.to_csv(path_or_buf=outputs_folder_path + "test_output" + ".csv")
+    fig.show()
+    
+    return fig, df_realigned
+
+fig, df_realigned = visualiser_up_down_confidence_tester(preds, y_test, STEPS, output_str, outputs_folder_path = ".//outputs//", figure_name = "test_output", make_relative=True)
 
 
+fig.savefig('books_read.png')
 
 
+print("Compelete")
+
+
+# %%
