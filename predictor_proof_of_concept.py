@@ -28,6 +28,7 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import GridSearchCV
 import seaborn as sns
+import copy
 
 #questionable modules
 #from sklearn import ignore_warnings
@@ -39,7 +40,7 @@ import warnings
 
 #stratergy params
 Features = 6
-STEPS = 9
+STEPS = 4
 time_series_split_qty = 5
 training_error_measure_main = 'neg_mean_squared_error'
 train_test_split = 0.7 #the ratio of the time series used for training
@@ -64,6 +65,8 @@ bscv = ""
 
 #generic strings
 step_forward_string = "Fwd_Output"
+pred_col_name_str = "{}_" + time_step_notation_sting + "_" + step_forward_string
+
 
 
 #%% methods definition
@@ -78,12 +81,12 @@ def import_data(target_file_folder_path, target_file_name, index_col=date_str):
 """create_step_responces methods"""
 #this method populates each row with the next X output results, this is done so that, each time step can be trained
 #to predict the value of the next X steps
-def create_step_responces(output_col_name=output_str, df=df, feature_qty=feature_qty, train_test_split=train_test_split):
+def create_step_responces_and_split_training_test_set(output_col_name=output_str, df=df, STEPS=STEPS, feature_qty=feature_qty, train_test_split=train_test_split, pred_col_name_str=pred_col_name_str):
     #create regressors
-    for i in np.arange(1 ,STEPS):
+    for i in np.arange(1 ,STEPS + 1):
         #col_name = '{}d_Fwd_Output'.format(i)
-        col_name = str(i) + "_" + time_step_notation_sting + "_" + step_forward_string
-        df[col_name] = df[output_str].shift(-i)
+        
+        df[pred_col_name_str.format(i)] = df[output_str].shift(-i)
         
     df = df.dropna()
 
@@ -221,6 +224,105 @@ def return_best_scores_from_CV_snalysis(CV_Reps=CV_Reps, cv=bscv): #CV_snalysis_
 
 """testing methods"""
 
+def visualiser_up_down_confidence_tester(preds, X_test, STEPS, output_str, range_to_show=range(0,20,2), make_relative=True, output_name="Test", outputs_folder_path = ".//outputs//", figure_name = "test_output", pred_col_name_str=pred_col_name_str):
+    
+    df_realigned = return_realign_plus_minus_table(preds, X_test, STEPS, output_str, range_to_show=range(0,20,2), make_relative=True)
+    #column_names = [output_str]
+    diagram_labels_X = ["Actual"]
+    for i in np.arange(1 ,STEPS + 1):
+        #column_names = column_names + [col_name.format(i)]
+        diagram_labels_X = diagram_labels_X + [str(i)]
+    
+    
+    fig, ax3 = plt.subplots(nrows=1, ncols=1, figsize=(9,5))
+    #sns.heatmap(df_realigned, cmap="vlag_r", annot=True, center=0.00, ax=ax3, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
+    sns.heatmap(df_realigned, cmap="vlag_r", annot=True, center=0.00, ax=ax3, xticklabels=diagram_labels_X, yticklabels=df_realigned.index.astype(str))#, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
+    fig.suptitle("Realigned Fig_FG_Action: Change")
+    fig.savefig(outputs_folder_path + output_name + ".png")
+    df_realigned.to_csv(path_or_buf=outputs_folder_path + output_name + ".csv")
+    fig.show()
+    
+    return fig, df_realigned
+
+
+def return_realign_plus_minus_table(preds, X_test, STEPS, output_str, range_to_show=range(0,20,2), make_relative=True):
+    col_name = 'pred_{}_' + time_step_notation_sting + '_before'
+    column_names = [output_str]
+    for i in np.arange(1 ,STEPS + 1):
+        column_names = column_names + [col_name.format(i)]
+        
+    df_realigned = pd.DataFrame(columns=column_names)
+    for index in range_to_show:
+    #for y_test_index, pred_index in zip(X_test.index[STEPS:], preds.index[STEPS:]): #FG_Action, the preditions and the real data must use the same index
+        X_test_index    = X_test.index[STEPS:][index]
+        pred_index      = preds.index[STEPS:][index]
+        if make_relative == True:
+            previous_output_value = X_test[output_str][X_test.index[STEPS:][index-1]]
+        else:
+            previous_output_value = 0
+        df_realigned.loc[X_test_index, output_str] = X_test[output_str][X_test_index] - previous_output_value
+        for step_backs in range(1, STEPS+1):
+            df_realigned.loc[X_test_index, col_name.format(step_backs)] = preds[pred_col_name_str.format(step_backs)][pred_index - step_backs] - previous_output_value
+    return df_realigned.astype(float)
+
+
+
+def return_df_X_day_plus_minus_accuracy(preds, X_test, STEPS, output_str, confidences_before_betting=[0], fixed_bet_penality=0, save=True, output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2", pred_col_name_str=pred_col_name_str):
+    #df_realigned_temp = copy.deepcopy(df_realigned)
+    results_X_day_plus_minus_accuracy = dict()
+    results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_count = dict()
+    results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_score = dict()
+    
+    temp_range = preds.index[:-STEPS]
+    df_temp = return_realign_plus_minus_table(preds, X_test, STEPS, output_str, range_to_show=temp_range, make_relative=True)
+    
+    count_bets_with_confidence               = dict()
+    count_correct_bets_with_confidence       = dict()
+    count_correct_bets_with_confidence_score = dict()
+        
+    for steps_back in range(1, STEPS + 1):
+        #initialise variables
+        col_name = df_temp.columns[steps_back]
+        count           = 0
+        count_correct   = 0
+        count_bets_with_confidence[steps_back]               = dict()
+        count_correct_bets_with_confidence[steps_back]       = dict()
+        count_correct_bets_with_confidence_score[steps_back] = dict()
+        results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_count[steps_back] = dict()
+        results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_score[steps_back] = dict()
+        
+        for confidence_level in confidences_before_betting:
+            count_bets_with_confidence[steps_back][confidence_level]               = 0
+            count_correct_bets_with_confidence[steps_back][confidence_level]       = 0
+            count_correct_bets_with_confidence_score[steps_back][confidence_level] = 0
+        
+        for row_index in df_temp.index:
+            count += 1
+            #basic count scoring 
+            if df_temp[output_str][row_index] * df_temp[col_name][row_index] > 1:
+                count_correct += 1
+            #bets with confidence scoring
+            for confidence_level in confidences_before_betting:
+                if   abs(df_temp[col_name][row_index]) > confidence_level and df_temp[output_str][row_index] * df_temp[col_name][row_index] > 1:
+                    count_bets_with_confidence[steps_back][confidence_level] += 1
+                    count_correct_bets_with_confidence[steps_back][confidence_level] += 1
+                    count_correct_bets_with_confidence_score[steps_back][confidence_level] += abs(df_temp[col_name][row_index]) - fixed_bet_penality
+                elif abs(df_temp[col_name][row_index]) > confidence_level and df_temp[output_str][row_index] * df_temp[col_name][row_index] < 1:
+                    count_bets_with_confidence[steps_back][confidence_level] += 1
+                    count_correct_bets_with_confidence_score[steps_back][confidence_level] -= abs(abs(df_temp[col_name][row_index]) - fixed_bet_penality)
+    
+        results_X_day_plus_minus_accuracy[steps_back] = count_correct / count
+        results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_count[steps_back][confidence_level] = count_correct_bets_with_confidence[steps_back][confidence_level]       / count_bets_with_confidence[steps_back][confidence_level]
+        results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_score[steps_back][confidence_level] = count_correct_bets_with_confidence_score[steps_back][confidence_level] / count_bets_with_confidence[steps_back][confidence_level]
+        
+    if save == True:
+        df_temp.to_csv(path_or_buf=outputs_folder_path + output_name + ".csv")
+        
+    return results_X_day_plus_minus_accuracy, results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_score, results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_count
+            
+    
+    print("Hello")
+
 
 
 """print_results methods"""
@@ -253,46 +355,21 @@ testing_results                  = testing(response_models_list, df)
 void                             = print_results(testing_results)
 """
 
+
+
+
 df                               = import_data(target_file_folder_path, target_file_name, index_col=date_str)
-X_train, y_train, X_test, y_test = create_step_responces(output_col_name=output_str, df=df, feature_qty=feature_qty, train_test_split=train_test_split)
+X_train, y_train, X_test, y_test = create_step_responces_and_split_training_test_set(output_col_name=output_str, df=df, feature_qty=feature_qty, train_test_split=train_test_split)
 btscv                            = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
 #warnings.filterwarnings("ignore", category=ConvergenceWarning)
 warnings.filterwarnings("ignore")
 scores, best_params, finder      = return_best_scores_from_CV_snalysis(CV_Reps=CV_Reps, cv=btscv)
-#FG_Question: what is a finder
+#FG_Question: what is a finder object?
 #Final Training
 preds                            = pd.DataFrame(finder.predict(X_test), columns=df.iloc[:, Features:].columns)
-
-def visualiser_up_down_confidence_tester(preds, y_test, STEPS, output_str, outputs_folder_path = ".//outputs//", figure_name = "test_output", make_relative=True):
-    
-    column_names = [output_str]
-    col_name = 'pred_{}_' + time_step_notation_sting + '_before'
-    for i in np.arange(1 ,STEPS):
-        column_names = column_names + [col_name.format(i)]
-    
-    df_realigned = pd.DataFrame(columns=column_names)
-    for y_test_index, pred_index in zip(y_test.index[STEPS:], preds.index[STEPS:]): #FG_Action, the preditions and the real data must use the same index
-        df_realigned.loc[pred_index, output_str] = y_test[output_str][y_test_index]
-        for step_backs in range(1, STEPS+1):
-            df_realigned.loc[pred_index, col_name.format(i)] = preds[output_str][pred_index - step_backs]
-    
-    fig, ax3 = plt.subplots(nrows=1, ncols=1, figsize=(9,5))
-    #sns.heatmap(df_realigned, cmap="vlag_r", annot=True, center=0.00, ax=ax3, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
-    sns.heatmap(df_realigned, cmap="vlag_r", annot=True, center=0.00, ax=ax3)#, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
-    fig.suptitle("Realigned Fig_FG_Action: Change")
-    fig.savefig('books_read.png')
-    df_realigned.to_csv(path_or_buf=outputs_folder_path + "test_output" + ".csv")
-    fig.show()
-    
-    return fig, df_realigned
-
-fig, df_realigned = visualiser_up_down_confidence_tester(preds, y_test, STEPS, output_str, outputs_folder_path = ".//outputs//", figure_name = "test_output", make_relative=True)
-
-
-fig.savefig('books_read.png')
-
-
-print("Compelete")
+#Results Analysis
+fig, df_realigned                = visualiser_up_down_confidence_tester(preds, X_test, STEPS, output_str, outputs_folder_path = ".//outputs//", figure_name = "test_output", make_relative=True)
+results_X_day_plus_minus_accuracy= return_df_X_day_plus_minus_accuracy(preds, X_test, STEPS, output_str, output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2", pred_col_name_str=pred_col_name_str)
 
 
 # %%
