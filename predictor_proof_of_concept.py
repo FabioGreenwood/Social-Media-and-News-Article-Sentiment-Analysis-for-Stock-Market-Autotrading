@@ -1,12 +1,10 @@
 """
-Config Control
-0.0.1 - intial population
-
 Required actions:
- - after basic population an additional analysis looking at the accuracy of the model to predict an up or down is required
+ - upgrade analysis of up down betting with for loop
  - change all mentions of close to "output"
 - rearrange method declaration as needed
 - actions about the drop NA needs to be done, this will unalign my data
+- I'm unsure if the finder function is wiping all information between iterations
 
 Dev notes:
  - Cound potentially add the function to view the model parameters scores
@@ -27,6 +25,13 @@ from sklearn.linear_model import ElasticNet
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import GridSearchCV
+import warnings
+from sklearn.exceptions import DataConversionWarning
+warnings.filterwarnings(action='ignore', category=DataConversionWarning)
+from sklearn.exceptions import ConvergenceWarning
+warnings.filterwarnings(action='ignore', category=ConvergenceWarning)
+warnings.simplefilter('always', category=any)
+
 import seaborn as sns
 import copy
 
@@ -182,8 +187,7 @@ params = {
     'estimator__l1_ratio':(0.1, 0.3, 0.5, 0.7, 0.9)
 }
 
-def return_best_scores_from_CV_snalysis(CV_Reps=CV_Reps, cv=bscv): #CV_snalysis_script
-    btscv = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
+def return_best_scores_from_CV_analysis(CV_Reps=CV_Reps, cv=bscv): #CV_snalysis_script
     scores = []
     for i in range(CV_Reps):
         model = build_model(_alpha=1.0, _l1_ratio=0.3)
@@ -196,19 +200,21 @@ def return_best_scores_from_CV_snalysis(CV_Reps=CV_Reps, cv=bscv): #CV_snalysis_
             #iid=False,
             refit=True,
             cv=cv,  # change this to the splitter subject to test
-            verbose=-1,
+            verbose=0,
             pre_dispatch=8,
             error_score=-999,
             return_train_score=True
             )
 
-    #warnings.filterwarnings("ignore", category=ConvergenceWarning)
-    finder.fit(X_train, y_train)
-    #warnings.filterwarnings("default", category=ConvergenceWarning)
+        #warnings.filterwarnings("ignore", category=ConvergenceWarning)
+        
+        warnings.filterwarnings('ignore') 
+        finder.fit(X_train, y_train)
+        #warnings.filterwarnings("default", category=ConvergenceWarning)
 
-    best_params = finder.best_params_
-    best_score = round(finder.best_score_,4)
-    scores.append(best_score)
+        best_params = finder.best_params_
+        best_score = round(finder.best_score_,4)
+        scores.append(best_score)
     
     return scores, best_params, finder
 
@@ -355,7 +361,19 @@ testing_results                  = testing(response_models_list, df)
 void                             = print_results(testing_results)
 """
 
-
+def run_design_of_experiments(
+    target_file_folder_path,
+    target_strings_to_filter_for_list,
+    stock_name_dict,
+    existing_output_cols_list,
+    technicial_indicators_to_add,
+    
+    
+    
+    
+    
+    
+):
 
 
 df                               = import_data(target_file_folder_path, target_file_name, index_col=date_str)
@@ -363,7 +381,7 @@ X_train, y_train, X_test, y_test = create_step_responces_and_split_training_test
 btscv                            = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
 #warnings.filterwarnings("ignore", category=ConvergenceWarning)
 warnings.filterwarnings("ignore")
-scores, best_params, finder      = return_best_scores_from_CV_snalysis(CV_Reps=CV_Reps, cv=btscv)
+scores, best_params, finder      = return_best_scores_from_CV_analysis(CV_Reps=CV_Reps, cv=btscv)
 #FG_Question: what is a finder object?
 #Final Training
 preds                            = pd.DataFrame(finder.predict(X_test), columns=df.iloc[:, Features:].columns)
@@ -373,3 +391,6 @@ results_X_day_plus_minus_accuracy= return_df_X_day_plus_minus_accuracy(preds, X_
 
 
 # %%
+
+
+
