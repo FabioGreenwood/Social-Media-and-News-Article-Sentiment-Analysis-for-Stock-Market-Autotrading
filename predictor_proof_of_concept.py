@@ -12,33 +12,41 @@ Dev notes:
 """
 #%% Import Modules and Basic Parameters
 
-from sklearn.model_selection import TimeSeriesSplit
-from sklearn.model_selection import KFold
+
+
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 import seaborn as sns 
 
+
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
 import sklearn
+from sklearn.model_selection import TimeSeriesSplit
+from sklearn.model_selection import KFold
 from sklearn.linear_model import ElasticNet
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import GridSearchCV
-import warnings
-from sklearn.exceptions import DataConversionWarning
-warnings.filterwarnings(action='ignore', category=DataConversionWarning)
-from sklearn.exceptions import ConvergenceWarning
-warnings.filterwarnings(action='ignore', category=ConvergenceWarning)
-warnings.simplefilter('always', category=any)
+warnings.filterwarnings('ignore', category=RuntimeWarning, append=True)
+
+#import warnings
+#from sklearn.exceptions import DataConversionWarning
+#warnings.filterwarnings(action='ignore', category=DataConversionWarning)
+#from sklearn.exceptions import ConvergenceWarning
+#warnings.filterwarnings(action='ignore', category=ConvergenceWarning)
+#warnings.simplefilter('always', category=any)
 
 import seaborn as sns
 import copy
 
 #questionable modules
 #from sklearn import ignore_warnings
-from sklearn.exceptions import ConvergenceWarning
-import warnings
 import os
 
 
@@ -53,6 +61,7 @@ training_error_measure_main = 'neg_mean_squared_error'
 train_test_split            = 0.7 #the ratio of the time series used for training
 CV_Reps                     = 30
 time_step_notation_sting    = "d" #day here is for a day, update as needed
+
 
 
 
@@ -278,26 +287,28 @@ def return_best_scores_from_CV_analysis(X_train, y_train, CV_Reps=CV_Reps, cv=bs
     scores = []
     params_ = []
     for i in range(CV_Reps):
-        model = build_model(_alpha=1.0, _l1_ratio=0.3)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            model = build_model(_alpha=1.0, _l1_ratio=0.3)
 
-        finder = GridSearchCV(
-            estimator=model,
-            param_grid=params,
-            scoring='r2',
-            n_jobs=4,
-            #iid=False,
-            refit=True,
-            cv=cv,  # change this to the splitter subject to test
-            verbose=0,
-            pre_dispatch=8,
-            error_score=-999,
-            return_train_score=True
-            )
+            finder = GridSearchCV(
+                estimator=model,
+                param_grid=params,
+                scoring='r2',
+                n_jobs=4,
+                #iid=False,
+                refit=True,
+                cv=cv,  # change this to the splitter subject to test
+                verbose=0,
+                pre_dispatch=8,
+                error_score=-999,
+                return_train_score=True
+                )
 
         #warnings.filterwarnings("ignore", category=ConvergenceWarning)
         
-        warnings.filterwarnings('ignore') 
-        finder.fit(X_train, y_train)
+            warnings.filterwarnings('ignore') 
+            finder.fit(X_train, y_train)
         #warnings.filterwarnings("default", category=ConvergenceWarning)
 
         best_params = finder.best_params_
