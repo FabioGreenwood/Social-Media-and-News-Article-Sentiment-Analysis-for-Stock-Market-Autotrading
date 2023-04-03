@@ -39,6 +39,7 @@ import copy
 #from sklearn import ignore_warnings
 from sklearn.exceptions import ConvergenceWarning
 import warnings
+import os
 
 
 ##basic parameters
@@ -52,14 +53,17 @@ train_test_split = 0.7 #the ratio of the time series used for training
 CV_Reps=30
 time_step_notation_sting = "d" #day here is for a day, update as needed
 
+
+
 #file params
 output_str = "close"
-date_str  ='date'
-target_file_name = 'Bitfinex_ETHUSD_d.csv'
+input_cols_to_include_list = ["<CLOSE>", "<HIGH>"]
+time_col_str_list  = ["<DATE>","<TIME>"]
+index_col_str = "datetime"
+target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"]
 target_file_folder_path = ""
 feature_qty = 6
 outputs_folder_path = ".\\outputs\\"
-
 
 
 
@@ -68,19 +72,64 @@ df = pd.DataFrame()
 tscv = ""
 bscv = ""
 
+
+
 #generic strings
 step_forward_string = "Fwd_Output"
 pred_col_name_str = "{}_" + time_step_notation_sting + "_" + step_forward_string
+
+
+#placeholder variables
+input_cols_to_include               = np.nan
+stock_name_dict                     = np.nan
+existing_output_cols_list           = np.nan
+technicial_indicators_to_add_list   = np.nan
+time_series_spliting_strats_dict    = np.nan
+model_types_and_Mparams_list        = np.nan
+stocks_to_trade_for_list            = np.nan
+
 
 
 
 #%% methods definition
 
 """import_data methods"""
-def import_data(target_file_folder_path, target_file_name, index_col=date_str):
-    df = pd.read_csv(target_file_folder_path + target_file_name, skiprows=1, parse_dates=True, index_col=index_col)
-    df = df.sort_index().drop('symbol', axis=1)
-    return df
+def import_data(target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], index_col_str=index_col_str, input_cols_to_include_list=input_cols_to_include_list):
+    stocks_included_list = []
+    df_financial_data = pd.DataFrame()
+    for folder in target_folder_path_list:
+        if os.path.isdir(folder) == True:
+            initial_list = os.listdir(folder)
+            for file in os.listdir(folder):
+                #extract values from file
+                df_temp = pd.read_csv(folder + file, parse_dates=True)
+                if len(input_cols_to_include_list)==2:
+                    df_temp[index_col_str] = df_temp[time_col_str_list[0]].astype(str) + "_" + df_temp[time_col_str_list[1]].astype(str)
+                    df_temp = df_temp.set_index(index_col_str)
+                elif len(input_cols_to_include_list)==1:
+                    df_temp = df_temp.set_index(index_col_str)
+                    
+                                        
+                df_temp = df_temp[input_cols_to_include_list]
+                
+                if initial_list[0] == file:
+                    df_financial_data   = copy.deepcopy(df_temp)
+                    stocks_included_list     = stocks_included_list + [file]
+                else:
+                    df_financial_data   = pd.concat([df_financial_data, df_temp], axis=1)
+                    stocks_included_list     = stocks_included_list + [file]
+                col_rename_dict = dict()
+                for col in input_cols_to_include_list:
+                    col_rename_dict[col] = col + "_" + file
+                df_financial_data = df_financial_data.rename(columns=col_rename_dict)
+                
+                del df_temp
+                
+    return df_financial_data, stocks_included_list
+
+def populate_technical_indicators_2(df_financial_data, stocks_included_list, technicial_indicators_to_add_list):
+    #FG_Actions: to populate method
+    return df_financial_data
 
 
 """create_step_responces methods"""
@@ -88,10 +137,9 @@ def import_data(target_file_folder_path, target_file_name, index_col=date_str):
 #to predict the value of the next X steps
 def create_step_responces_and_split_training_test_set(output_col_name=output_str, df=df, STEPS=STEPS, feature_qty=feature_qty, train_test_split=train_test_split, pred_col_name_str=pred_col_name_str):
     #create regressors
-    for i in np.arange(1 ,STEPS + 1):
+    for step in np.arange(1 ,STEPS + 1):
         #col_name = '{}d_Fwd_Output'.format(i)
-        
-        df[pred_col_name_str.format(i)] = df[output_str].shift(-i)
+        df[pred_col_name_str.format(i)] = df[output_col_name].shift(-i)
         
     df = df.dropna()
 
@@ -187,7 +235,7 @@ params = {
     'estimator__l1_ratio':(0.1, 0.3, 0.5, 0.7, 0.9)
 }
 
-def return_best_scores_from_CV_analysis(CV_Reps=CV_Reps, cv=bscv): #CV_snalysis_script
+def return_best_scores_from_CV_analysis(X_train, y_train, CV_Reps=CV_Reps, cv=bscv): #CV_snalysis_script
     scores = []
     for i in range(CV_Reps):
         model = build_model(_alpha=1.0, _l1_ratio=0.3)
@@ -238,7 +286,6 @@ def visualiser_up_down_confidence_tester(preds, X_test, STEPS, output_str, range
     for i in np.arange(1 ,STEPS + 1):
         #column_names = column_names + [col_name.format(i)]
         diagram_labels_X = diagram_labels_X + [str(i)]
-    
     
     fig, ax3 = plt.subplots(nrows=1, ncols=1, figsize=(9,5))
     #sns.heatmap(df_realigned, cmap="vlag_r", annot=True, center=0.00, ax=ax3, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
@@ -362,21 +409,34 @@ void                             = print_results(testing_results)
 """
 
 def run_design_of_experiments(
-    target_file_folder_path,
-    target_strings_to_filter_for_list,
-    stock_name_dict,
-    existing_output_cols_list,
-    technicial_indicators_to_add,
-    
-    
-    
-    
-    
-    
-):
+    target_folder_path_list=target_folder_path_list,
+    input_cols_to_include=input_cols_to_include,
+    stock_name_dict=stock_name_dict,
+    existing_output_cols_list=existing_output_cols_list,
+    technicial_indicators_to_add_list=technicial_indicators_to_add_list,
+    time_series_spliting_strats_dict=time_series_spliting_strats_dict,
+    model_types_and_Mparams_list=model_types_and_Mparams_list,
+    stocks_to_trade_for_list=stocks_to_trade_for_list,
+    STEPS=STEPS
+    ):
+    df_financial_data, stocks_included_list = import_data(target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], index_col_str=index_col_str, input_cols_to_include_list=input_cols_to_include_list)    
+    df_financial_data                = populate_technical_indicators_2(df_financial_data, stocks_included_list, technicial_indicators_to_add_list)
+    X_train, y_train, X_test, y_test = create_step_responces_and_split_training_test_set(df = df_financial_data, output_col_name=output_str, feature_qty=feature_qty, train_test_split=train_test_split)
+    btscv                            = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
+    scores, best_params, finder      = return_best_scores_from_CV_analysis(X_train, y_train, CV_Reps=CV_Reps, cv=btscv)
+    #FG_Question: what is a finder object?
+    #Final Training
+    preds                            = pd.DataFrame(finder.predict(X_test), columns=df.iloc[:, Features:].columns)
+    #Results Analysis
+    fig, df_realigned                = visualiser_up_down_confidence_tester(preds, X_test, STEPS, output_str, outputs_folder_path = ".//outputs//", figure_name = "test_output", make_relative=True)
+    results_X_day_plus_minus_accuracy= return_df_X_day_plus_minus_accuracy(preds, X_test, STEPS, output_str, output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2", pred_col_name_str=pred_col_name_str)
 
 
-df                               = import_data(target_file_folder_path, target_file_name, index_col=date_str)
+run_design_of_experiments()
+
+
+"""
+df                               = import_data(target_file_folder_path, target_file_name, index_col=date_col_str)
 X_train, y_train, X_test, y_test = create_step_responces_and_split_training_test_set(output_col_name=output_str, df=df, feature_qty=feature_qty, train_test_split=train_test_split)
 btscv                            = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
 #warnings.filterwarnings("ignore", category=ConvergenceWarning)
@@ -388,6 +448,7 @@ preds                            = pd.DataFrame(finder.predict(X_test), columns=
 #Results Analysis
 fig, df_realigned                = visualiser_up_down_confidence_tester(preds, X_test, STEPS, output_str, outputs_folder_path = ".//outputs//", figure_name = "test_output", make_relative=True)
 results_X_day_plus_minus_accuracy= return_df_X_day_plus_minus_accuracy(preds, X_test, STEPS, output_str, output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2", pred_col_name_str=pred_col_name_str)
+"""
 
 
 # %%
