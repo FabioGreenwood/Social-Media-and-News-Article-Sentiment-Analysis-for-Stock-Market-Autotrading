@@ -58,7 +58,7 @@ time_step_notation_sting = "d" #day here is for a day, update as needed
 #file params
 output_str = "close"
 input_cols_to_include_list = ["<CLOSE>", "<HIGH>"]
-time_col_str_list  = ["<DATE>","<TIME>"]
+index_cols_list = ["<DATE>","<TIME>"]
 index_col_str = "datetime"
 target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"]
 target_file_folder_path = ""
@@ -81,21 +81,28 @@ pred_col_name_str = "{}_" + time_step_notation_sting + "_" + step_forward_string
 
 #placeholder variables
 input_cols_to_include               = np.nan
-stock_name_dict                     = np.nan
 existing_output_cols_list           = np.nan
 technicial_indicators_to_add_list   = np.nan
 time_series_spliting_strats_dict    = np.nan
 model_types_and_Mparams_list        = np.nan
 stocks_to_trade_for_list            = np.nan
-
+stocks_name_trans_dict              = np.nan
 
 
 
 #%% methods definition
 
+def return_ticker_code_1(filename):
+    return filename[:filename.index(".")]
+    
+    
+
 """import_data methods"""
-def import_data(target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], index_col_str=index_col_str, input_cols_to_include_list=input_cols_to_include_list):
-    stocks_included_list = []
+def import_financial_data(
+                target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], 
+                index_cols_list = index_cols_list, 
+                input_cols_to_include_list=input_cols_to_include_list):
+    
     df_financial_data = pd.DataFrame()
     for folder in target_folder_path_list:
         if os.path.isdir(folder) == True:
@@ -104,7 +111,7 @@ def import_data(target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\
                 #extract values from file
                 df_temp = pd.read_csv(folder + file, parse_dates=True)
                 if len(input_cols_to_include_list)==2:
-                    df_temp[index_col_str] = df_temp[time_col_str_list[0]].astype(str) + "_" + df_temp[time_col_str_list[1]].astype(str)
+                    df_temp[index_col_str] = df_temp[index_cols_list[0]].astype(str) + "_" + df_temp[index_cols_list[1]].astype(str)
                     df_temp = df_temp.set_index(index_col_str)
                 elif len(input_cols_to_include_list)==1:
                     df_temp = df_temp.set_index(index_col_str)
@@ -114,18 +121,16 @@ def import_data(target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\
                 
                 if initial_list[0] == file:
                     df_financial_data   = copy.deepcopy(df_temp)
-                    stocks_included_list     = stocks_included_list + [file]
                 else:
                     df_financial_data   = pd.concat([df_financial_data, df_temp], axis=1)
-                    stocks_included_list     = stocks_included_list + [file]
                 col_rename_dict = dict()
                 for col in input_cols_to_include_list:
-                    col_rename_dict[col] = col + "_" + file
+                    col_rename_dict[col] = return_ticker_code_1(file) + "_" + col
                 df_financial_data = df_financial_data.rename(columns=col_rename_dict)
                 
                 del df_temp
                 
-    return df_financial_data, stocks_included_list
+    return df_financial_data
 
 def populate_technical_indicators_2(df_financial_data, stocks_included_list, technicial_indicators_to_add_list):
     #FG_Actions: to populate method
@@ -411,7 +416,6 @@ void                             = print_results(testing_results)
 def run_design_of_experiments(
     target_folder_path_list=target_folder_path_list,
     input_cols_to_include=input_cols_to_include,
-    stock_name_dict=stock_name_dict,
     existing_output_cols_list=existing_output_cols_list,
     technicial_indicators_to_add_list=technicial_indicators_to_add_list,
     time_series_spliting_strats_dict=time_series_spliting_strats_dict,
@@ -419,17 +423,17 @@ def run_design_of_experiments(
     stocks_to_trade_for_list=stocks_to_trade_for_list,
     STEPS=STEPS
     ):
-    df_financial_data, stocks_included_list = import_data(target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], index_col_str=index_col_str, input_cols_to_include_list=input_cols_to_include_list)    
-    df_financial_data                = populate_technical_indicators_2(df_financial_data, stocks_included_list, technicial_indicators_to_add_list)
-    X_train, y_train, X_test, y_test = create_step_responces_and_split_training_test_set(df = df_financial_data, output_col_name=output_str, feature_qty=feature_qty, train_test_split=train_test_split)
-    btscv                            = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
-    scores, best_params, finder      = return_best_scores_from_CV_analysis(X_train, y_train, CV_Reps=CV_Reps, cv=btscv)
+    df_financial_data, stocks_included_list = import_financial_data(target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], index_cols_list = index_cols_list, input_cols_to_include_list=input_cols_to_include_list)    
+    df_financial_data                       = populate_technical_indicators_2(df_financial_data, stocks_included_list, technicial_indicators_to_add_list)
+    X_train, y_train, X_test, y_test        = create_step_responces_and_split_training_test_set(df = df_financial_data, output_col_name=output_str, feature_qty=feature_qty, train_test_split=train_test_split)
+    btscv                                   = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
+    scores, best_params, finder             = return_best_scores_from_CV_analysis(X_train, y_train, CV_Reps=CV_Reps, cv=btscv)
     #FG_Question: what is a finder object?
     #Final Training
-    preds                            = pd.DataFrame(finder.predict(X_test), columns=df.iloc[:, Features:].columns)
+    preds                                   = pd.DataFrame(finder.predict(X_test), columns=df.iloc[:, Features:].columns)
     #Results Analysis
-    fig, df_realigned                = visualiser_up_down_confidence_tester(preds, X_test, STEPS, output_str, outputs_folder_path = ".//outputs//", figure_name = "test_output", make_relative=True)
-    results_X_day_plus_minus_accuracy= return_df_X_day_plus_minus_accuracy(preds, X_test, STEPS, output_str, output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2", pred_col_name_str=pred_col_name_str)
+    fig, df_realigned                       = visualiser_up_down_confidence_tester(preds, X_test, STEPS, output_str, outputs_folder_path = ".//outputs//", figure_name = "test_output", make_relative=True)
+    results_X_day_plus_minus_accuracy       = return_df_X_day_plus_minus_accuracy(preds, X_test, STEPS, output_str, output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2", pred_col_name_str=pred_col_name_str)
 
 
 run_design_of_experiments()
