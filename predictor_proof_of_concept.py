@@ -46,17 +46,17 @@ import os
 
 #stratergy params
 Features = 6
-STEPS = 4
-time_series_split_qty = 5
+pred_output_and_tickers_combos_list = [("aapl", "<CLOSE>"), ("esea", "<CLOSE>"), ("aapl", "<HIGH>")]
+pred_steps_list                = [1,2,3,5,10]
+time_series_split_qty       = 5
 training_error_measure_main = 'neg_mean_squared_error'
-train_test_split = 0.7 #the ratio of the time series used for training
-CV_Reps=30
-time_step_notation_sting = "d" #day here is for a day, update as needed
+train_test_split            = 0.7 #the ratio of the time series used for training
+CV_Reps                     = 30
+time_step_notation_sting    = "d" #day here is for a day, update as needed
 
 
 
 #file params
-output_str = "close"
 input_cols_to_include_list = ["<CLOSE>", "<HIGH>"]
 index_cols_list = ["<DATE>","<TIME>"]
 index_col_str = "datetime"
@@ -87,6 +87,7 @@ time_series_spliting_strats_dict    = np.nan
 model_types_and_Mparams_list        = np.nan
 stocks_to_trade_for_list            = np.nan
 stocks_name_trans_dict              = np.nan
+df_financial_data                   = np.nan
 
 
 
@@ -95,13 +96,30 @@ stocks_name_trans_dict              = np.nan
 def return_ticker_code_1(filename):
     return filename[:filename.index(".")]
     
+def current_infer_values_method(df):
     
+    nan_values_removed = 0
+    for col in df.columns:
+        good_indexes = df[col][df[col] > 0].index
+        faulty_indexes = df[col].drop(good_indexes).index
+        for faulty_index in faulty_indexes:
+            nan_values_removed += 1
+            #previous_row          = df.index.match(faulty_index) - 1
+            previous_row          = list(df.index).index(faulty_index) - 1
+            previous_index        = df.index[previous_row]
+            df[col][faulty_index] = df[col][previous_index]
+    
+    return df, nan_values_removed
+
+
+
+
 
 """import_data methods"""
 def import_financial_data(
-                target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], 
-                index_cols_list = index_cols_list, 
-                input_cols_to_include_list=input_cols_to_include_list):
+        target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], 
+        index_cols_list = index_cols_list, 
+        input_cols_to_include_list=input_cols_to_include_list):
     
     df_financial_data = pd.DataFrame()
     for folder in target_folder_path_list:
@@ -122,7 +140,7 @@ def import_financial_data(
                 if initial_list[0] == file:
                     df_financial_data   = copy.deepcopy(df_temp)
                 else:
-                    df_financial_data   = pd.concat([df_financial_data, df_temp], axis=1)
+                    df_financial_data   = pd.concat([df_financial_data, df_temp], axis=1, ignore_index=False)
                 col_rename_dict = dict()
                 for col in input_cols_to_include_list:
                     col_rename_dict[col] = return_ticker_code_1(file) + "_" + col
@@ -132,7 +150,7 @@ def import_financial_data(
                 
     return df_financial_data
 
-def populate_technical_indicators_2(df_financial_data, stocks_included_list, technicial_indicators_to_add_list):
+def populate_technical_indicators_2(df_financial_data, technicial_indicators_to_add_list):
     #FG_Actions: to populate method
     return df_financial_data
 
@@ -140,28 +158,44 @@ def populate_technical_indicators_2(df_financial_data, stocks_included_list, tec
 """create_step_responces methods"""
 #this method populates each row with the next X output results, this is done so that, each time step can be trained
 #to predict the value of the next X steps
-def create_step_responces_and_split_training_test_set(output_col_name=output_str, df=df, STEPS=STEPS, feature_qty=feature_qty, train_test_split=train_test_split, pred_col_name_str=pred_col_name_str):
+def create_step_responces_and_split_training_test_set(
+        df_financial_data=df_financial_data, 
+        pred_output_and_tickers_combos_list = pred_output_and_tickers_combos_list,
+        pred_steps_list=pred_steps_list,
+        train_test_split=train_test_split):
+    
+    new_col_str = "{}_{}_{}"
+    old_col_str = "{}_{}"
+    list_of_new_columns = []
+    nan_values_replaced = 0
+    
+    df_financial_data, nan_values_replaced = current_infer_values_method(df_financial_data)
+    
     #create regressors
-    for step in np.arange(1 ,STEPS + 1):
-        #col_name = '{}d_Fwd_Output'.format(i)
-        df[pred_col_name_str.format(i)] = df[output_col_name].shift(-i)
-        
-    df = df.dropna()
+    for combo in pred_output_and_tickers_combos_list:
+        for step in pred_steps_list:
+            list_of_new_columns = list_of_new_columns + [new_col_str.format(combo[0], combo[1], step)]
+            df_financial_data[new_col_str.format(combo[0], combo[1], step)] = df_financial_data[old_col_str.format(combo[0], combo[1])].shift(-step)
 
     #split regressors and responses
     #Features = 6
 
-    X = df.iloc[:, :feature_qty]
-    y = df.iloc[:, feature_qty:]
+    df_financial_data = df_financial_data[:-max(pred_steps_list)]
 
-    split = int(len(df) * train_test_split)
+    X = copy.deepcopy(df_financial_data)
+    y = copy.deepcopy(df_financial_data[list_of_new_columns])
+    
+    for col in list_of_new_columns:
+        X.drop(col, axis=1)
+    
+    split = int(len(df_financial_data) * train_test_split)
 
     X_train = X[:split]
     y_train = y[:split]
 
     X_test = X[split:]
     y_test = y[split:]
-    return X_train, y_train, X_test, y_test
+    return X_train, y_train, X_test, y_test, nan_values_replaced
 
 """create_model methods"""
 #Let’s define a method that creates an elastic net model from sci-kit learn
@@ -242,6 +276,7 @@ params = {
 
 def return_best_scores_from_CV_analysis(X_train, y_train, CV_Reps=CV_Reps, cv=bscv): #CV_snalysis_script
     scores = []
+    params_ = []
     for i in range(CV_Reps):
         model = build_model(_alpha=1.0, _l1_ratio=0.3)
 
@@ -266,7 +301,9 @@ def return_best_scores_from_CV_analysis(X_train, y_train, CV_Reps=CV_Reps, cv=bs
         #warnings.filterwarnings("default", category=ConvergenceWarning)
 
         best_params = finder.best_params_
+        params_ = params_ + [best_params]
         best_score = round(finder.best_score_,4)
+        last_score = round(finder.best_score_,4)
         scores.append(best_score)
     
     return scores, best_params, finder
@@ -421,13 +458,13 @@ def run_design_of_experiments(
     time_series_spliting_strats_dict=time_series_spliting_strats_dict,
     model_types_and_Mparams_list=model_types_and_Mparams_list,
     stocks_to_trade_for_list=stocks_to_trade_for_list,
-    STEPS=STEPS
+    
     ):
-    df_financial_data, stocks_included_list = import_financial_data(target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], index_cols_list = index_cols_list, input_cols_to_include_list=input_cols_to_include_list)    
-    df_financial_data                       = populate_technical_indicators_2(df_financial_data, stocks_included_list, technicial_indicators_to_add_list)
-    X_train, y_train, X_test, y_test        = create_step_responces_and_split_training_test_set(df = df_financial_data, output_col_name=output_str, feature_qty=feature_qty, train_test_split=train_test_split)
-    btscv                                   = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
-    scores, best_params, finder             = return_best_scores_from_CV_analysis(X_train, y_train, CV_Reps=CV_Reps, cv=btscv)
+    df_financial_data                = import_financial_data(target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], index_cols_list = index_cols_list, input_cols_to_include_list=input_cols_to_include_list)    
+    df_financial_data                = populate_technical_indicators_2(df_financial_data, technicial_indicators_to_add_list)
+    X_train, y_train, X_test, y_test, nan_values_replaced = create_step_responces_and_split_training_test_set(df_financial_data = df_financial_data, pred_output_and_tickers_combos_list = pred_output_and_tickers_combos_list,pred_steps_list=pred_steps_list,train_test_split=train_test_split)
+    btscv                            = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
+    scores, best_params, finder      = return_best_scores_from_CV_analysis(X_train, y_train, CV_Reps=CV_Reps, cv=btscv)
     #FG_Question: what is a finder object?
     #Final Training
     preds                                   = pd.DataFrame(finder.predict(X_test), columns=df.iloc[:, Features:].columns)
