@@ -44,22 +44,27 @@ warnings.filterwarnings('ignore', category=RuntimeWarning, append=True)
 
 import seaborn as sns
 import copy
+import datetime
 
 #questionable modules
 #from sklearn import ignore_warnings
 import os
-
+import sys
+if not sys.warnoptions:
+    warnings.simplefilter("ignore")
+    os.environ["PYTHONWARNINGS"] = "ignore"
 
 ##basic parameters
 
 #stratergy params
 Features = 6
-pred_output_and_tickers_combos_list = [("aapl", "<CLOSE>"), ("esea", "<CLOSE>"), ("aapl", "<HIGH>")]
+#pred_output_and_tickers_combos_list = [("aapl", "<CLOSE>"), ("esea", "<CLOSE>"), ("aapl", "<HIGH>")]
+pred_output_and_tickers_combos_list = [("aapl", "<CLOSE>"), ("carm", "<HIGH>")]
 pred_steps_list                = [1,2,3,5,10]
 time_series_split_qty       = 5
 training_error_measure_main = 'neg_mean_squared_error'
 train_test_split            = 0.7 #the ratio of the time series used for training
-CV_Reps                     = 30
+CV_Reps                     = 10
 time_step_notation_sting    = "d" #day here is for a day, update as needed
 
 
@@ -69,7 +74,7 @@ time_step_notation_sting    = "d" #day here is for a day, update as needed
 input_cols_to_include_list = ["<CLOSE>", "<HIGH>"]
 index_cols_list = ["<DATE>","<TIME>"]
 index_col_str = "datetime"
-target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"]
+target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1 - Copy\\"]
 target_file_folder_path = ""
 feature_qty = 6
 outputs_folder_path = ".\\outputs\\"
@@ -90,7 +95,7 @@ pred_col_name_str = "{}_" + time_step_notation_sting + "_" + step_forward_string
 
 #placeholder variables
 input_cols_to_include               = np.nan
-existing_output_cols_list           = np.nan
+#existing_output_cols_list           = np.nan
 technicial_indicators_to_add_list   = np.nan
 time_series_spliting_strats_dict    = np.nan
 model_types_and_Mparams_list        = np.nan
@@ -286,6 +291,7 @@ params = {
 def return_best_scores_from_CV_analysis(X_train, y_train, CV_Reps=CV_Reps, cv=bscv): #CV_snalysis_script
     scores = []
     params_ = []
+    complete_record = [] 
     for i in range(CV_Reps):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
@@ -309,8 +315,10 @@ def return_best_scores_from_CV_analysis(X_train, y_train, CV_Reps=CV_Reps, cv=bs
         
             warnings.filterwarnings('ignore') 
             finder.fit(X_train, y_train)
+            
         #warnings.filterwarnings("default", category=ConvergenceWarning)
-
+        print(str(i) + "/" + str(CV_Reps))
+        print(datetime.datetime.now().strftime("%H:%M:%S"))
         best_params = finder.best_params_
         params_ = params_ + [best_params]
         best_score = round(finder.best_score_,4)
@@ -463,19 +471,21 @@ void                             = print_results(testing_results)
 
 def run_design_of_experiments(
     target_folder_path_list=target_folder_path_list,
+    index_cols_list = index_cols_list,
     input_cols_to_include=input_cols_to_include,
-    existing_output_cols_list=existing_output_cols_list,
     technicial_indicators_to_add_list=technicial_indicators_to_add_list,
+
     time_series_spliting_strats_dict=time_series_spliting_strats_dict,
     model_types_and_Mparams_list=model_types_and_Mparams_list,
     stocks_to_trade_for_list=stocks_to_trade_for_list,
     
     ):
-    df_financial_data                = import_financial_data(target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], index_cols_list = index_cols_list, input_cols_to_include_list=input_cols_to_include_list)    
-    df_financial_data                = populate_technical_indicators_2(df_financial_data, technicial_indicators_to_add_list)
+    df_financial_data                                     = import_financial_data(target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], 
+                                                                                  index_cols_list = index_cols_list, input_cols_to_include_list=input_cols_to_include_list)    
+    df_financial_data                                     = populate_technical_indicators_2(df_financial_data, technicial_indicators_to_add_list)
     X_train, y_train, X_test, y_test, nan_values_replaced = create_step_responces_and_split_training_test_set(df_financial_data = df_financial_data, pred_output_and_tickers_combos_list = pred_output_and_tickers_combos_list,pred_steps_list=pred_steps_list,train_test_split=train_test_split)
-    btscv                            = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
-    scores, best_params, finder      = return_best_scores_from_CV_analysis(X_train, y_train, CV_Reps=CV_Reps, cv=btscv)
+    btscv                                                 = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
+    scores, best_params, ficnder                           = return_best_scores_from_CV_analysis(X_train, y_train, CV_Reps=CV_Reps, cv=btscv)
     #FG_Question: what is a finder object?
     #Final Training
     preds                                   = pd.DataFrame(finder.predict(X_test), columns=df.iloc[:, Features:].columns)
