@@ -446,27 +446,31 @@ def return_models_and_preds(X_train, y_train, X_test, best_params=best_params_fg
     remove_from_param_str  = "estimator__"
     params_long_names_list = list(best_params["params order"])
     
-    for ticker, value in pred_output_and_tickers_combos_list:
+    
         #models_dict[(ticker, output)]
         #preds_steps_dict[(ticker, output)]
-        for step in steps_list:
-            input_dict = dict()
-            preds_steps_dict[step] = dict()
-            #create best model param values
-            for param_name, i in zip(params_long_names_list, range(len(params_long_names_list))):
-                param_short_name_str = param_name.replace(remove_from_param_str, "")
-                input_dict[param_short_name_str] = best_params[step][i]
-            #prep columns
-            column_str = output_col_str.format(ticker, value ,step)
-            y_temp = y_train[column_str]
+    for step in steps_list:
+        input_dict = dict()
+        preds_steps_dict[step] = dict()
+        #create best model param values
+        for param_name, i in zip(params_long_names_list, range(len(params_long_names_list))):
+            param_short_name_str = param_name.replace(remove_from_param_str, "")
+            input_dict[param_short_name_str] = best_params[step][i]
+        #prep columns
+        column_str_list = []
+        for ticker, value in pred_output_and_tickers_combos_list:
+            column_str_list = column_str_list + [output_col_str.format(ticker, value ,step)]
+            y_temp = y_train[column_str_list]
+        
+        model_temp        = build_model(input_dict=input_dict)
+        model_temp        = model_temp.fit(X_train, y_temp)
+        models_dict[step] = model_temp
+        preds_temp = model_temp.predict(X_test)
+        preds = pd.concat([preds, pd.DataFrame(preds_temp, index=X_test.index, columns=y_temp.columns)], axis=1)
             
-            model_temp        = build_model(input_dict=input_dict)
-            model_temp        = model_temp.fit(X_train, y_temp)
-            models_dict[step] = model_temp
-            preds[column_str] = model_temp.predict(X_test, y_temp)
+        
     
-    
-    return models_dict, preds_steps_dict
+    return models_dict, preds
 
 
 
@@ -475,95 +479,146 @@ def return_models_and_preds(X_train, y_train, X_test, best_params=best_params_fg
 
 """testing methods"""
 
-def visualiser_up_down_confidence_tester(preds, X_test, STEPS, output_str, range_to_show=range(0,20,2), make_relative=True, output_name="Test", outputs_folder_path = ".//outputs//", figure_name = "test_output", pred_col_name_str=pred_col_name_str):
+def visualiser_up_down_confidence_tester(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, range_to_show=range(0,20,2), make_relative=True, output_name="Test", outputs_folder_path = ".//outputs//", figure_name = "test_output", pred_col_name_str=pred_col_name_str):
     
-    df_realigned = return_realign_plus_minus_table(preds, X_test, STEPS, output_str, range_to_show=range(0,20,2), make_relative=True)
+    #output_col_str = "{}_{}_{}"
+    #output_col_str.format(ticker, value, step)
+    
+    df_realigned_dict = return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
     #column_names = [output_str]
-    diagram_labels_X = ["Actual"]
-    for i in np.arange(1 ,STEPS + 1):
-        #column_names = column_names + [col_name.format(i)]
-        diagram_labels_X = diagram_labels_X + [str(i)]
+    index_list = []
+    for step in range_to_show:
+        index_list = index_list + [preds.index[step]]
     
-    fig, ax3 = plt.subplots(nrows=1, ncols=1, figsize=(9,5))
-    #sns.heatmap(df_realigned, cmap="vlag_r", annot=True, center=0.00, ax=ax3, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
-    sns.heatmap(df_realigned, cmap="vlag_r", annot=True, center=0.00, ax=ax3, xticklabels=diagram_labels_X, yticklabels=df_realigned.index.astype(str))#, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
-    fig.suptitle("Realigned Fig_FG_Action: Change")
-    fig.savefig(outputs_folder_path + output_name + ".png")
-    df_realigned.to_csv(path_or_buf=outputs_folder_path + output_name + ".csv")
-    fig.show()
-    
-    return fig, df_realigned
+    plot_qty = len(df_realigned_dict)
+    Position = range(1,plot_qty+1)
+
+    num=0
+    #fig, ax3 = plt.subplots(nrows=1, ncols=1, figsize=(9,5))
+    #fig, axes = plt.subplots(1,plot_qty)
+    fig = plt.figure(1)
 
 
-def return_realign_plus_minus_table(preds, X_test, STEPS, output_str, range_to_show=range(0,20,2), make_relative=True):
-    col_name = 'pred_{}_' + time_step_notation_sting + '_before'
-    column_names = [output_str]
-    for i in np.arange(1 ,STEPS + 1):
-        column_names = column_names + [col_name.format(i)]
+    for df_re_key in df_realigned_dict:
         
-    df_realigned = pd.DataFrame(columns=column_names)
-    for index in range_to_show:
-    #for y_test_index, pred_index in zip(X_test.index[STEPS:], preds.index[STEPS:]): #FG_Action, the preditions and the real data must use the same index
-        X_test_index    = X_test.index[STEPS:][index]
-        pred_index      = preds.index[STEPS:][index]
-        if make_relative == True:
-            previous_output_value = X_test[output_str][X_test.index[STEPS:][index-1]]
-        else:
-            previous_output_value = 0
-        df_realigned.loc[X_test_index, output_str] = X_test[output_str][X_test_index] - previous_output_value
-        for step_backs in range(1, STEPS+1):
-            df_realigned.loc[X_test_index, col_name.format(step_backs)] = preds[pred_col_name_str.format(step_backs)][pred_index - step_backs] - previous_output_value
-    return df_realigned.astype(float)
+        df_re = df_realigned_dict[df_re_key].loc[index_list]
+        diagram_labels_X = ["Actual"]
+        
+        for step in range_to_show:
+            diagram_labels_X = diagram_labels_X + [str(step)]
+        
+        #sns.heatmap(df_realigned, cmap="vlag_r", annot=True, center=0.00, ax=ax3, xticklabels=diagram_labels_X, yticklabels=df_realigned.index.astype(str))#, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
+        ax = fig.add_subplot(plot_qty+1,1,Position[num])
+        sns.heatmap(df_re, cmap="vlag_r", annot=True, center=0.00, ax=ax, xticklabels=diagram_labels_X, yticklabels=df_re.index.astype(str))#, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
+        #sns.heatmap(uniform_data, ax=axes[num])
+        
+        #fig.suptitle("Realigned Fig_FG_Action: Change")
+        #fig.savefig(outputs_folder_path + output_name + ".png")
+        
+        
+        #plt.subplot(plot_qty, 1, num)
+        #plt.matshow(sns.heatmap(df_re))#, cmap="vlag_r", annot=True, center=0.00, xticklabels=diagram_labels_X, yticklabels=df_re.index.astype(str)))#, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
+        num+=1
+        
+        #fig.suptitle("Realigned Fig_FG_Action: Change")
+        #fig.savefig(outputs_folder_path + output_name + ".png")
+        #df_re.to_csv(path_or_buf=outputs_folder_path + output_name + df_re + ".csv")
+    #plt.show()
+    
+    return plt, df_realigned_dict
+
+
+def return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True):
+    input_col_str = "{}_{}"
+    output_col_str = "{}_{}_{}"
+    reaglined_plus_minus_dict = dict()
+    for ticker, output in pred_output_and_tickers_combos_list:
+        #initial output
+        input_col_str_curr = input_col_str.format(ticker, output)
+        df_temp = pd.DataFrame(X_test[input_col_str_curr])
+        #pop the preditions
+        output_col_str_2 = output_col_str.format(ticker, output, {})
+    
+        for step_backs in pred_steps_list:
+            df_temp[output_col_str_2.format(step_backs)+"_before"] = preds[output_col_str_2.format(step_backs)].shift(step_backs)
+            if make_relative == True:
+                df_temp[output_col_str_2.format(step_backs)+"_before"] -= df_temp[input_col_str_curr]
+        
+        reaglined_plus_minus_dict[(ticker, output)] = df_temp
+        df_temp.to_csv("C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\" +"temp" + ".csv")
+        preds.to_csv("C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\" +"preds" + ".csv")
+    
+    return reaglined_plus_minus_dict
 
 
 
-def return_df_X_day_plus_minus_accuracy(preds, X_test, STEPS, output_str, confidences_before_betting=[0], fixed_bet_penality=0, save=True, output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2", pred_col_name_str=pred_col_name_str):
+def return_df_X_day_plus_minus_accuracy(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting=[0], fixed_bet_penality=0, save=True, output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2", pred_col_name_str=pred_col_name_str):
+    
+    
     #df_realigned_temp = copy.deepcopy(df_realigned)
+    df_temp_dict = return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
+    
+    pred_str = "{}_{}_{}_before"
+    record_str = "{}_{}"
+    
     results_X_day_plus_minus_accuracy = dict()
     results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_count = dict()
-    results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_score = dict()
     
-    temp_range = preds.index[:-STEPS]
-    df_temp = return_realign_plus_minus_table(preds, X_test, STEPS, output_str, range_to_show=temp_range, make_relative=True)
+    results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_score = dict()
     
     count_bets_with_confidence               = dict()
     count_correct_bets_with_confidence       = dict()
     count_correct_bets_with_confidence_score = dict()
+
+    for prediction in list(df_temp_dict.keys()):
+        df_temp = df_temp_dict[prediction]
         
-    for steps_back in range(1, STEPS + 1):
-        #initialise variables
-        col_name = df_temp.columns[steps_back]
-        count           = 0
-        count_correct   = 0
-        count_bets_with_confidence[steps_back]               = dict()
-        count_correct_bets_with_confidence[steps_back]       = dict()
-        count_correct_bets_with_confidence_score[steps_back] = dict()
-        results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_count[steps_back] = dict()
-        results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_score[steps_back] = dict()
+        results_X_day_plus_minus_accuracy[prediction] = dict()
+        results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_count[prediction] = dict()
+        results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_score[prediction] = dict()
+
+        count_bets_with_confidence[prediction]               = dict()
+        count_correct_bets_with_confidence[prediction]       = dict()
+        count_correct_bets_with_confidence_score[prediction] = dict()
         
-        for confidence_level in confidences_before_betting:
-            count_bets_with_confidence[steps_back][confidence_level]               = 0
-            count_correct_bets_with_confidence[steps_back][confidence_level]       = 0
-            count_correct_bets_with_confidence_score[steps_back][confidence_level] = 0
+        time_series_index = X_test.index
         
-        for row_index in df_temp.index:
-            count += 1
-            #basic count scoring 
-            if df_temp[output_str][row_index] * df_temp[col_name][row_index] > 1:
-                count_correct += 1
-            #bets with confidence scoring
+        for steps_back in pred_steps_list:
+            #initialise variables
+            
+            col_name = df_temp.columns[pred_steps_list.index(steps_back)]
+            count           = 0
+            count_correct   = 0
+            count_bets_with_confidence[prediction][steps_back]               = dict()
+            count_correct_bets_with_confidence[prediction][steps_back]       = dict()
+            count_correct_bets_with_confidence_score[prediction][steps_back] = dict()
+            results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_count[prediction][steps_back] = dict()
+            results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_score[prediction][steps_back] = dict()
+
             for confidence_level in confidences_before_betting:
-                if   abs(df_temp[col_name][row_index]) > confidence_level and df_temp[output_str][row_index] * df_temp[col_name][row_index] > 1:
-                    count_bets_with_confidence[steps_back][confidence_level] += 1
-                    count_correct_bets_with_confidence[steps_back][confidence_level] += 1
-                    count_correct_bets_with_confidence_score[steps_back][confidence_level] += abs(df_temp[col_name][row_index]) - fixed_bet_penality
-                elif abs(df_temp[col_name][row_index]) > confidence_level and df_temp[output_str][row_index] * df_temp[col_name][row_index] < 1:
-                    count_bets_with_confidence[steps_back][confidence_level] += 1
-                    count_correct_bets_with_confidence_score[steps_back][confidence_level] -= abs(abs(df_temp[col_name][row_index]) - fixed_bet_penality)
-    
-        results_X_day_plus_minus_accuracy[steps_back] = count_correct / count
-        results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_count[steps_back][confidence_level] = count_correct_bets_with_confidence[steps_back][confidence_level]       / count_bets_with_confidence[steps_back][confidence_level]
-        results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_score[steps_back][confidence_level] = count_correct_bets_with_confidence_score[steps_back][confidence_level] / count_bets_with_confidence[steps_back][confidence_level]
+                count_bets_with_confidence[prediction][steps_back][confidence_level]               = 0
+                count_correct_bets_with_confidence[prediction][steps_back][confidence_level]       = 0
+                count_correct_bets_with_confidence_score[prediction][steps_back][confidence_level] = 0
+
+            for row_num in range(max(pred_steps_list), len(X_test.index)):
+                actual_values = X_test[record_str.format(prediction[0], prediction[1])]
+                count += 1
+                #basic count scoring 
+                if (actual_values[row_num] - actual_values[row_num - steps_back]) * df_temp[col_name][row_num]  > 1:
+                    count_correct += 1
+                #bets with confidence scoring
+                for confidence_level in confidences_before_betting:
+                    if   abs(actual_values[row_num] - actual_values[row_num - steps_back]) > confidence_level and (actual_values[row_num] - actual_values[row_num - steps_back]) * df_temp[col_name][row_num] > 1:
+                        count_bets_with_confidence[prediction][steps_back][confidence_level] += 1
+                        count_correct_bets_with_confidence[prediction][steps_back][confidence_level] += 1
+                        count_correct_bets_with_confidence_score[prediction][steps_back][confidence_level] += abs(actual_values[row_num] - actual_values[row_num - steps_back]) - fixed_bet_penality
+                    elif abs(actual_values[row_num] - actual_values[row_num - steps_back]) > confidence_level and (actual_values[row_num] - actual_values[row_num - steps_back]) * df_temp[col_name][row_num] < 1:
+                        count_bets_with_confidence[prediction][steps_back][confidence_level] += 1
+                        count_correct_bets_with_confidence_score[prediction][steps_back][confidence_level] -= abs(abs(df_temp[col_name][row_num]) - fixed_bet_penality)
+
+            results_X_day_plus_minus_accuracy[prediction][steps_back] = count_correct / count
+            results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_count[prediction][steps_back][confidence_level] = count_correct_bets_with_confidence[prediction][steps_back][confidence_level]       / count_bets_with_confidence[prediction][steps_back][confidence_level]
+            results_BASIC_X_day_plus_minus_accuracy_betting_score_with_confidence_score[prediction][steps_back][confidence_level] = count_correct_bets_with_confidence_score[prediction][steps_back][confidence_level] / count_bets_with_confidence[prediction][steps_back][confidence_level]
         
     if save == True:
         df_temp.to_csv(path_or_buf=outputs_folder_path + output_name + ".csv")
@@ -642,8 +697,10 @@ def run_design_of_experiments(
     X_test = pickle_dict["X_test"]
     
     best_params_fg                  = return_best_model_paramemeters(complete_record=pickle_dict["complete_record"], params_sweep=EXAMPLE_model_params_sweep)
-    models_dict, preds_steps_dict   = return_models_and_preds(X_train = X_train, y_train = y_train, X_test = X_test, best_params=best_params_fg, params_sweep=EXAMPLE_model_params_sweep, pred_steps_list=pred_steps_list, pred_output_and_tickers_combos_list=pred_output_and_tickers_combos_list)
+    models_dict, preds   = return_models_and_preds(X_train = X_train, y_train = y_train, X_test = X_test, best_params=best_params_fg, params_sweep=EXAMPLE_model_params_sweep, pred_steps_list=pred_steps_list, pred_output_and_tickers_combos_list=pred_output_and_tickers_combos_list)
     print("d")
+    fig, df_realigned               = visualiser_up_down_confidence_tester(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, outputs_folder_path = ".//outputs//", figure_name = "test_output", make_relative=True)
+    results_X_day_plus_minus_accuracy= return_df_X_day_plus_minus_accuracy(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2", pred_col_name_str=pred_col_name_str)
 #save_list = ["complete_record", "EXAMPLE_model_params_sweep", "X_train", "y_train", "X_test", "y_test", "pred_steps_list", "pred_output_and_tickers_combos_list", "preds", "STEPS", "output_str", "btscv"]
 #def fg_pickle_save(save_list=save_list, save_location="C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\pickle"):
 
