@@ -42,21 +42,12 @@ from sklearn.linear_model import ElasticNet
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import GridSearchCV
-warnings.filterwarnings('ignore', category=RuntimeWarning, append=True)
-
-#import warnings
-#from sklearn.exceptions import DataConversionWarning
-#warnings.filterwarnings(action='ignore', category=DataConversionWarning)
-#from sklearn.exceptions import ConvergenceWarning
-#warnings.filterwarnings(action='ignore', category=ConvergenceWarning)
-#warnings.simplefilter('always', category=any)
 
 import seaborn as sns
 import copy
 import datetime
 
 #questionable modules
-#from sklearn import ignore_warnings
 import os
 import sys
 if not sys.warnoptions:
@@ -357,7 +348,7 @@ def return_CV_analysis_scores(X_train, y_train, CV_Reps=CV_Reps, cv=bscv, cores_
         #run study for that number of time steps
         for i in range(CV_Reps):
             with warnings.catch_warnings():
-                warnings.simplefilter("ignore", category=RuntimeWarning)
+                #warnings.simplefilter("ignore", category=RuntimeWarning)
                 model = build_model(_alpha=1.0, _l1_ratio=0.3)
                 
 
@@ -375,7 +366,7 @@ def return_CV_analysis_scores(X_train, y_train, CV_Reps=CV_Reps, cv=bscv, cores_
                     return_train_score=True
                     )
 
-                warnings.filterwarnings('ignore') 
+                #warnings.filterwarnings('ignore') 
                 finder.fit(X_train, y_temp)
                 
             #warnings.filterwarnings("default", category=ConvergenceWarning)
@@ -402,7 +393,7 @@ def return_CV_analysis_scores(X_train, y_train, CV_Reps=CV_Reps, cv=bscv, cores_
         print(datetime.datetime.now().strftime("%H:%M:%S"))
         print(str(pred_steps_list.index(pred_step)+1) + "/" + str(len(pred_steps_list)))
         
-    return scores, best_params, finder, complete_record
+    return complete_record
 
 def return_df_filtered_for_timestep(df, step):
     cols_to_keep_temp, cols_to_del_temp = [], []
@@ -435,7 +426,7 @@ def return_best_model_paramemeters(complete_record, params_sweep):
     
 """training methods"""
     
-def return_models_and_preds(X_train, y_train, X_test, best_params=best_params_fg, params_sweep=EXAMPLE_model_params_sweep, pred_steps_list=pred_steps_list, pred_output_and_tickers_combos_list=pred_output_and_tickers_combos_list):
+def return_models_and_preds(X_train, y_train, X_test, best_params=best_params_fg, pred_output_and_tickers_combos_list=pred_output_and_tickers_combos_list):
     preds = pd.DataFrame()
     output_col_str = "{}_{}_{}"
     preds_dict = dict()
@@ -479,16 +470,16 @@ def return_models_and_preds(X_train, y_train, X_test, best_params=best_params_fg
 
 """testing methods"""
 
-def visualiser_up_down_confidence_tester(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, range_to_show=range(0,20,2), make_relative=True, output_name="Test", outputs_folder_path = ".//outputs//", figure_name = "test_output", pred_col_name_str=pred_col_name_str):
+def visualiser_plus_minus_results(df_realigned_dict ,preds, pred_steps_list, range_to_show=range(0,20,2), output_name="Test", outputs_folder_path = ".//outputs//", figure_name = "test_output", remove_actual_value=True):
     
-    #output_col_str = "{}_{}_{}"
-    #output_col_str.format(ticker, value, step)
     
-    df_realigned_dict = return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
-    #column_names = [output_str]
-    index_list = []
-    for step in range_to_show:
-        index_list = index_list + [preds.index[step]]
+    #prep time index
+    if isinstance(range_to_show[0], int):
+        index_list = []
+        for step in range_to_show:
+            index_list = index_list + [preds.index[step+max(pred_steps_list)]]
+    else:
+        index_list = range_to_show
     
     plot_qty = len(df_realigned_dict)
     Position = range(1,plot_qty+1)
@@ -496,20 +487,25 @@ def visualiser_up_down_confidence_tester(preds, X_test, pred_steps_list, pred_ou
     num=0
     #fig, ax3 = plt.subplots(nrows=1, ncols=1, figsize=(9,5))
     #fig, axes = plt.subplots(1,plot_qty)
-    fig = plt.figure(1)
+    fig, axes = plt.subplots(1,2)
 
 
     for df_re_key in df_realigned_dict:
         
         df_re = df_realigned_dict[df_re_key].loc[index_list]
-        diagram_labels_X = ["Actual"]
-        
-        for step in range_to_show:
+        if remove_actual_value == True:
+            diagram_labels_X = []
+            df_re = df_re.drop(df_re.columns[0], axis=1)
+        else:
+            diagram_labels_X = ["Actual"]
+            
+        for step in pred_steps_list:
             diagram_labels_X = diagram_labels_X + [str(step)]
         
         #sns.heatmap(df_realigned, cmap="vlag_r", annot=True, center=0.00, ax=ax3, xticklabels=diagram_labels_X, yticklabels=df_realigned.index.astype(str))#, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
-        ax = fig.add_subplot(plot_qty+1,1,Position[num])
-        sns.heatmap(df_re, cmap="vlag_r", annot=True, center=0.00, ax=ax, xticklabels=diagram_labels_X, yticklabels=df_re.index.astype(str))#, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
+        #ax = fig.add_subplot(plot_qty+1,1,Position[num])
+        sns.heatmap(df_re, cmap="vlag_r", annot=True, center=0.00, ax=axes[num], xticklabels=diagram_labels_X, yticklabels=df_re.index.astype(str))#, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
+        num += 1
         #sns.heatmap(uniform_data, ax=axes[num])
         
         #fig.suptitle("Realigned Fig_FG_Action: Change")
@@ -518,12 +514,12 @@ def visualiser_up_down_confidence_tester(preds, X_test, pred_steps_list, pred_ou
         
         #plt.subplot(plot_qty, 1, num)
         #plt.matshow(sns.heatmap(df_re))#, cmap="vlag_r", annot=True, center=0.00, xticklabels=diagram_labels_X, yticklabels=df_re.index.astype(str)))#, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
-        num+=1
+
         
         #fig.suptitle("Realigned Fig_FG_Action: Change")
         #fig.savefig(outputs_folder_path + output_name + ".png")
         #df_re.to_csv(path_or_buf=outputs_folder_path + output_name + df_re + ".csv")
-    #plt.show()
+    plt.show()
     
     return plt, df_realigned_dict
 
@@ -552,12 +548,10 @@ def return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_
 
 
 
-def return_df_X_day_plus_minus_accuracy(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting=[0], fixed_bet_penality=0, save=True, output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2", pred_col_name_str=pred_col_name_str):
+def return_df_X_day_plus_minus_accuracy(df_temp_dict, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting=[0], fixed_bet_penality=0, save=True, output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2", pred_col_name_str=pred_col_name_str):
     
     
     #df_realigned_temp = copy.deepcopy(df_realigned)
-    df_temp_dict = return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
-    
     pred_str = "{}_{}_{}_before"
     record_str = "{}_{}"
     
@@ -637,28 +631,6 @@ def return_df_X_day_plus_minus_accuracy(preds, X_test, pred_steps_list, pred_out
 
 
 #%% Main Script
-"""
-
-This is a placeholder for the basic model script
-
-df                               = import_data(data_folder_location)
-X_train, y_train, X_test, y_test = create_step_responces(df, Steps)
-
-
-models_list                      = create_model(list_of_model_types)
-
-##This object informs the cross_val_score (the training method) of the time splits
-btscv                            = time_series_blocking(n_splits=time_series_split_qty)
-
-##This object scans all the modelling parameters to fine the best combo for fit
-scores, best_params, finder      = return_best_scores_from_CV_snalysis(models_list, model_params_list)
-
-##this trains and tests the models
-response_models_list             = training(X, Y, models_list, best_params)
-
-testing_results                  = testing(response_models_list, df)
-void                             = print_results(testing_results)
-"""
 
 def run_design_of_experiments(
     target_folder_path_list=target_folder_path_list,
@@ -677,30 +649,22 @@ def run_design_of_experiments(
     model_types_and_Mparams_list=model_types_and_Mparams_list,
     stocks_to_trade_for_list=stocks_to_trade_for_list,
     ):
-    if "pickle load" == False:
-        df_financial_data                       = import_financial_data(target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], 
-                                                                                      index_cols_list = index_cols_list, input_cols_to_include_list=input_cols_to_include_list)    
-        df_financial_data                       = populate_technical_indicators_2(df_financial_data, technicial_indicators_to_add_list)
-        X_train, y_train, X_test, y_test, nan_values_replaced = create_step_responces_and_split_training_test_set(df_financial_data = df_financial_data, pred_output_and_tickers_combos_list = pred_output_and_tickers_combos_list,pred_steps_list=pred_steps_list,train_test_split=train_test_split)
-        btscv                                   = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
-        scores, best_params, finder, complete_record = return_CV_analysis_scores(X_train, y_train, CV_Reps=CV_Reps, cv=btscv, cores_used=4,
-                                                                        params_sweep=params_sweep, pred_steps_list=pred_steps_list
-                                                                        )
-    
-    
-    #fg_pickle_save(["complete_record", "X_train", "y_train", "X_test", "y_test", "pred_steps_list"], locals())
-    pickle_dict = fg_pickle_load()
-    print(pickle_dict.keys())
-    
-    X_train = pickle_dict["X_train"]
-    y_train = pickle_dict["y_train"]
-    X_test = pickle_dict["X_test"]
-    
-    best_params_fg                  = return_best_model_paramemeters(complete_record=pickle_dict["complete_record"], params_sweep=EXAMPLE_model_params_sweep)
-    models_dict, preds   = return_models_and_preds(X_train = X_train, y_train = y_train, X_test = X_test, best_params=best_params_fg, params_sweep=EXAMPLE_model_params_sweep, pred_steps_list=pred_steps_list, pred_output_and_tickers_combos_list=pred_output_and_tickers_combos_list)
-    print("d")
-    fig, df_realigned               = visualiser_up_down_confidence_tester(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, outputs_folder_path = ".//outputs//", figure_name = "test_output", make_relative=True)
-    results_X_day_plus_minus_accuracy= return_df_X_day_plus_minus_accuracy(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2", pred_col_name_str=pred_col_name_str)
+    """Import and Prep Financial Data"""
+    df_financial_data                   = import_financial_data(target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], index_cols_list = index_cols_list, input_cols_to_include_list=input_cols_to_include_list)    
+    df_financial_data                   = populate_technical_indicators_2(df_financial_data, technicial_indicators_to_add_list)
+    """Import and Prep Sentiment Data"""
+    """Prep Data"""
+    X_train, y_train, X_test, y_test, nan_values_replaced   = create_step_responces_and_split_training_test_set(df_financial_data = df_financial_data, pred_output_and_tickers_combos_list = pred_output_and_tickers_combos_list,pred_steps_list=pred_steps_list,train_test_split=train_test_split)
+    """Define and Calibrate Model"""
+    btscv                               = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
+    complete_record                     = return_CV_analysis_scores(X_train, y_train, CV_Reps=CV_Reps, cv=btscv, cores_used=4, params_sweep=params_sweep, pred_steps_list=pred_steps_list)
+    best_params_fg                      = return_best_model_paramemeters(complete_record=complete_record, params_sweep=EXAMPLE_model_params_sweep)
+    """Train Model"""
+    models_dict, preds                  = return_models_and_preds(X_train = X_train, y_train = y_train, X_test = X_test, best_params=best_params_fg, pred_output_and_tickers_combos_list=pred_output_and_tickers_combos_list)
+    """Report Results"""
+    df_realigned_dict                   = return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
+    fig                                 = visualiser_plus_minus_results(df_realigned_dict ,preds, pred_steps_list, range_to_show=range(0,20,2), output_name="Test", outputs_folder_path = ".//outputs//", figure_name = "test_output")
+    results_X_day_plus_minus_accuracy   = return_df_X_day_plus_minus_accuracy(df_realigned_dict, X_test, pred_steps_list, pred_output_and_tickers_combos_list, output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2", pred_col_name_str=pred_col_name_str)
 #save_list = ["complete_record", "EXAMPLE_model_params_sweep", "X_train", "y_train", "X_test", "y_test", "pred_steps_list", "pred_output_and_tickers_combos_list", "preds", "STEPS", "output_str", "btscv"]
 #def fg_pickle_save(save_list=save_list, save_location="C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\pickle"):
 
@@ -711,22 +675,6 @@ run_design_of_experiments()
 print("d")
 
 
-
-
-"""
-df                               = import_data(target_file_folder_path, target_file_name, index_col=date_col_str)
-X_train, y_train, X_test, y_test = create_step_responces_and_split_training_test_set(output_col_name=output_str, df=df, feature_qty=feature_qty, train_test_split=train_test_split)
-btscv                            = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
-#warnings.filterwarnings("ignore", category=ConvergenceWarning)
-warnings.filterwarnings("ignore")
-scores, best_params, finder      = return_best_scores_from_CV_analysis(CV_Reps=CV_Reps, cv=btscv)
-#FG_Question: what is a finder object?
-#Final Training
-preds                            = pd.DataFrame(finder.predict(X_test), columns=df.iloc[:, Features:].columns)
-#Results Analysis
-fig, df_realigned                = visualiser_up_down_confidence_tester(preds, X_test, STEPS, output_str, outputs_folder_path = ".//outputs//", figure_name = "test_output", make_relative=True)
-results_X_day_plus_minus_accuracy= return_df_X_day_plus_minus_accuracy(preds, X_test, STEPS, output_str, output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2", pred_col_name_str=pred_col_name_str)
-"""
 
 
 # %%
