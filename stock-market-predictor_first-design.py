@@ -31,7 +31,8 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.neural_network import MLPRegressor
 import seaborn as sns
 import copy
-import datetime
+from datetime import datetime
+
 import os
 import warnings
 import sys
@@ -57,6 +58,7 @@ def return_conbinations_or_lists(list_a, list_b):
 NN_hidden_layer_sizes_strat = [(100,), (200,), (100,10), (200,20)]
 NN_activation_strat         = ['relu', 'logistic']
 model_types_and_params_dict = {
+    "name" : "Test_DoE",
     "overall strat" : {
         "param search full" : True,
         "predict on only best params post CV analysis" : True
@@ -101,6 +103,8 @@ bscv                        = np.nan
 EXAMPLE_model_params_sweep  = np.nan
 params_grid                 = np.nan
 input_grid                  = np.nan
+PLACEHOLDER_best_params_fg  = np.nan
+pred_col_name_str           = np.nan
 
 #%% Misc Methods and Classes
 
@@ -149,7 +153,7 @@ class BlockingTimeSeriesSplit():
 
 #%% Experiment Handlers Methods
 
-def define_DoE(DoE_name, model_types_and_params_dict, fin_data_input, fin_indi, pred_output_and_tickers_combos_list, pred_steps_list=pred_steps_list, train_test_split=train_test_split):
+def define_DoE(model_types_and_params_dict, fin_data_input, fin_indi, pred_output_and_tickers_combos_list, pred_steps_list=pred_steps_list, train_test_split=train_test_split):
     df_financial_data = import_financial_data(
         target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], 
         index_cols_list = index_cols_list, 
@@ -168,29 +172,43 @@ def define_DoE(DoE_name, model_types_and_params_dict, fin_data_input, fin_indi, 
     return model_types_and_params_dict, prepped_fin_input
 """XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"""
 def run_DoE_return_models_and_result(DoE_orders_dict, prepped_fin_input,
-                                     pred_output_and_tickers_combos_list, pred_steps_list=pred_steps_list):
+                                     pred_output_and_tickers_combos_list, pred_steps_list=pred_steps_list, parent_output_dir=".\\outputs\\"):
     print("Hello")
     X_train, y_train, X_test, y_test = prepped_fin_input
     results_dict = dict()
     models_dict = dict()
     models_list = list(DoE_orders_dict)
     models_list.remove("overall strat")
+    models_list.remove("name")
     
     
+    #create 
+    now = datetime.now()
+    model_start_time = now.strftime("%Y_%m_%d_%H_%M_%S")
+    output_parent_path = r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs"
+    outputs_path = os.path.join(output_parent_path, model_start_time + "_" + DoE_orders_dict["name"])# + "\\")
+    os.mkdir(outputs_path) 
     
     for key in models_list:
         params_sweep=DoE_orders_dict[key]
+        
         #define time blocking
         btscv                               = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
         complete_record                     = return_CV_analysis_scores(X_train, y_train, CV_Reps=CV_Reps, model_str=key, cv=btscv, cores_used=4, params_grid=params_sweep, pred_steps_list=pred_steps_list)
         best_params_fg                      = return_best_model_paramemeters(complete_record=complete_record, params_sweep=params_sweep)
-        print("Hello")
+        
         #"""Train Model"""
-        #models_dict, preds                  = return_models_and_preds(X_train = X_train, y_train = y_train, X_test = X_test, best_params=best_params_fg, pred_output_and_tickers_combos_list=pred_output_and_tickers_combos_list)
-        #"""Report Results"""
-        #df_realigned_dict                   = return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
-        #fig                                 = visualiser_plus_minus_results(df_realigned_dict ,preds, pred_steps_list, range_to_show=range(0,20,2), output_name="Test", outputs_folder_path = ".//outputs//", figure_name = "test_output")
-        #results_X_day_plus_minus_accuracy   = return_df_X_day_plus_minus_accuracy(df_realigned_dict, X_test, pred_steps_list, pred_output_and_tickers_
+        models_dict, preds                  = return_models_and_preds(X_train = X_train, y_train = y_train, X_test = X_test, model_str=key, best_params=best_params_fg, pred_output_and_tickers_combos_list=pred_output_and_tickers_combos_list)        
+        
+        #"""Calc Results"""
+        df_realigned_dict                   = return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
+        results_tables_dict                 = return_results_X_day_plus_minus_accuracy(df_realigned_dict, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting_PC=[0, 0.01], output_name="Test2", outputs_folder_path = outputs_path, figure_name = "test_output2", pred_col_name_str=pred_col_name_str)
+        #results_x_day_plus_minus_PC, results_x_day_plus_minus_PC_confindence, results_x_day_plus_minus_score_confidence, results_x_day_plus_minus_score_confidence_weighted,         
+        
+        fig                                 = return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_list, results_tables_dict, DoE_name = DoE_orders_dict["name"], model_type=key, model_start_time = model_start_time, outputs_folder_path = outputs_path, timestamp = False)
+        
+        
+        print("Hello")
     
 
 
@@ -282,7 +300,7 @@ def create_step_responces_and_split_training_test_set(
 #%% Model Training - Programmatically Define Model
 def check_dict_keys_for_build_model(keys, dict, type_str):
     for key in keys:
-        if not key in list(dict.keys()):
+        if not key in list(dict) and not key.replace("estimator__","") in list(dict):
             raise ValueError("Key: " + key + " missing from model_types_and_params_dict[" + type_str  + "], dict must have the folliwing keys: " + str(keys))
     
 def build_model(type_str, input_dict=None):
@@ -394,7 +412,7 @@ def return_CV_analysis_scores(X_train, y_train, CV_Reps=CV_Reps, cv=bscv, cores_
             last_score = round(finder.best_score_,4)
             scores.append(best_score)
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-        print(datetime.datetime.now().strftime("%H:%M:%S"))
+        print(datetime.now().strftime("%H:%M:%S"))
         print("CV Analysis completed for pred step " + str(pred_step))
         print(str(pred_steps_list))
         print(model_str)
@@ -439,13 +457,321 @@ def return_default_values_of_param_dict(page):
     return output
 
 
+#%% Model Training - Model Training and tickers
+
+def return_models_and_preds(X_train, y_train, X_test, model_str="ElasticNet", best_params=PLACEHOLDER_best_params_fg, pred_output_and_tickers_combos_list=pred_output_and_tickers_combos_list):
+    preds = pd.DataFrame()
+    output_col_str = "{}_{}_{}"
+    preds_dict = dict()
+    models_dict= dict()
+    preds_steps_dict = dict()
+    steps_list = list(best_params.keys())
+    steps_list.remove("params order")
+    remove_from_param_str  = "estimator__"
+    params_long_names_list = list(best_params["params order"])
+    
+    
+        #models_dict[(ticker, output)]
+        #preds_steps_dict[(ticker, output)]
+    for step in steps_list:
+        input_dict = dict()
+        preds_steps_dict[step] = dict()
+        #create best model param values
+        for param_name, i in zip(params_long_names_list, range(len(params_long_names_list))):
+            param_short_name_str = param_name.replace(remove_from_param_str, "")
+            input_dict[param_short_name_str] = best_params[step][i]
+        #prep columns
+        column_str_list = []
+        for ticker, value in pred_output_and_tickers_combos_list:
+            column_str_list = column_str_list + [output_col_str.format(ticker, value ,step)]
+            y_temp = y_train[column_str_list]
+        input_params = dict()
+        for key, i2 in zip(best_params["params order"], range(len(best_params["params order"]))):
+            input_params[key] = best_params[step][i2]
+        
+        model_temp        = build_model(model_str, input_params)
+        model_temp        = model_temp.fit(X_train, y_temp)
+        models_dict[step] = model_temp
+        preds_temp = model_temp.predict(X_test)
+        preds = pd.concat([preds, pd.DataFrame(preds_temp, index=X_test.index, columns=y_temp.columns)], axis=1)
+            
+        
+    
+    return models_dict, preds
+
+#%% Model Testing and Reproting
+
+def return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_list, results_tables_dict, DoE_name = "", model_type="", model_start_time = "", outputs_folder_path = ".//outputs//tables//", timestamp = False):
+    
+    
+    
+    #prep time index
+    
+    
+    outputs_folder_path = outputs_folder_path + "\\"
+    
+    single_levelled_tables = ["results_x_day_plus_minus_PC"]
+    double_levelled_tables = ["results_x_day_plus_minus_PC_confindence", "results_x_day_plus_minus_score_confidence", "results_x_day_plus_minus_score_confidence_weighted"]
+
+    table_figs_dict = dict()
+    
+    for table_name in single_levelled_tables:
+        target_dict = results_tables_dict[table_name]
+        table = pd.DataFrame.from_dict(target_dict, orient="columns")
+        fig = sns.heatmap(table, cmap="vlag_r")
+        figure = fig.get_figure()
+        figure.savefig(outputs_folder_path+model_type+"_"+table_name+".png")
+        
+        #sns.heatmap(table, cmap="vlag_r", annot=True, center=0.00, ax=axes[num], xticklabels=diagram_labels_X, yticklabels=df_re.index.astype(str))
+    
+    #prep info for double layered lists
+    tickers_list    = list(results_tables_dict  [double_levelled_tables[0]].keys())
+    steps_list      = list(results_tables_dict  [double_levelled_tables[0]][tickers_list[0]].keys())
+    confidences_list = list(results_tables_dict [double_levelled_tables[0]][tickers_list[0]][steps_list[0]].keys())
+    tickers_confidences_combos = []
+    for con in confidences_list:
+        for tic in tickers_list:
+            tickers_confidences_combos = tickers_confidences_combos + [str(tic) + "_" + str(con)]
+        
+    #print double layered list
+    for table_name in double_levelled_tables:
+        del figure
+        new_dict = dict()
+        target_dict = results_tables_dict[table_name]
+        new_table = pd.DataFrame(columns=tickers_confidences_combos)
+        for step in steps_list:
+            new_dict[step] = dict()
+            for con in confidences_list:
+                for tic in tickers_list:
+                    new_dict[step][(tic, con)] = target_dict[tic][step][con]
+                    #new_table.iloc[str(tic) + "_" + str(con), step] = target_dict[tic][step][con]
+                    new_table.loc[step, str(tic) + "_" + str(con)] = target_dict[tic][step][con]
+                    
+        
+                    
+        new_table = pd.DataFrame.from_dict(new_dict, orient="columns")      
+        fig = sns.heatmap(new_table, cmap="vlag_r", xticklabels=list(new_table.columns), yticklabels=list(new_table.index))
+        figure = fig.get_figure()
+        figure.savefig(outputs_folder_path+model_type+"_"+table_name+".png")
+        
+    
+    figure.show()
+    
+    results_x_day_plus_minus_PC                         = results_tables_dict["results_x_day_plus_minus_PC"]
+    results_x_day_plus_minus_PC_confindence             = results_tables_dict["results_x_day_plus_minus_PC_confindence"]
+    results_x_day_plus_minus_score_confidence           = results_tables_dict["results_x_day_plus_minus_score_confidence"]
+    results_x_day_plus_minus_score_confidence_weighted  = results_tables_dict["results_x_day_plus_minus_score_confidence_weighted"]
+    print("Hello")
+    #for table in results_tables_dict:
+        
+        
+    
+    
+    
+    
+    #plot_qty = len(df_realigned_dict)
+    #Position = range(1,plot_qty+1)
+
+    num=0
+    #fig, ax3 = plt.subplots(nrows=1, ncols=1, figsize=(9,5))
+    #fig, axes = plt.subplots(1,plot_qty)
+    fig, axes = plt.subplots(1,2)
+    
+    
+    
+
+
+
+
+
+    for df_re_key in df_realigned_dict:
+        
+        df_re = df_realigned_dict[df_re_key].loc[index_list]
+        if remove_actual_value == True:
+            diagram_labels_X = []
+            df_re = df_re.drop(df_re.columns[0], axis=1)
+        else:
+            diagram_labels_X = ["Actual"]
+            
+        for step in pred_steps_list:
+            diagram_labels_X = diagram_labels_X + [str(step)]
+        
+        #sns.heatmap(df_realigned, cmap="vlag_r", annot=True, center=0.00, ax=ax3, xticklabels=diagram_labels_X, yticklabels=df_realigned.index.astype(str))#, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
+        #ax = fig.add_subplot(plot_qty+1,1,Position[num])
+        sns.heatmap(df_re, cmap="vlag_r", annot=True, center=0.00, ax=axes[num], xticklabels=diagram_labels_X, yticklabels=df_re.index.astype(str))#, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
+        num += 1
+        #sns.heatmap(uniform_data, ax=axes[num])
+        
+        #fig.suptitle("Realigned Fig_FG_Action: Change")
+        #fig.savefig(outputs_folder_path + output_name + ".png")
+        
+        
+        #plt.subplot(plot_qty, 1, num)
+        #plt.matshow(sns.heatmap(df_re))#, cmap="vlag_r", annot=True, center=0.00, xticklabels=diagram_labels_X, yticklabels=df_re.index.astype(str)))#, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
+
+        
+        #fig.suptitle("Realigned Fig_FG_Action: Change")
+        #fig.savefig(outputs_folder_path + output_name + ".png")
+        #df_re.to_csv(path_or_buf=outputs_folder_path + output_name + df_re + ".csv")
+    plt.show()
+    
+    return plt, df_realigned_dict
+
+
+def return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True):
+    input_col_str = "{}_{}"
+    output_col_str = "{}_{}_{}"
+    reaglined_plus_minus_dict = dict()
+    for ticker, output in pred_output_and_tickers_combos_list:
+        #initial output
+        input_col_str_curr = input_col_str.format(ticker, output)
+        df_temp = pd.DataFrame(X_test[input_col_str_curr])
+        #pop the preditions
+        output_col_str_2 = output_col_str.format(ticker, output, {})
+    
+        for step_backs in pred_steps_list:
+            df_temp[output_col_str_2.format(step_backs)+"_before"] = preds[output_col_str_2.format(step_backs)].shift(step_backs)
+            if make_relative == True:
+                df_temp[output_col_str_2.format(step_backs)+"_before"] -= df_temp[input_col_str_curr]
+        
+        reaglined_plus_minus_dict[(ticker, output)] = df_temp
+        df_temp.to_csv("C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\" +"temp" + ".csv")
+        preds.to_csv("C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\" +"preds" + ".csv")
+    
+    return reaglined_plus_minus_dict
+
+
+
+def return_results_X_day_plus_minus_accuracy(df_temp_dict, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting_PC=[0, 0.01], save=True, output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2", pred_col_name_str=pred_col_name_str):
+    
+    
+    #df_realigned_temp = copy.deepcopy(df_realigned)
+    pred_str = "{}_{}_{}_before"
+    record_str = "{}_{}"
+    
+    results_x_day_plus_minus_PC                         = dict() 
+    results_x_day_plus_minus_PC_confindence             = dict()
+    results_x_day_plus_minus_score_confidence           = dict() 
+    results_x_day_plus_minus_score_confidence_weighted  = dict() 
+    
+    count_bets_with_confidence               = dict()
+    count_correct_bets_with_confidence       = dict()
+    count_correct_bets_with_confidence_score = dict()
+    count_correct_bets_with_confidence_score_weight = dict()
+    count_correct_bets_with_confidence_score_weight_total = dict()
+    
+    for ticker in list(df_temp_dict.keys()):
+        
+        df_temp = df_temp_dict[ticker]
+        results_x_day_plus_minus_PC                       [ticker]  = dict()
+        results_x_day_plus_minus_PC_confindence           [ticker]  = dict()
+        results_x_day_plus_minus_score_confidence         [ticker]  = dict()
+        results_x_day_plus_minus_score_confidence_weighted[ticker]  = dict()
+        
+        count_bets_with_confidence[ticker]               = dict()
+        count_correct_bets_with_confidence[ticker]       = dict()
+        count_correct_bets_with_confidence_score[ticker] = dict()
+        count_correct_bets_with_confidence_score_weight[ticker] = dict()
+        count_correct_bets_with_confidence_score_weight_total[ticker] = dict()
+        
+        time_series_index = X_test.index
+        
+        for steps_back in pred_steps_list:
+            #initialise variables
+            
+            col_name = df_temp.columns[pred_steps_list.index(steps_back)]
+            count           = 0
+            count_correct   = 0
+            count_bets_with_confidence              [ticker][steps_back] = dict()
+            count_correct_bets_with_confidence      [ticker][steps_back] = dict()
+            count_correct_bets_with_confidence_score[ticker][steps_back] = dict()
+            count_correct_bets_with_confidence_score_weight[ticker][steps_back] = dict()
+            count_correct_bets_with_confidence_score_weight_total[ticker][steps_back] = dict()
+            
+            results_x_day_plus_minus_PC                     [ticker][steps_back] = dict()
+            results_x_day_plus_minus_PC_confindence         [ticker][steps_back] = dict()
+            results_x_day_plus_minus_score_confidence       [ticker][steps_back] = dict()
+            results_x_day_plus_minus_score_confidence_weighted[ticker][steps_back] = dict()
+            
+            
+            for confidence_threshold in confidences_before_betting_PC:
+                count_bets_with_confidence              [ticker][steps_back][confidence_threshold] = 0
+                count_correct_bets_with_confidence      [ticker][steps_back][confidence_threshold] = 0
+                count_correct_bets_with_confidence_score[ticker][steps_back][confidence_threshold] = 0
+                count_correct_bets_with_confidence_score_weight[ticker][steps_back][confidence_threshold] = 0
+                count_correct_bets_with_confidence_score_weight_total[ticker][steps_back][confidence_threshold] = 0
+
+            actual_values = X_test[record_str.format(ticker[0], ticker[1])]
+            
+            max_pred_steps = max(pred_steps_list)
+            for row_num in range(max(pred_steps_list), len(X_test.index)):
+                
+                count += 1
+
+                
+                #basic values
+                prediction_vector   = df_temp[pred_str.format(ticker[0], ticker[1], steps_back)]
+                original_vaule      = actual_values[row_num - steps_back]
+                expected_difference = prediction_vector[row_num]
+                actual_difference   = actual_values[row_num] - actual_values[row_num - steps_back]
+                relative_confidence = expected_difference / original_vaule
+                
+                #basic count scoring 
+                if actual_difference * expected_difference > 0:
+                    count_correct += 1
+                
+                #bets with confidence scoring
+                for confidence_threshold in confidences_before_betting_PC:
+                    if   abs(relative_confidence) > confidence_threshold and actual_difference * expected_difference > 0:
+                        count_bets_with_confidence              [ticker][steps_back][confidence_threshold] += 1
+                        count_correct_bets_with_confidence      [ticker][steps_back][confidence_threshold] += 1
+                        count_correct_bets_with_confidence_score[ticker][steps_back][confidence_threshold] += abs(actual_difference)
+                        count_correct_bets_with_confidence_score_weight[ticker][steps_back][confidence_threshold] += abs(actual_difference) * (abs(relative_confidence) - confidence_threshold)
+                        count_correct_bets_with_confidence_score_weight_total[ticker][steps_back][confidence_threshold] += (abs(relative_confidence) - confidence_threshold)
+                        
+                    elif abs(relative_confidence) > confidence_threshold and actual_difference * expected_difference < 0:
+                        count_bets_with_confidence              [ticker][steps_back][confidence_threshold] += 1
+                        count_correct_bets_with_confidence      [ticker][steps_back][confidence_threshold] += 0
+                        count_correct_bets_with_confidence_score[ticker][steps_back][confidence_threshold] -= abs(actual_difference)
+                        count_correct_bets_with_confidence_score_weight[ticker][steps_back][confidence_threshold] -= abs(actual_difference) * (abs(relative_confidence) - confidence_threshold)
+                        count_correct_bets_with_confidence_score_weight_total[ticker][steps_back][confidence_threshold] += (abs(relative_confidence) - confidence_threshold)
+                        
+
+            results_x_day_plus_minus_PC
+            results_x_day_plus_minus_PC_confindence
+            results_x_day_plus_minus_score_confidence
+            results_x_day_plus_minus_score_confidence_weighted
+
+            #Total scores for ticker steps_back conbination
+            results_x_day_plus_minus_PC[ticker][steps_back] = count_correct / count
+            for confidence_threshold in confidences_before_betting_PC:
+                results_x_day_plus_minus_PC_confindence           [ticker][steps_back][confidence_threshold] = count_correct_bets_with_confidence             [ticker][steps_back][confidence_threshold] / count_bets_with_confidence[ticker][steps_back][confidence_threshold]
+                results_x_day_plus_minus_score_confidence         [ticker][steps_back][confidence_threshold] = count_correct_bets_with_confidence_score       [ticker][steps_back][confidence_threshold] / count_bets_with_confidence[ticker][steps_back][confidence_threshold]
+                results_x_day_plus_minus_score_confidence_weighted[ticker][steps_back][confidence_threshold] = count_correct_bets_with_confidence_score_weight[ticker][steps_back][confidence_threshold] / count_correct_bets_with_confidence_score_weight_total[ticker][steps_back][confidence_threshold]
+        
+    if save == True:
+        df_temp.to_csv(path_or_buf=outputs_folder_path + output_name + ".csv")
+    
+    results_dict = dict()
+    results_dict["results_x_day_plus_minus_PC"]                         = results_x_day_plus_minus_PC
+    results_dict["results_x_day_plus_minus_PC_confindence"]             = results_x_day_plus_minus_PC_confindence
+    results_dict["results_x_day_plus_minus_score_confidence"]           = results_x_day_plus_minus_score_confidence 
+    results_dict["results_x_day_plus_minus_score_confidence_weighted"]  = results_x_day_plus_minus_score_confidence_weighted
+    
+    return results_dict
+
+
+        
+
+
+
 
 
 
 #%% Main Line Script
 
 
-DoE_orders_dict, prepped_fin_input  = define_DoE("initial test DoE", model_types_and_params_dict, target_folder_path_list, fin_indi, pred_output_and_tickers_combos_list, pred_steps_list=pred_steps_list, train_test_split=train_test_split)
+DoE_orders_dict, prepped_fin_input  = define_DoE(model_types_and_params_dict, target_folder_path_list, fin_indi, pred_output_and_tickers_combos_list, pred_steps_list=pred_steps_list, train_test_split=train_test_split)
 results_dict, models_dict           = run_DoE_return_models_and_result(DoE_orders_dict, 
                                                                        prepped_fin_input, 
                                                                        pred_output_and_tickers_combos_list, 
