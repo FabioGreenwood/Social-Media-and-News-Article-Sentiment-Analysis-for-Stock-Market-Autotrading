@@ -29,6 +29,10 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import GridSearchCV
 from sklearn.neural_network import MLPRegressor
+from sklearn.svm import SVC
+from sklearn.ensemble import BaggingClassifier
+from sklearn.ensemble import BaggingRegressor
+from sklearn.datasets import make_classification
 import seaborn as sns
 import copy
 from datetime import datetime
@@ -51,6 +55,13 @@ def return_conbinations_or_lists(list_a, list_b):
         unique_combinations.append(list(zipped))
     return unique_combinations
 
+def return_conbinations_or_lists_fg(list_a,list_b):
+    combined_lists = []
+    for a in list_a:
+        for b in list_b:
+            combined_lists = combined_lists + [[a, b]]
+                
+    return combined_lists
 
 #DoE params
 
@@ -65,9 +76,12 @@ model_types_and_params_dict = {
     },
     "ElasticNet" : { #Linear regression with combined L1 and L2 priors as regularizer.
         'estimator__alpha':[0.1, 0.5, 0.9], 
-        'estimator__l1_ratio':[0.1, 0.5, 0.9]
+        'estimator__l1_ratio':[0.1, 0.5, 0.9], 
+        'n_estimators' : [10, 20],
+        'max_samples' : [1.0],
+        'max_features' : [0.5]
     },
-    "MLPRegressor" : { #Multi-layer Perceptron regressor
+        "MLPRegressor" : { #Multi-layer Perceptron regressor
         "estimator__hidden_layer_sizes"    : NN_hidden_layer_sizes_strat, 
         "estimator__activation"            : NN_activation_strat}
 }
@@ -188,12 +202,13 @@ def run_DoE_return_models_and_result(DoE_orders_dict, prepped_fin_input,
     model_start_time = now.strftime("%Y%m%d_%H%M")
     output_parent_path = r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs"
     outputs_path = os.path.join(output_parent_path, model_start_time + "_" + DoE_orders_dict["name"])# + "\\")
-    os.mkdir(outputs_path) 
+    if not os.path.isdir(outputs_path):
+        os.mkdir(outputs_path) 
     #create subfolders
-    for model_type in models_list:
-        subfolder_path = os.path.join(outputs_path, model_type)
-        os.mkdir(subfolder_path)
-    
+        for model_type in models_list:
+            subfolder_path = os.path.join(outputs_path, model_type)
+            os.mkdir(subfolder_path)
+        
     for key in models_list:
         params_sweep=DoE_orders_dict[key]
         
@@ -314,25 +329,31 @@ def build_model(type_str, input_dict=None):
         case "ElasticNet":
             
             keys = ["estimator__alpha", "estimator__l1_ratio"]
-            check_dict_keys_for_build_model(keys, input_dict, type_str)
-            estimator = ElasticNet(
-                alpha   =input_dict["estimator__alpha"],
-                l1_ratio=input_dict["estimator__l1_ratio"],
-                fit_intercept=True,
-                #normalize=False,
-                precompute=False,
-                max_iter=16,
-                copy_X=True,
-                tol=0.1,
-                warm_start=False,
-                positive=False,
-                random_state=None,
-                selection='random'
+            #check_dict_keys_for_build_model(keys, input_dict, type_str)
+            estimator = BaggingRegressor(
+                ElasticNet(
+                    alpha   =input_dict["estimator__alpha"],
+                    l1_ratio=input_dict["estimator__l1_ratio"],
+                    fit_intercept=True,
+                    #normalize=False,
+                    precompute=False,
+                    max_iter=16,
+                    copy_X=True,
+                    tol=0.1,
+                    warm_start=False,
+                    positive=False,
+                    random_state=None,
+                    selection='random'
+                ), 
+                n_estimators = input_dict["n_estimators"],
+                max_samples = input_dict["max_samples"], 
+                max_features = input_dict["max_features"], 
+                random_state=0
             )
         case "MLPRegressor":
             
             keys = ["estimator__hidden_layer_sizes", "estimator__activation"]
-            check_dict_keys_for_build_model(keys, input_dict, type_str)
+            #check_dict_keys_for_build_model(keys, input_dict, type_str)
             estimator = MLPRegressor(
                 activation=input_dict["estimator__activation"],
                 hidden_layer_sizes=input_dict["estimator__hidden_layer_sizes"],
@@ -344,7 +365,49 @@ def build_model(type_str, input_dict=None):
             raise ValueError("the model type: " + type_str + " was not found in the method")
     
     return MultiOutputRegressor(estimator, n_jobs=4)
- 
+
+def build_model2(type_str, input_dict=None):
+    
+    match type_str:
+        case "ElasticNet":
+            
+            keys = ["estimator__alpha", "estimator__l1_ratio"]
+            #check_dict_keys_for_build_model(keys, input_dict, type_str)
+            estimator = BaggingRegressor(
+                MultiOutputRegressor(
+                ElasticNet(
+                    alpha   =input_dict["estimator__alpha"],
+                    l1_ratio=input_dict["estimator__l1_ratio"],
+                    fit_intercept=True,
+                    #normalize=False,
+                    precompute=False,
+                    max_iter=16,
+                    copy_X=True,
+                    tol=0.1,
+                    warm_start=False,
+                    positive=False,
+                    random_state=None,
+                    selection='random'
+                )), n_estimators=10, random_state=0, max_features=0.5
+            )
+        case "MLPRegressor":
+            
+            keys = ["estimator__hidden_layer_sizes", "estimator__activation"]
+            #check_dict_keys_for_build_model(keys, input_dict, type_str)
+            estimator = MLPRegressor(
+                MultiOutputRegressor(
+                activation=input_dict["estimator__activation"],
+                hidden_layer_sizes=input_dict["estimator__hidden_layer_sizes"],
+                alpha=0.001,
+                random_state=20,
+                early_stopping=False)
+            )
+        case _:
+            raise ValueError("the model type: " + type_str + " was not found in the method")
+    
+    return estimator
+
+
 
 
 #%% Model Training - CV Analysis
@@ -364,58 +427,33 @@ def return_CV_analysis_scores(X_train, y_train, CV_Reps=CV_Reps, cv=bscv, cores_
     complete_record["params order"] = []
     for pred_step in pred_steps_list:
         complete_record[pred_step] = dict()
-        
+    params_keys = list(params_grid.keys())
+    complete_record["params order"] = params_keys
+    params_sweep = params_grid[params_keys[0]]
+    for i in range(1, len(params_keys)):
+        params_sweep = return_conbinations_or_lists_fg(params_sweep, params_grid[params_keys[i]])
     #main method
     #prep only outputs for a single number of time steps
-    for pred_step in pred_steps_list:
-        
-        
-        y_temp = return_df_filtered_for_timestep(y_train, pred_step)
-        
-        #run study for that number of time steps
-        for i in range(CV_Reps):
-            input = return_default_values_of_param_dict(params_grid)
-            with warnings.catch_warnings():
-                
-                
-                model = build_model(model_str, input)
-        
-                finder = GridSearchCV(
-                    estimator=model,
-                    param_grid=params_grid,
-                    scoring='r2',
-                    n_jobs=4,
-                    #iid=False,
-                    refit=True,
-                    cv=cv,  # change this to the splitter subject to test
-                    verbose=0,
-                    pre_dispatch=8,
-                    error_score=-999,
-                    return_train_score=True
-                    )
-                
-                finder.fit(X_train, y_temp)
-            #warnings.filterwarnings("default", category=ConvergenceWarning)
-            #manually store stats
-            complete_record["params order"] = list(finder.cv_results_["params"][0].keys())
-            for para, score in zip(finder.cv_results_["params"],finder.cv_results_["mean_test_score"]):
-                a, b = para.values()
-                if not (a, b) in complete_record[pred_step].keys():
-                    complete_record[pred_step][(a, b)] = []
-                complete_record[pred_step][(a, b)] = complete_record[pred_step][(a, b)] + [score]
-            
-            #complete_record[pred_step]["scores"] =  complete_record[pred_step]["scores"] + list(finder.cv_results_["mean_score_time"])
-            #for para_name in  params_sweep.keys():
-            #    complete_record[pred_step][para_name] = complete_record[pred_step][para_name] + list(finder.cv_results_["param_" + para_name])
     
-            #preint progress
+    for pred_step in pred_steps_list:
+        y_temp = return_df_filtered_for_timestep(y_train, pred_step)
+        #run study for that number of time steps
+        for params in params_sweep:
+            #input = return_default_values_of_param_dict(params_grid)
             
+            with warnings.catch_warnings():    
+                input_dict = dict()
+                for key, i in zip(params_keys, range(len(params_keys))):
+                    input_dict[key] = params[i]
+                model = build_model2(model_str, input_dict)
+                model.fit(X_train, y_temp)
+                score = model.score(X_train, y_temp)
             
-            best_params = finder.best_params_
-            params_ = params_ + [best_params]
-            best_score = round(finder.best_score_,4)
-            last_score = round(finder.best_score_,4)
-            scores.append(best_score)
+            #manually store stats
+            if not tuple(params) in complete_record[pred_step].keys():
+                complete_record[pred_step][tuple(params)] = []
+            complete_record[pred_step][tuple(params)] = complete_record[pred_step][tuple(params)] + [score]
+            
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         print(datetime.now().strftime("%H:%M:%S"))
         print("CV Analysis completed for pred step " + str(pred_step))
@@ -559,18 +597,13 @@ def return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_li
         else:
             fig = sns.heatmap(tt, cmap="vlag_r", annot=True, vmin=-4, vmax=4)
         fig.set_title(table_name)
-        #fig.xlabel("Steps Ahead")
-        #fig.ylabel("Ticker")
         figure = fig.get_figure()
-        
-        
         figure.tight_layout()
         figure.savefig(outputs_folder_path+model_type+"_"+table_name+".png")
         new_table.to_csv(outputs_folder_path+model_type+"_"+table_name+".csv")
         fig_i += 1
         del fig, figure, new_table, target_dict, new_dict
         
-    
     results_x_day_plus_minus_PC                         = results_tables_dict["results_x_day_plus_minus_PC"]
     results_x_day_plus_minus_PC_confindence             = results_tables_dict["results_x_day_plus_minus_PC_confindence"]
     results_x_day_plus_minus_score_confidence           = results_tables_dict["results_x_day_plus_minus_score_confidence"]
@@ -728,4 +761,6 @@ results_dict, models_dict           = run_DoE_return_models_and_result(DoE_order
                                                                        prepped_fin_input, 
                                                                        pred_output_and_tickers_combos_list, 
                                                                        pred_steps_list=pred_steps_list)
+
+
 
