@@ -182,12 +182,17 @@ def run_DoE_return_models_and_result(DoE_orders_dict, prepped_fin_input,
     models_list.remove("name")
     
     
-    #create 
+    #create folders for outputs
     now = datetime.now()
-    model_start_time = now.strftime("%Y_%m_%d_%H_%M_%S")
+    #model_start_time = now.strftime("%Y_%m_%d_%H_%M_%S")
+    model_start_time = now.strftime("%Y%m%d_%H%M")
     output_parent_path = r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs"
     outputs_path = os.path.join(output_parent_path, model_start_time + "_" + DoE_orders_dict["name"])# + "\\")
     os.mkdir(outputs_path) 
+    #create subfolders
+    for model_type in models_list:
+        subfolder_path = os.path.join(outputs_path, model_type)
+        os.mkdir(subfolder_path)
     
     for key in models_list:
         params_sweep=DoE_orders_dict[key]
@@ -202,10 +207,10 @@ def run_DoE_return_models_and_result(DoE_orders_dict, prepped_fin_input,
         
         #"""Calc Results"""
         df_realigned_dict                   = return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
-        results_tables_dict                 = return_results_X_day_plus_minus_accuracy(df_realigned_dict, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting_PC=[0, 0.01], output_name="Test2", outputs_folder_path = outputs_path, figure_name = "test_output2", pred_col_name_str=pred_col_name_str)
+        results_tables_dict                 = return_results_X_day_plus_minus_accuracy( df_realigned_dict, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting_PC=[0, 0.01], model_type=key, model_start_time = model_start_time, output_name="Test2", outputs_folder_path = outputs_path, figure_name = "test_output2", pred_col_name_str=pred_col_name_str)
         #results_x_day_plus_minus_PC, results_x_day_plus_minus_PC_confindence, results_x_day_plus_minus_score_confidence, results_x_day_plus_minus_score_confidence_weighted,         
         
-        fig                                 = return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_list, results_tables_dict, DoE_name = DoE_orders_dict["name"], model_type=key, model_start_time = model_start_time, outputs_folder_path = outputs_path, timestamp = False)
+        plt, df_realigned_dict              = return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_list, results_tables_dict, DoE_name = DoE_orders_dict["name"], model_type=key, model_start_time = model_start_time, outputs_folder_path = outputs_path, timestamp = False)
         
         
         print("Hello")
@@ -356,6 +361,7 @@ def return_CV_analysis_scores(X_train, y_train, CV_Reps=CV_Reps, cv=bscv, cores_
     scores = []
     params_ = []
     complete_record = dict()
+    complete_record["params order"] = []
     for pred_step in pred_steps_list:
         complete_record[pred_step] = dict()
         
@@ -389,10 +395,9 @@ def return_CV_analysis_scores(X_train, y_train, CV_Reps=CV_Reps, cv=bscv, cores_
                     )
                 
                 finder.fit(X_train, y_temp)
-                
             #warnings.filterwarnings("default", category=ConvergenceWarning)
-            
             #manually store stats
+            complete_record["params order"] = list(finder.cv_results_["params"][0].keys())
             for para, score in zip(finder.cv_results_["params"],finder.cv_results_["mean_test_score"]):
                 a, b = para.values()
                 if not (a, b) in complete_record[pred_step].keys():
@@ -440,8 +445,9 @@ def return_best_model_paramemeters(complete_record, params_sweep):
         output = dict()
         average_scores_record   = copy.deepcopy(complete_record)
         steps_list              = list(complete_record.keys())
+        steps_list.remove("params order")
         variables_list          = list(params_sweep.keys())
-        output["params order"]  = list(params_sweep.keys())
+        output["params order"]  = complete_record["params order"]
         
         for steps in steps_list:
             for index in average_scores_record[steps]:
@@ -503,27 +509,24 @@ def return_models_and_preds(X_train, y_train, X_test, model_str="ElasticNet", be
 
 def return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_list, results_tables_dict, DoE_name = "", model_type="", model_start_time = "", outputs_folder_path = ".//outputs//tables//", timestamp = False):
     
-    
-    
-    #prep time index
-    
-    
-    outputs_folder_path = outputs_folder_path + "\\"
-    
+    outputs_folder_path = outputs_folder_path + "\\" + model_type + "\\"
     single_levelled_tables = ["results_x_day_plus_minus_PC"]
     double_levelled_tables = ["results_x_day_plus_minus_PC_confindence", "results_x_day_plus_minus_score_confidence", "results_x_day_plus_minus_score_confidence_weighted"]
-
-    table_figs_dict = dict()
+    fig_i = 0
     
     for table_name in single_levelled_tables:
+        fig = plt.figure(fig_i)
+        figure = plt.figure(fig_i)
         target_dict = results_tables_dict[table_name]
         table = pd.DataFrame.from_dict(target_dict, orient="columns")
-        fig = sns.heatmap(table, cmap="vlag_r")
-        figure = fig.get_figure()
+        fig = sns.heatmap(table, cmap="vlag_r", annot=True, vmin=0, vmax=1)
+        fig.set_title(table_name)
+        fig.get_figure()
+        figure.tight_layout()
         figure.savefig(outputs_folder_path+model_type+"_"+table_name+".png")
-        
-        #sns.heatmap(table, cmap="vlag_r", annot=True, center=0.00, ax=axes[num], xticklabels=diagram_labels_X, yticklabels=df_re.index.astype(str))
-    
+        table.to_csv(outputs_folder_path+model_type+"_"+table_name+".csv")
+        fig_i += 1
+           
     #prep info for double layered lists
     tickers_list    = list(results_tables_dict  [double_levelled_tables[0]].keys())
     steps_list      = list(results_tables_dict  [double_levelled_tables[0]][tickers_list[0]].keys())
@@ -532,10 +535,10 @@ def return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_li
     for con in confidences_list:
         for tic in tickers_list:
             tickers_confidences_combos = tickers_confidences_combos + [str(tic) + "_" + str(con)]
-        
+    
     #print double layered list
     for table_name in double_levelled_tables:
-        del figure
+        #del fig, figure, new_table, target_dict, new_dict
         new_dict = dict()
         target_dict = results_tables_dict[table_name]
         new_table = pd.DataFrame(columns=tickers_confidences_combos)
@@ -545,76 +548,34 @@ def return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_li
                 for tic in tickers_list:
                     new_dict[step][(tic, con)] = target_dict[tic][step][con]
                     #new_table.iloc[str(tic) + "_" + str(con), step] = target_dict[tic][step][con]
-                    new_table.loc[step, str(tic) + "_" + str(con)] = target_dict[tic][step][con]
+                    #new_table.loc[step, str(tic) + "_" + str(con)] = target_dict[tic][step][con]
+                    tt = pd.DataFrame.from_dict(new_dict, orient="columns")
                     
-        
-                    
-        new_table = pd.DataFrame.from_dict(new_dict, orient="columns")      
-        fig = sns.heatmap(new_table, cmap="vlag_r", xticklabels=list(new_table.columns), yticklabels=list(new_table.index))
+        fig = plt.figure(fig_i)
+        figure = plt.figure(fig_i)
+        new_table = pd.DataFrame.from_dict(new_dict, orient="columns")
+        if "PC" in table_name:
+            fig = sns.heatmap(tt, cmap="vlag_r", annot=True, vmin=0, vmax=1)
+        else:
+            fig = sns.heatmap(tt, cmap="vlag_r", annot=True, vmin=-4, vmax=4)
+        fig.set_title(table_name)
+        #fig.xlabel("Steps Ahead")
+        #fig.ylabel("Ticker")
         figure = fig.get_figure()
-        figure.savefig(outputs_folder_path+model_type+"_"+table_name+".png")
         
-    
-    figure.show()
+        
+        figure.tight_layout()
+        figure.savefig(outputs_folder_path+model_type+"_"+table_name+".png")
+        new_table.to_csv(outputs_folder_path+model_type+"_"+table_name+".csv")
+        fig_i += 1
+        del fig, figure, new_table, target_dict, new_dict
+        
     
     results_x_day_plus_minus_PC                         = results_tables_dict["results_x_day_plus_minus_PC"]
     results_x_day_plus_minus_PC_confindence             = results_tables_dict["results_x_day_plus_minus_PC_confindence"]
     results_x_day_plus_minus_score_confidence           = results_tables_dict["results_x_day_plus_minus_score_confidence"]
     results_x_day_plus_minus_score_confidence_weighted  = results_tables_dict["results_x_day_plus_minus_score_confidence_weighted"]
-    print("Hello")
-    #for table in results_tables_dict:
-        
-        
-    
-    
-    
-    
-    #plot_qty = len(df_realigned_dict)
-    #Position = range(1,plot_qty+1)
 
-    num=0
-    #fig, ax3 = plt.subplots(nrows=1, ncols=1, figsize=(9,5))
-    #fig, axes = plt.subplots(1,plot_qty)
-    fig, axes = plt.subplots(1,2)
-    
-    
-    
-
-
-
-
-
-    for df_re_key in df_realigned_dict:
-        
-        df_re = df_realigned_dict[df_re_key].loc[index_list]
-        if remove_actual_value == True:
-            diagram_labels_X = []
-            df_re = df_re.drop(df_re.columns[0], axis=1)
-        else:
-            diagram_labels_X = ["Actual"]
-            
-        for step in pred_steps_list:
-            diagram_labels_X = diagram_labels_X + [str(step)]
-        
-        #sns.heatmap(df_realigned, cmap="vlag_r", annot=True, center=0.00, ax=ax3, xticklabels=diagram_labels_X, yticklabels=df_realigned.index.astype(str))#, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
-        #ax = fig.add_subplot(plot_qty+1,1,Position[num])
-        sns.heatmap(df_re, cmap="vlag_r", annot=True, center=0.00, ax=axes[num], xticklabels=diagram_labels_X, yticklabels=df_re.index.astype(str))#, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
-        num += 1
-        #sns.heatmap(uniform_data, ax=axes[num])
-        
-        #fig.suptitle("Realigned Fig_FG_Action: Change")
-        #fig.savefig(outputs_folder_path + output_name + ".png")
-        
-        
-        #plt.subplot(plot_qty, 1, num)
-        #plt.matshow(sns.heatmap(df_re))#, cmap="vlag_r", annot=True, center=0.00, xticklabels=diagram_labels_X, yticklabels=df_re.index.astype(str)))#, xticklabels=df_section_3.columns, yticklabels=df_section_3.index[0:7])
-
-        
-        #fig.suptitle("Realigned Fig_FG_Action: Change")
-        #fig.savefig(outputs_folder_path + output_name + ".png")
-        #df_re.to_csv(path_or_buf=outputs_folder_path + output_name + df_re + ".csv")
-    plt.show()
-    
     return plt, df_realigned_dict
 
 
@@ -642,7 +603,7 @@ def return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_
 
 
 
-def return_results_X_day_plus_minus_accuracy(df_temp_dict, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting_PC=[0, 0.01], save=True, output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2", pred_col_name_str=pred_col_name_str):
+def return_results_X_day_plus_minus_accuracy(df_temp_dict, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting_PC=[0, 0.01], model_type="", save=True, model_start_time = "", output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2", pred_col_name_str=pred_col_name_str):
     
     
     #df_realigned_temp = copy.deepcopy(df_realigned)
@@ -749,27 +710,18 @@ def return_results_X_day_plus_minus_accuracy(df_temp_dict, X_test, pred_steps_li
                 results_x_day_plus_minus_score_confidence         [ticker][steps_back][confidence_threshold] = count_correct_bets_with_confidence_score       [ticker][steps_back][confidence_threshold] / count_bets_with_confidence[ticker][steps_back][confidence_threshold]
                 results_x_day_plus_minus_score_confidence_weighted[ticker][steps_back][confidence_threshold] = count_correct_bets_with_confidence_score_weight[ticker][steps_back][confidence_threshold] / count_correct_bets_with_confidence_score_weight_total[ticker][steps_back][confidence_threshold]
         
-    if save == True:
-        df_temp.to_csv(path_or_buf=outputs_folder_path + output_name + ".csv")
-    
     results_dict = dict()
     results_dict["results_x_day_plus_minus_PC"]                         = results_x_day_plus_minus_PC
     results_dict["results_x_day_plus_minus_PC_confindence"]             = results_x_day_plus_minus_PC_confindence
     results_dict["results_x_day_plus_minus_score_confidence"]           = results_x_day_plus_minus_score_confidence 
     results_dict["results_x_day_plus_minus_score_confidence_weighted"]  = results_x_day_plus_minus_score_confidence_weighted
     
+    print("Hello")
+    
     return results_dict
 
 
-        
-
-
-
-
-
-
 #%% Main Line Script
-
 
 DoE_orders_dict, prepped_fin_input  = define_DoE(model_types_and_params_dict, target_folder_path_list, fin_indi, pred_output_and_tickers_combos_list, pred_steps_list=pred_steps_list, train_test_split=train_test_split)
 results_dict, models_dict           = run_DoE_return_models_and_result(DoE_orders_dict, 
