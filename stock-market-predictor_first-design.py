@@ -6,10 +6,8 @@ Required actions:
 - actions about the drop NA needs to be done, this will unalign my data
 - I'm unsure if the finder function is wiping all information between iterations
 - the disabling of the warnings needs to be better controlled
-
 Dev notes:
  - Cound potentially add the function to view the model parameters scores
-
 """
 #%% Imports Modules and Define Basic Parameters
 
@@ -36,8 +34,6 @@ from sklearn.datasets import make_classification
 import seaborn as sns
 import copy
 from datetime import datetime
-from stock_indicators import indicators
-from stock_indicators import Quote
 
 import os
 import warnings
@@ -62,7 +58,7 @@ def return_conbinations_or_lists_fg(list_a,list_b):
     for a in list_a:
         for b in list_b:
             if isinstance(a, list):
-                combined_lists = combined_lists + [a.__add__([b])]
+                combined_lists = combined_lists + [a + [b]]
             else:
                 combined_lists = combined_lists + [[a, b]]
                 
@@ -79,49 +75,37 @@ model_types_and_params_dict = {
         "param search full" : True,
         "predict on only best params post CV analysis" : True
     },
-    
-        "MLPRegressor" : { #Multi-layer Perceptron regressor
-        "estimator__hidden_layer_sizes"    : NN_hidden_layer_sizes_strat, 
-        "estimator__activation"            : NN_activation_strat
-    },
-
-    "Bagged_ElasticNet" : { #Linear regression with combined L1 and L2 priors as regularizer.
+    "ElasticNet" : { #Linear regression with combined L1 and L2 priors as regularizer.
         'estimator__alpha':[0.1, 0.5, 0.9], 
         'estimator__l1_ratio':[0.1, 0.5, 0.9], 
         'n_estimators' : [10, 20],
         'max_samples' : [1.0],
-        'max_features' : [0.5]}
-
+        'max_features' : [0.5]
+    },
+        "MLPRegressor" : { #Multi-layer Perceptron regressor
+        "estimator__hidden_layer_sizes"    : NN_hidden_layer_sizes_strat, 
+        "estimator__activation"            : NN_activation_strat}
 }
 
 #stratergy params
 Features = 6
-pred_output_and_tickers_combos_list = [("aapl", "<CLOSE>"), ("carm", "<CLOSE>")]
+pred_output_and_tickers_combos_list = [("aapl", "<CLOSE>"), ("carm", "<HIGH>")]
 pred_steps_list                     = [1,2,5,10]
 time_series_split_qty               = 5
 training_error_measure_main         = 'neg_mean_squared_error'
 train_test_split                    = 0.7 #the ratio of the time series used for training
 CV_Reps                             = 2
 time_step_notation_sting            = "d" #day here is for a day, update as needed
-fin_indi                            = {
-    #"SMA" : [5,10,15],
-    "rsi" : [5,10]
-    
-}
-
- #financial indicators
-
+fin_indi                            = [] #financial indicators
 
 #file params
 input_cols_to_include_list = ["<CLOSE>", "<HIGH>"]
 index_cols_list = ["<DATE>","<TIME>"]
 index_col_str = "datetime"
-target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\5_us_txt\\data\\5 min\\us\\nasdaq stocks\\selected\\"]
-                          
+target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1 - Copy\\"]
 target_file_folder_path = ""
 feature_qty = 6
 outputs_folder_path = ".\\outputs\\"
-datetime_str_format = "%Y%m%d_%H%M%S"
 
 
 #Blank Variables (to remove problem messages)
@@ -181,30 +165,16 @@ class BlockingTimeSeriesSplit():
             mid = int(0.5 * (stop - start)) + start
             yield indices[start: mid], indices[mid + margin: stop]
 
-def convert_datetime_to_custom_string(datetime):
-    output = ""
-    
-    print("Hello")
-    
-    return output
-    
-    
-    
-
-
-
 
 #%% Experiment Handlers Methods
 
 def define_DoE(model_types_and_params_dict, fin_data_input, fin_indi, pred_output_and_tickers_combos_list, pred_steps_list=pred_steps_list, train_test_split=train_test_split):
-    df_financial_data, df_financial_data_complete = import_financial_data(
+    df_financial_data = import_financial_data(
         target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], 
         index_cols_list = index_cols_list, 
         input_cols_to_include_list=input_cols_to_include_list)
     
-    df_financial_data = populate_technical_indicators_2(df_financial_data, df_financial_data_complete, fin_indi, pred_output_and_tickers_combos_list)
-    
-    
+    df_financial_data = populate_technical_indicators_2(df_financial_data, fin_indi)
     
     X_train, y_train, X_test, y_test, nan_values_replaced = create_step_responces_and_split_training_test_set(
         df_financial_data=df_financial_data, 
@@ -214,10 +184,10 @@ def define_DoE(model_types_and_params_dict, fin_data_input, fin_indi, pred_outpu
     
     prepped_fin_input = X_train, y_train, X_test, y_test
     
-    return model_types_and_params_dict, prepped_fin_input, df_financial_data
+    return model_types_and_params_dict, prepped_fin_input
 """XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"""
 def run_DoE_return_models_and_result(DoE_orders_dict, prepped_fin_input,
-                                     pred_output_and_tickers_combos_list, pred_steps_list=pred_steps_list, parent_output_dir=".\\outputs\\", df_financial_data=df_financial_data):
+                                     pred_output_and_tickers_combos_list, pred_steps_list=pred_steps_list, parent_output_dir=".\\outputs\\"):
     print("Hello")
     X_train, y_train, X_test, y_test = prepped_fin_input
     results_dict = dict()
@@ -239,8 +209,6 @@ def run_DoE_return_models_and_result(DoE_orders_dict, prepped_fin_input,
         for model_type in models_list:
             subfolder_path = os.path.join(outputs_path, model_type)
             os.mkdir(subfolder_path)
-    
-    df_financial_data.to_csv(outputs_path + "\\inputs_used.csv")
         
     for key in models_list:
         params_sweep=DoE_orders_dict[key]
@@ -277,7 +245,6 @@ def import_financial_data(
         input_cols_to_include_list=input_cols_to_include_list):
     
     df_financial_data = pd.DataFrame()
-    df_financial_data_complete = pd.DataFrame()
     for folder in target_folder_path_list:
         if os.path.isdir(folder) == True:
             initial_list = os.listdir(folder)
@@ -290,82 +257,25 @@ def import_financial_data(
                 elif len(input_cols_to_include_list)==1:
                     df_temp = df_temp.set_index(index_col_str)
                     
-                df_temp_complete                = copy.deepcopy(df_temp)                        
-                df_temp                         = df_temp[input_cols_to_include_list]
+                                        
+                df_temp = df_temp[input_cols_to_include_list]
                 
                 if initial_list[0] == file:
-                    df_financial_data           = copy.deepcopy(df_temp)
-                    df_financial_data_complete  = copy.deepcopy(df_temp_complete)
+                    df_financial_data   = copy.deepcopy(df_temp)
                 else:
-                    df_financial_data           = pd.concat([df_financial_data, df_temp], axis=1, ignore_index=False)
-                    df_financial_data_complete  = pd.concat([df_financial_data_complete, df_temp_complete], axis=1, ignore_index=False)
-                    
+                    df_financial_data   = pd.concat([df_financial_data, df_temp], axis=1, ignore_index=False)
                 col_rename_dict = dict()
-                col_rename_dict_complete = dict()
                 for col in input_cols_to_include_list:
                     col_rename_dict[col] = return_ticker_code_1(file) + "_" + col
-                for col in df_temp_complete.columns:
-                    col_rename_dict_complete[col] = return_ticker_code_1(file) + "_" + col
-                
                 df_financial_data = df_financial_data.rename(columns=col_rename_dict)
-                df_financial_data_complete = df_financial_data_complete.rename(columns=col_rename_dict_complete)
                 
+                del df_temp
                 
-                
-                del df_temp, df_temp_complete
-                
-    
-    
-    return df_financial_data, df_financial_data_complete
-
-
-def populate_technical_indicators_2(df_financial_data, df_financial_data_complete, technicial_indicators_to_add_list, pred_output_and_tickers_combos_list):
-    
-    df_additional_columns = pd.DataFrame(index=df_financial_data_complete.index)
-    
-    quotes_dict = dict()
-    for ticker, value_name in pred_output_and_tickers_combos_list:
-        col_name = ticker + "_" + value_name
-        quotes_dict[col_name] = return_quote_format_from_df(df_financial_data_complete, ticker)
-    
-    for indicator in technicial_indicators_to_add_list:
-        for time_scale in technicial_indicators_to_add_list[indicator]:
-            for a, b in pred_output_and_tickers_combos_list:
-                col_name = a + "_" + b
-                new_series = convert_si_quote_to_pdseries(quotes_dict[col_name], indicator, time_scale)
-                new_series.name = col_name + "_" + indicator + "_" + str(time_scale)
-                df_financial_data[new_series.name] = new_series
-
     return df_financial_data
 
-def convert_si_quote_to_pdseries(quote, indicator, time_steps):
-    indexes, values = [], []
-    if indicator == "rsi":
-        indi = indicators.get_rsi(quote, time_steps)
-    for q in indi:
-        indexes = indexes + [getattr(q, "date").strftime(datetime_str_format)]
-        values  = values  + [getattr(q, indicator)]
-    return pd.Series(index=indexes, data=values)
-    
-
-def return_quote_format_from_df(df, ticker):
-
-    df.index = pd.to_datetime(df.index, format="%Y%m%d_%H%M%S")
-    rename_dict = {
-        "Open"        : ticker + "_<OPEN>",
-        "High"        : ticker + "_<HIGH>",
-        "Low"         : ticker + "_<LOW>",
-        "Close*"      : ticker + "_<CLOSE>",
-        "Volume"      : ticker + "_<VOL>"
-    }
-    quotes_list = [
-        Quote(d,o,h,l,c,v) 
-        for d,o,h,l,c,v 
-        #in zip(df['Datetime'], df['Open'], df['High'], df['Low'], df['Close*'], df['Volume'])
-        in zip(pd.Series(df.index), df[rename_dict["Open"]], df[rename_dict["High"]], df[rename_dict['Low']], df[rename_dict['Close*']], df[rename_dict['Volume']])
-    ]
-    return quotes_list
-
+def populate_technical_indicators_2(df_financial_data, technicial_indicators_to_add_list):
+    #FG_Actions: to populate method
+    return df_financial_data
 
 #this method populates each row with the next X output results, this is done so that, each time step can be trained
 #to predict the value of the next X steps
@@ -414,10 +324,54 @@ def check_dict_keys_for_build_model(keys, dict, type_str):
         if not key in list(dict) and not key.replace("estimator__","") in list(dict):
             raise ValueError("Key: " + key + " missing from model_types_and_params_dict[" + type_str  + "], dict must have the folliwing keys: " + str(keys))
     
+def build_model(type_str, input_dict=None):
+    
+    match type_str:
+        case "ElasticNet":
+            
+            keys = ["estimator__alpha", "estimator__l1_ratio"]
+            #check_dict_keys_for_build_model(keys, input_dict, type_str)
+            estimator = BaggingRegressor(
+                ElasticNet(
+                    alpha   =input_dict["estimator__alpha"],
+                    l1_ratio=input_dict["estimator__l1_ratio"],
+                    fit_intercept=True,
+                    #normalize=False,
+                    precompute=False,
+                    max_iter=16,
+                    copy_X=True,
+                    tol=0.1,
+                    warm_start=False,
+                    positive=False,
+                    random_state=None,
+                    selection='random'
+                ), 
+                n_estimators = input_dict["n_estimators"],
+                max_samples = input_dict["max_samples"], 
+                max_features = input_dict["max_features"], 
+                random_state=0
+            )
+        case "MLPRegressor":
+            
+            keys = ["estimator__hidden_layer_sizes", "estimator__activation"]
+            #check_dict_keys_for_build_model(keys, input_dict, type_str)
+            estimator = MLPRegressor(
+                activation=input_dict["estimator__activation"],
+                hidden_layer_sizes=input_dict["estimator__hidden_layer_sizes"],
+                alpha=0.001,
+                random_state=20,
+                early_stopping=False
+            )
+        case _:
+            raise ValueError("the model type: " + type_str + " was not found in the method")
+    
+    return MultiOutputRegressor(estimator, n_jobs=4)
+
 def build_model2(type_str, input_dict=None):
     
     match type_str:
-        case "Bagged_ElasticNet":
+        case "ElasticNet":
+            
             keys = ["estimator__alpha", "estimator__l1_ratio"]
             #check_dict_keys_for_build_model(keys, input_dict, type_str)
             estimator = BaggingRegressor(
@@ -434,24 +388,21 @@ def build_model2(type_str, input_dict=None):
                     warm_start=False,
                     positive=False,
                     random_state=None,
-                    selection='random')), 
-                n_estimators = input_dict["n_estimators"],
-                max_samples  = input_dict["max_samples"],
-                max_features = input_dict["max_features"],
-                random_state=0
+                    selection='random'
+                )), n_estimators=10, random_state=0, max_features=0.5
             )
-            
         case "MLPRegressor":
+            
             keys = ["estimator__hidden_layer_sizes", "estimator__activation"]
             #check_dict_keys_for_build_model(keys, input_dict, type_str)
-            estimator = MultiOutputRegressor(
-                MLPRegressor(
-                    activation=input_dict["estimator__activation"],
-                    hidden_layer_sizes=input_dict["estimator__hidden_layer_sizes"],
-                    alpha=0.001,
-                    random_state=20,
-                    early_stopping=False))
-                
+            estimator = MLPRegressor(
+                MultiOutputRegressor(
+                activation=input_dict["estimator__activation"],
+                hidden_layer_sizes=input_dict["estimator__hidden_layer_sizes"],
+                alpha=0.001,
+                random_state=20,
+                early_stopping=False)
+            )
         case _:
             raise ValueError("the model type: " + type_str + " was not found in the method")
     
@@ -463,7 +414,7 @@ def build_model2(type_str, input_dict=None):
 #%% Model Training - CV Analysis
 #GridSearchCV works by exhaustively searching all the possible combinations of the model’s parameters
 
-def return_CV_analysis_scores(X_train, y_train, CV_Reps=CV_Reps, cv=bscv, cores_used=4, model_str="Bagged_ElasticNet",
+def return_CV_analysis_scores(X_train, y_train, CV_Reps=CV_Reps, cv=bscv, cores_used=4, model_str="ElasticNet",
                               params_grid=params_grid, pred_steps_list=pred_steps_list, 
                               pred_output_and_tickers_combos_list=pred_output_and_tickers_combos_list, 
                               input_grid=input_grid
@@ -553,7 +504,7 @@ def return_default_values_of_param_dict(page):
 
 #%% Model Training - Model Training and tickers
 
-def return_models_and_preds(X_train, y_train, X_test, model_str="Bagged_ElasticNet", best_params=PLACEHOLDER_best_params_fg, pred_output_and_tickers_combos_list=pred_output_and_tickers_combos_list):
+def return_models_and_preds(X_train, y_train, X_test, model_str="ElasticNet", best_params=PLACEHOLDER_best_params_fg, pred_output_and_tickers_combos_list=pred_output_and_tickers_combos_list):
     preds = pd.DataFrame()
     output_col_str = "{}_{}_{}"
     preds_dict = dict()
@@ -583,7 +534,7 @@ def return_models_and_preds(X_train, y_train, X_test, model_str="Bagged_ElasticN
         for key, i2 in zip(best_params["params order"], range(len(best_params["params order"]))):
             input_params[key] = best_params[step][i2]
         
-        model_temp        = build_model2(model_str, input_params)
+        model_temp        = build_model(model_str, input_params)
         model_temp        = model_temp.fit(X_train, y_temp)
         models_dict[step] = model_temp
         preds_temp = model_temp.predict(X_test)
@@ -806,12 +757,8 @@ def return_results_X_day_plus_minus_accuracy(df_temp_dict, X_test, pred_steps_li
 
 #%% Main Line Script
 
-DoE_orders_dict, prepped_fin_input, df_financial_data  = define_DoE(model_types_and_params_dict, target_folder_path_list, fin_indi, pred_output_and_tickers_combos_list, pred_steps_list=pred_steps_list, train_test_split=train_test_split)
-results_dict, models_dict                              = run_DoE_return_models_and_result(DoE_orders_dict, 
+DoE_orders_dict, prepped_fin_input  = define_DoE(model_types_and_params_dict, target_folder_path_list, fin_indi, pred_output_and_tickers_combos_list, pred_steps_list=pred_steps_list, train_test_split=train_test_split)
+results_dict, models_dict           = run_DoE_return_models_and_result(DoE_orders_dict, 
                                                                        prepped_fin_input, 
                                                                        pred_output_and_tickers_combos_list, 
-                                                                       pred_steps_list=pred_steps_list, 
-                                                                       df_financial_data=df_financial_data)
-
-
-
+                                                                       pred_steps_list=pred_steps_list)
