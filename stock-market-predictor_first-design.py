@@ -81,8 +81,11 @@ model_types_and_params_dict = {
         "predict on only best params post CV analysis" : True
     },
     "RandomSubspace" : {
-        "identity":[0],
-        "identity2":[0]
+        "training_time_splits" : [10],
+        "n_estimators"         : [10],
+        #"max_depth"            : [50],
+        "max_features"         : [1.0],
+        "random_state"         : [42]
     },
     "ElasticNet" : { #Linear regression with combined L1 and L2 priors as regularizer.
         'estimator__alpha':[0.1, 0.5, 0.9], 
@@ -338,27 +341,29 @@ def check_dict_keys_for_build_model(keys, dict, type_str):
 
 class DRSLinReg():
     def __init__(self, base_estimator=LinearRegression(),
-                 n_estimators=10,
-                 max_depth=2,
-                 max_features=1.0,
-                 random_state=None):
+                 input_dict=dict()):
+        #expected keys: training_time_splits, max_depth, max_features, random_state,        
+        for key in input_dict:
+           setattr(self, key, input_dict[key])
+        self.input_dict = input_dict
         self.base_estimator = base_estimator
-        self.n_estimators = n_estimators
-        self.max_depth = max_depth
-        self.max_features = max_features
-        self.random_state = random_state
         self.estimators_ = []
         
     def fit(self, X, y):
-        tscv = BlockingTimeSeriesSplit(n_splits=self.n_estimators)
+        tscv = BlockingTimeSeriesSplit(n_splits=self.training_time_splits)
         for train_index, _ in tscv.split(X):
+            #these are the base values that will be updated if there isn't a passed value in the input dict
             estimator = BaggingRegressor(base_estimator=self.base_estimator,
+                                          #the assignment of "one" estimator is overwritten by the rest of the method
                                           n_estimators=1,
                                           max_samples=1.0,
-                                          max_features=self.max_features,
+                                          max_features=1.0,
                                           bootstrap=True,
                                           bootstrap_features=False,
                                           random_state=self.random_state)
+            for key in self.input_dict:
+                setattr(estimator, key, self.input_dict[key])
+            
             estimator.base_estimator = self.base_estimator
             
             for i_random in range(10):
@@ -435,10 +440,7 @@ def build_model2(type_str, input_dict=None):
         case "RandomSubspace":
             keys = ["estimator__alpha", "estimator__l1_ratio", "enforced_features", "proportion_of_random_features"]
             estimator = DRSLinReg(base_estimator=LinearRegression(),
-                      n_estimators=10,
-                      max_depth=2,
-                      max_features=0.5,
-                      random_state=42)
+                      input_dict=input_dict)
             
         
         case "ElasticNet":
