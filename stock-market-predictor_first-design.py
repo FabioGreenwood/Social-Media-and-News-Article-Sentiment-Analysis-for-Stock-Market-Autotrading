@@ -11,9 +11,10 @@ Dev notes:
 """
 #%% Imports Modules and Define Basic Parameters
 
+
 import numpy as np
 import pandas as pd
-
+import fnmatch
 import pickle
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
@@ -83,9 +84,13 @@ model_types_and_params_dict = {
     "RandomSubspace" : {
         "training_time_splits" : [10],
         "n_estimators"         : [10],
-        #"max_depth"            : [50],
+        "max_depth"            : [50],
         "max_features"         : [1.0],
-        "random_state"         : [42]
+        "random_state"         : [42],
+        "cohort_retention_rate_dict" : {
+            "STOCK_NAME*" : 1,
+            "carm*" : 0.5,
+            "*" : 0.1}
     },
     "ElasticNet" : { #Linear regression with combined L1 and L2 priors as regularizer.
         'estimator__alpha':[0.1, 0.5, 0.9], 
@@ -336,16 +341,39 @@ def check_dict_keys_for_build_model(keys, dict, type_str):
         if not key in list(dict) and not key.replace("estimator__","") in list(dict):
             raise ValueError("Key: " + key + " missing from model_types_and_params_dict[" + type_str  + "], dict must have the folliwing keys: " + str(keys))
     
-
+def return_columns_to_remove(columns_list, self):
+    
+    columns_to_remove = []
+    retain_dict = self.input_dict["cohort_retention_rate_dict"]
+    max_features = self.max_features
+    stock_strings_list = []
+    for a in self.ticker_name:
+        stock_strings_list = stock_strings_list + [a[0]]
+    for key in retain_dict:
+        target_string = key
+        cohort = []
+        if len(fnmatch.filter(key, "STOCK_NAME*")) > 0:
+            for stock in stock_strings_list:
+                target_string = target_string.replace("STOCK_NAME", stock)
+                cohort = cohort + [fnmatch.filter(columns_list, target_string)]
+        else:
+            cohort = cohort + [fnmatch.filter(columns_list, target_string)]
+        
+    
+    print("hello")
+    
+    return columns_to_remove
 
 
 class DRSLinReg():
     def __init__(self, base_estimator=LinearRegression(),
-                 input_dict=dict()):
+                 input_dict=dict(),
+                 ticker_name=[]):
         #expected keys: training_time_splits, max_depth, max_features, random_state,        
         for key in input_dict:
            setattr(self, key, input_dict[key])
         self.input_dict = input_dict
+        self.ticker_name = ticker_name
         self.base_estimator = base_estimator
         self.estimators_ = []
         
@@ -366,11 +394,12 @@ class DRSLinReg():
             
             estimator.base_estimator = self.base_estimator
             
-            for i_random in range(10):
+            for i_random in range(self.n_estimators):
                 # randomly select features to drop out
                 n_features = X.shape[1]
-                dropout_cols = np.random.choice(n_features, size=int(n_features * (1 - self.max_features)), replace=False)
-                dropout_cols = X.columns[dropout_cols]
+                dropout_cols = return_columns_to_remove(columns_list=X.columns, self=self)
+                #dropout_cols = np.random.choice(n_features, size=int(n_features * (1 - self.max_features)), replace=False)
+                #dropout_cols = X.columns[dropout_cols]
                 X_sel = X.loc[X.index[train_index].values].copy()
                 X_sel.loc[:, dropout_cols] = 0
                 y_sel= y.loc[y.index[train_index].values].copy()
@@ -433,14 +462,15 @@ class DRSLinReg():
             return output, high_good
         
 
+    
 
-def build_model2(type_str, input_dict=None):
+def build_model2(type_str, input_dict=None, ticker_name=None):
     
     match type_str:
         case "RandomSubspace":
             keys = ["estimator__alpha", "estimator__l1_ratio", "enforced_features", "proportion_of_random_features"]
             estimator = DRSLinReg(base_estimator=LinearRegression(),
-                      input_dict=input_dict)
+                      input_dict=input_dict, ticker_name=ticker_name)
             
         
         case "ElasticNet":
@@ -496,6 +526,7 @@ def return_CV_analysis_scores(X_train, y_train, X_test, y_test, CV_Reps=CV_Reps,
     params_ = []
     complete_record = dict()
     complete_record["params order"] = []
+    cohort_retention_rate_dict = params_grid.pop("cohort_retention_rate_dict")
     for pred_step in pred_steps_list:
         complete_record[pred_step] = dict()
     params_keys = list(params_grid.keys())
@@ -517,7 +548,8 @@ def return_CV_analysis_scores(X_train, y_train, X_test, y_test, CV_Reps=CV_Reps,
                 input_dict = dict()
                 for key, i in zip(params_keys, range(len(params_keys))):
                     input_dict[key] = params[i]
-                model = build_model2(model_str, input_dict)
+                input_dict["cohort_retention_rate_dict"] = cohort_retention_rate_dict
+                model = build_model2(model_str, input_dict, ticker_name=pred_output_and_tickers_combos_list)
                 model.fit(X_train, y_train_temp)
                 score = model.evaluate(X_test=X_test , y_test=y_test_temp)
             
