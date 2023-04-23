@@ -31,9 +31,14 @@ from sklearn.svm import SVC
 from sklearn.ensemble import BaggingClassifier
 from sklearn.ensemble import BaggingRegressor
 from sklearn.datasets import make_classification
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 import seaborn as sns
 import copy
 from datetime import datetime
+from sklearn.ensemble import BaggingRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import TimeSeriesSplit
+import numpy as np
 
 import os
 import warnings
@@ -74,6 +79,10 @@ model_types_and_params_dict = {
     "overall strat" : {
         "param search full" : True,
         "predict on only best params post CV analysis" : True
+    },
+    "RandomSubspace" : {
+        "identity":[0],
+        "identity2":[0]
     },
     "ElasticNet" : { #Linear regression with combined L1 and L2 priors as regularizer.
         'estimator__alpha':[0.1, 0.5, 0.9], 
@@ -215,7 +224,7 @@ def run_DoE_return_models_and_result(DoE_orders_dict, prepped_fin_input,
         
         #define time blocking
         btscv                               = BlockingTimeSeriesSplit(n_splits=time_series_split_qty)
-        complete_record                     = return_CV_analysis_scores(X_train, y_train, CV_Reps=CV_Reps, model_str=key, cv=btscv, cores_used=4, params_grid=params_sweep, pred_steps_list=pred_steps_list)
+        complete_record                     = return_CV_analysis_scores(X_train, y_train, X_test, y_test, CV_Reps=CV_Reps, model_str=key, cv=btscv, cores_used=4, params_grid=params_sweep, pred_steps_list=pred_steps_list)
         best_params_fg                      = return_best_model_paramemeters(complete_record=complete_record, params_sweep=params_sweep)
         
         #"""Train Model"""
@@ -324,54 +333,115 @@ def check_dict_keys_for_build_model(keys, dict, type_str):
         if not key in list(dict) and not key.replace("estimator__","") in list(dict):
             raise ValueError("Key: " + key + " missing from model_types_and_params_dict[" + type_str  + "], dict must have the folliwing keys: " + str(keys))
     
-def build_model(type_str, input_dict=None):
-    
-    match type_str:
-        case "ElasticNet":
+
+
+
+class DRSLinReg():
+    def __init__(self, base_estimator=LinearRegression(),
+                 n_estimators=10,
+                 max_depth=2,
+                 max_features=1.0,
+                 random_state=None):
+        self.base_estimator = base_estimator
+        self.n_estimators = n_estimators
+        self.max_depth = max_depth
+        self.max_features = max_features
+        self.random_state = random_state
+        self.estimators_ = []
+        
+    def fit(self, X, y):
+        tscv = BlockingTimeSeriesSplit(n_splits=self.n_estimators)
+        for train_index, _ in tscv.split(X):
+            estimator = BaggingRegressor(base_estimator=self.base_estimator,
+                                          n_estimators=1,
+                                          max_samples=1.0,
+                                          max_features=self.max_features,
+                                          bootstrap=True,
+                                          bootstrap_features=False,
+                                          random_state=self.random_state)
+            estimator.base_estimator = self.base_estimator
             
-            keys = ["estimator__alpha", "estimator__l1_ratio"]
-            #check_dict_keys_for_build_model(keys, input_dict, type_str)
-            estimator = BaggingRegressor(
-                ElasticNet(
-                    alpha   =input_dict["estimator__alpha"],
-                    l1_ratio=input_dict["estimator__l1_ratio"],
-                    fit_intercept=True,
-                    #normalize=False,
-                    precompute=False,
-                    max_iter=16,
-                    copy_X=True,
-                    tol=0.1,
-                    warm_start=False,
-                    positive=False,
-                    random_state=None,
-                    selection='random'
-                ), 
-                n_estimators = input_dict["n_estimators"],
-                max_samples = input_dict["max_samples"], 
-                max_features = input_dict["max_features"], 
-                random_state=0
-            )
-        case "MLPRegressor":
+            for i_random in range(10):
+                # randomly select features to drop out
+                n_features = X.shape[1]
+                dropout_cols = np.random.choice(n_features, size=int(n_features * (1 - self.max_features)), replace=False)
+                dropout_cols = X.columns[dropout_cols]
+                X_sel = X.loc[X.index[train_index].values].copy()
+                X_sel.loc[:, dropout_cols] = 0
+                y_sel= y.loc[y.index[train_index].values].copy()
+                
+            # add layers to the estimator
+                for j in range(self.max_depth):
+                    estimator.fit(X_sel, y_sel)
+                    self.estimators_ = self.estimators_ + [estimator]
             
-            keys = ["estimator__hidden_layer_sizes", "estimator__activation"]
-            #check_dict_keys_for_build_model(keys, input_dict, type_str)
-            estimator = MLPRegressor(
-                activation=input_dict["estimator__activation"],
-                hidden_layer_sizes=input_dict["estimator__hidden_layer_sizes"],
-                alpha=0.001,
-                random_state=20,
-                early_stopping=False
-            )
-        case _:
-            raise ValueError("the model type: " + type_str + " was not found in the method")
+            #self.estimators_.append(estimator)
+        return self
+
+    def predict_ensemble(self, X, name_of_outputs=None):
+        
+        if name_of_outputs==None:
+            outputs_range = range(self.estimators_[0].predict(X).shape[1])
+        else:
+            outputs_range = name_of_outputs
+        output = pd.DataFrame(columns=outputs_range)
+
+        y_pred = []
+        for j in range(len(outputs_range)):
+            y_pred = y_pred + [np.zeros((X.shape[0], len(self.estimators_)))]
+            
+        for i, estimator in enumerate(self.estimators_):
+            # randomly select features to drop out
+            y_temp = estimator.predict(X)
+            if not len(outputs_range) == y_temp.shape[1]:
+                raise ValueError("the number of values in name_of_outputs must equals the number of outputs generated, please check this entry matches the outputs for the trained model")
+            
+            for j in range(len(outputs_range)):
+                y_pred[j][:,i] = y_temp[:,j]
+            
+        
+        for j in range(len(outputs_range)):
+            output[outputs_range[j]] = np.mean(y_pred[j], axis=1)
+        
+        return output
     
-    return MultiOutputRegressor(estimator, n_jobs=4)
+    def evaluate(self, X_test=None, y_test=None, y_pred=None, method="r2", return_high_good=False):
+        if y_pred==None:
+            y_pred = self.predict_ensemble(X_test).values
+        
+        match method:
+            case "r2":
+                output = r2_score(y_test, y_pred)
+                high_good = True
+            case "mse":
+                output = mean_squared_error(y_test, y_pred)
+                high_good = False
+            case "mae":
+                output = mean_absolute_error(y_test, y_pred)
+                high_good = False
+            case _:
+                raise ValueError("passed method string not found")
+        
+        if return_high_good==False:
+            return output
+        else:
+            return output, high_good
+        
+
 
 def build_model2(type_str, input_dict=None):
     
     match type_str:
-        case "ElasticNet":
+        case "RandomSubspace":
+            keys = ["estimator__alpha", "estimator__l1_ratio", "enforced_features", "proportion_of_random_features"]
+            estimator = DRSLinReg(base_estimator=LinearRegression(),
+                      n_estimators=10,
+                      max_depth=2,
+                      max_features=0.5,
+                      random_state=42)
             
+        
+        case "ElasticNet":
             keys = ["estimator__alpha", "estimator__l1_ratio"]
             #check_dict_keys_for_build_model(keys, input_dict, type_str)
             estimator = BaggingRegressor(
@@ -392,7 +462,6 @@ def build_model2(type_str, input_dict=None):
                 )), n_estimators=10, random_state=0, max_features=0.5
             )
         case "MLPRegressor":
-            
             keys = ["estimator__hidden_layer_sizes", "estimator__activation"]
             #check_dict_keys_for_build_model(keys, input_dict, type_str)
             estimator = MLPRegressor(
@@ -410,11 +479,10 @@ def build_model2(type_str, input_dict=None):
 
 
 
-
 #%% Model Training - CV Analysis
 #GridSearchCV works by exhaustively searching all the possible combinations of the model’s parameters
 
-def return_CV_analysis_scores(X_train, y_train, CV_Reps=CV_Reps, cv=bscv, cores_used=4, model_str="ElasticNet",
+def return_CV_analysis_scores(X_train, y_train, X_test, y_test, CV_Reps=CV_Reps, cv=bscv, cores_used=4, model_str="ElasticNet",
                               params_grid=params_grid, pred_steps_list=pred_steps_list, 
                               pred_output_and_tickers_combos_list=pred_output_and_tickers_combos_list, 
                               input_grid=input_grid
@@ -437,7 +505,8 @@ def return_CV_analysis_scores(X_train, y_train, CV_Reps=CV_Reps, cv=bscv, cores_
     #prep only outputs for a single number of time steps
     
     for pred_step in pred_steps_list:
-        y_temp = return_df_filtered_for_timestep(y_train, pred_step)
+        y_train_temp = return_df_filtered_for_timestep(y_train, pred_step)
+        y_test_temp  = return_df_filtered_for_timestep(y_test, pred_step)
         #run study for that number of time steps
         for params in params_sweep:
             #input = return_default_values_of_param_dict(params_grid)
@@ -447,8 +516,11 @@ def return_CV_analysis_scores(X_train, y_train, CV_Reps=CV_Reps, cv=bscv, cores_
                 for key, i in zip(params_keys, range(len(params_keys))):
                     input_dict[key] = params[i]
                 model = build_model2(model_str, input_dict)
-                model.fit(X_train, y_temp)
-                score = model.score(X_train, y_temp)
+                model.fit(X_train, y_train_temp)
+                score = model.evaluate(X_test=X_test , y_test=y_test_temp)
+            
+            
+            
             
             #manually store stats
             if not tuple(params) in complete_record[pred_step].keys():
@@ -534,10 +606,10 @@ def return_models_and_preds(X_train, y_train, X_test, model_str="ElasticNet", be
         for key, i2 in zip(best_params["params order"], range(len(best_params["params order"]))):
             input_params[key] = best_params[step][i2]
         
-        model_temp        = build_model(model_str, input_params)
+        model_temp        = build_model2(model_str, input_params)
         model_temp        = model_temp.fit(X_train, y_temp)
         models_dict[step] = model_temp
-        preds_temp = model_temp.predict(X_test)
+        preds_temp = model_temp.predict_ensemble(X_test)
         preds = pd.concat([preds, pd.DataFrame(preds_temp, index=X_test.index, columns=y_temp.columns)], axis=1)
             
         
