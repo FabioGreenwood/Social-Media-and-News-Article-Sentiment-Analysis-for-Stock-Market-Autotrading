@@ -75,6 +75,11 @@ def return_conbinations_or_lists_fg(list_a,list_b):
 
 NN_hidden_layer_sizes_strat = [(100,), (200,), (100,10), (200,20)]
 NN_activation_strat         = ['relu', 'logistic']
+standard_intput_cohort_retention_rate_dict = {
+            "STOCK_NAME*" : 1,
+            "chi*" : 0.5,
+            "carm*" : 0.5,
+            "*" : 0.1}
 model_types_and_params_dict = {
     "name" : "Test_DoE",
     "overall strat" : {
@@ -83,25 +88,24 @@ model_types_and_params_dict = {
     },
     "RandomSubspace" : {
         "training_time_splits" : [10],
-        "n_estimators"         : [10],
-        "max_depth"            : [50],
+        "n_estimators"         : [3],
+        "max_depth"            : [2],
         "max_features"         : [1.0],
         "random_state"         : [42],
-        "cohort_retention_rate_dict" : {
-            "STOCK_NAME*" : 1,
-            "carm*" : 0.5,
-            "*" : 0.1}
+        "cohort_retention_rate_dict" : standard_intput_cohort_retention_rate_dict,
     },
     "ElasticNet" : { #Linear regression with combined L1 and L2 priors as regularizer.
         'estimator__alpha':[0.1, 0.5, 0.9], 
         'estimator__l1_ratio':[0.1, 0.5, 0.9], 
         'n_estimators' : [10, 20],
         'max_samples' : [1.0],
-        'max_features' : [0.5]
+        'max_features' : [0.5],
+        "cohort_retention_rate_dict" : standard_intput_cohort_retention_rate_dict,
     },
         "MLPRegressor" : { #Multi-layer Perceptron regressor
         "estimator__hidden_layer_sizes"    : NN_hidden_layer_sizes_strat, 
-        "estimator__activation"            : NN_activation_strat}
+        "estimator__activation"            : NN_activation_strat,
+        "cohort_retention_rate_dict" : standard_intput_cohort_retention_rate_dict}
 }
 
 #stratergy params
@@ -343,24 +347,31 @@ def check_dict_keys_for_build_model(keys, dict, type_str):
     
 def return_columns_to_remove(columns_list, self):
     
-    columns_to_remove = []
+    columns_to_remove = list(copy.deepcopy(columns_list))
+    retain_cols = []
     retain_dict = self.input_dict["cohort_retention_rate_dict"]
     max_features = self.max_features
     stock_strings_list = []
+    columns_list = list(columns_list)
     for a in self.ticker_name:
         stock_strings_list = stock_strings_list + [a[0]]
     for key in retain_dict:
-        target_string = key
         cohort = []
-        if len(fnmatch.filter(key, "STOCK_NAME*")) > 0:
+        target_string = key
+        if len(fnmatch.filter([key], "STOCK_NAME*")) > 0:
             for stock in stock_strings_list:
+                target_string = key
                 target_string = target_string.replace("STOCK_NAME", stock)
-                cohort = cohort + [fnmatch.filter(columns_list, target_string)]
+                cohort = cohort + fnmatch.filter(columns_list, target_string)
         else:
-            cohort = cohort + [fnmatch.filter(columns_list, target_string)]
-        
-    
-    print("hello")
+            cohort = cohort + fnmatch.filter(columns_list, target_string)
+        if len(cohort) > 0:
+            for col in cohort:
+                columns_list.remove(col)
+            retain_cols = retain_cols + list(np.random.choice(cohort, int(len(cohort) * retain_dict[key]), replace=False))
+
+    for value in retain_cols:
+        columns_to_remove.remove(value)
     
     return columns_to_remove
 
@@ -379,6 +390,7 @@ class DRSLinReg():
         
     def fit(self, X, y):
         tscv = BlockingTimeSeriesSplit(n_splits=self.training_time_splits)
+        count = 0
         for train_index, _ in tscv.split(X):
             #these are the base values that will be updated if there isn't a passed value in the input dict
             estimator = BaggingRegressor(base_estimator=self.base_estimator,
@@ -394,6 +406,7 @@ class DRSLinReg():
             
             estimator.base_estimator = self.base_estimator
             
+            count += 1
             for i_random in range(self.n_estimators):
                 # randomly select features to drop out
                 n_features = X.shape[1]
@@ -403,9 +416,11 @@ class DRSLinReg():
                 X_sel = X.loc[X.index[train_index].values].copy()
                 X_sel.loc[:, dropout_cols] = 0
                 y_sel= y.loc[y.index[train_index].values].copy()
+                #print(str(i_random) + "/" + str(self.n_estimators) + "--" + str(count) + "/" + str(self.training_time_splits))
                 
             # add layers to the estimator
                 for j in range(self.max_depth):
+                    
                     estimator.fit(X_sel, y_sel)
                     self.estimators_ = self.estimators_ + [estimator]
             
@@ -550,6 +565,7 @@ def return_CV_analysis_scores(X_train, y_train, X_test, y_test, CV_Reps=CV_Reps,
                     input_dict[key] = params[i]
                 input_dict["cohort_retention_rate_dict"] = cohort_retention_rate_dict
                 model = build_model2(model_str, input_dict, ticker_name=pred_output_and_tickers_combos_list)
+                #print(input_dict)
                 model.fit(X_train, y_train_temp)
                 score = model.evaluate(X_test=X_test , y_test=y_test_temp)
             
@@ -641,6 +657,7 @@ def return_models_and_preds(X_train, y_train, X_test, model_str="ElasticNet", be
             input_params[key] = best_params[step][i2]
         
         model_temp        = build_model2(model_str, input_params)
+        print(model_str)
         model_temp        = model_temp.fit(X_train, y_temp)
         models_dict[step] = model_temp
         preds_temp = model_temp.predict_ensemble(X_test)
