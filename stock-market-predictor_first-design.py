@@ -339,6 +339,46 @@ def create_step_responces_and_split_training_test_set(
     y_test = y[split:]
     return X_train, y_train, X_test, y_test, nan_values_replaced
 
+#%% Prep Sentimental Data
+"""import_data methods"""
+def import_sentimental_data(
+
+        target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], 
+        index_cols_list = index_cols_list, 
+        input_cols_to_include_list=input_cols_to_include_list):
+    
+    df_financial_data = pd.DataFrame()
+    for folder in target_folder_path_list:
+        if os.path.isdir(folder) == True:
+            initial_list = os.listdir(folder)
+            for file in os.listdir(folder):
+                #extract values from file
+                df_temp = pd.read_csv(folder + file, parse_dates=True)
+                if len(input_cols_to_include_list)==2:
+                    df_temp[index_col_str] = df_temp[index_cols_list[0]].astype(str) + "_" + df_temp[index_cols_list[1]].astype(str)
+                    df_temp = df_temp.set_index(index_col_str)
+                elif len(input_cols_to_include_list)==1:
+                    df_temp = df_temp.set_index(index_col_str)
+                    
+                                        
+                df_temp = df_temp[input_cols_to_include_list]
+                
+                if initial_list[0] == file:
+                    df_financial_data   = copy.deepcopy(df_temp)
+                else:
+                    df_financial_data   = pd.concat([df_financial_data, df_temp], axis=1, ignore_index=False)
+                col_rename_dict = dict()
+                for col in input_cols_to_include_list:
+                    col_rename_dict[col] = return_ticker_code_1(file) + "_" + col
+                df_financial_data = df_financial_data.rename(columns=col_rename_dict)
+                
+                del df_temp
+                
+    return df_financial_data
+
+
+
+
 #%% Model Training - Programmatically Define Model
 def check_dict_keys_for_build_model(keys, dict, type_str):
     for key in keys:
@@ -667,7 +707,7 @@ def return_models_and_preds(X_train, y_train, X_test, model_str="ElasticNet", be
     
     return models_dict, preds
 
-#%% Model Testing and Reproting
+#%% Model Testing and Reporting
 
 def return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_list, results_tables_dict, DoE_name = "", model_type="", model_start_time = "", outputs_folder_path = ".//outputs//tables//", timestamp = False):
     
