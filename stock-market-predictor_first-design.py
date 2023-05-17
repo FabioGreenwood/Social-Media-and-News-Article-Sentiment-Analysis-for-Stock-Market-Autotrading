@@ -50,7 +50,7 @@ if not sys.warnoptions:
 
 import itertools as it
 
-
+#misc methods
 def return_conbinations_or_lists(list_a, list_b):
     unique_combinations = []
     permut = it.permutations(list_a, len(list_b))
@@ -71,12 +71,11 @@ def return_conbinations_or_lists_fg(list_a,list_b):
     return combined_lists
 
 #DoE params
-
-
 NN_hidden_layer_sizes_strat = [(100,), (200,), (100,10), (200,20)]
 NN_activation_strat         = ['relu', 'logistic']
 standard_intput_cohort_retention_rate_dict = {
             "STOCK_NAME*" : 1,
+            "~Sent*": 0.5,
             "chi*" : 0.5,
             "carm*" : 0.5,
             "*" : 0.1}
@@ -92,7 +91,7 @@ model_types_and_params_dict = {
         "max_depth"            : [2],
         "max_features"         : [1.0],
         "random_state"         : [42],
-        "cohort_retention_rate_dict" : standard_intput_cohort_retention_rate_dict,
+        "cohort_retention_rate_dict" : standard_intput_cohort_retention_rate_dict
     },
     "ElasticNet" : { #Linear regression with combined L1 and L2 priors as regularizer.
         'estimator__alpha':[0.1, 0.5, 0.9], 
@@ -118,6 +117,9 @@ train_test_split                    = 0.7 #the ratio of the time series used for
 CV_Reps                             = 2
 time_step_notation_sting            = "d" #day here is for a day, update as needed
 fin_indi                            = [] #financial indicators
+tweet_ratio_removed                 = int(5e2)
+topic_qty                           = 7
+
 
 #file params
 input_cols_to_include_list = ["<CLOSE>", "<HIGH>"]
