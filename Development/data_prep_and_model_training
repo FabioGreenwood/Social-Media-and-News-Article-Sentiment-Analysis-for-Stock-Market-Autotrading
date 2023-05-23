@@ -1,0 +1,435 @@
+"""
+Required actions:
+1. 
+2. 
+3. 
+4. 
+5. 
+
+"""
+
+
+#%%
+
+import numpy as np
+import pandas as pd
+
+import fnmatch
+import pickle
+import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
+import seaborn as sns 
+import jupyter
+import sklearn
+from sklearn.model_selection import TimeSeriesSplit
+from sklearn.model_selection import KFold
+from sklearn.linear_model import ElasticNet
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import GridSearchCV
+from sklearn.neural_network import MLPRegressor
+from sklearn.svm import SVC
+from sklearn.ensemble import BaggingClassifier
+from sklearn.ensemble import BaggingRegressor
+from sklearn.datasets import make_classification
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+import seaborn as sns
+import copy
+from datetime import datetime
+from sklearn.ensemble import BaggingRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import TimeSeriesSplit
+from datetime import datetime, timedelta
+import os
+import warnings
+import sys
+if not sys.warnoptions:
+    warnings.simplefilter("ignore")
+    os.environ["PYTHONWARNINGS"] = "ignore"
+
+import itertools as it
+
+#%% EXAMPLE INPUTS FOR MAIN METHOD
+
+#Temporal
+#    Period
+#    Time step (seconds)
+#    Splitting method & quantity (tup)
+#Input Features
+#    Technical Indicators
+#    Sentiment Parameters
+#Output Features:
+#    Prediction Features
+#    Prediction Timesteps
+#Model Hyperparameters
+#    Inc rep number
+
+temporal_params_dict    = {
+    "period_start"  : datetime.strptime('01/05/17 00:00:00', '%d/%m/%y %H:%M:%S'),
+    "period_end"    : datetime.strptime('14/05/17 00:00:00', '%d/%m/%y %H:%M:%S'),
+    "time_step_seconds" : 60**2, #hour
+}
+
+fin_inputs_params_dict      = {
+    "index_cols_list"   : ["<DATE>","<TIME>"],    
+    "cols_list" : ["<CLOSE>", "<HIGH>"],
+    "fin_indi"          : [] #additional financial indicators to generate
+}
+
+senti_inputs_params_dict    = {
+    "topic_qty"             : 7,
+    "topic_training_tweet_ratio_removed" : int(5e2),
+    "relative_lifetime"     : 60*60*4, # 4 hours
+    "relative_halflife"     : 60*60, #one hour
+    "topic_model_alpha"     : 1,
+    "weighted_topics"       : False
+}
+
+outputs_params_dict         = {
+    "output_symbol_indicators_tuple" : ("aapl", "<CLOSE>"),
+    "pred_steps_ahead" : [1,2,5,10],
+}
+
+model_hyper_params          = {
+    "MLPRegressor" : { #Multi-layer Perceptron regressor
+        "estimator__hidden_layer_sizes"    : (100,10), 
+        "estimator__activation"            : 'relu',
+        "cohort_retention_rate_dict"       : {
+            "Output_indicator" : 1,
+            "Sentiment": 0.5,
+            "Technical" : 0.5,
+            "*" : 0.1}},
+    "training_error_measure_main" : 'neg_mean_squared_error'
+}
+
+input_dict = {
+    "temporal_params_dict"      : temporal_params_dict,
+    "fin_inputs_params_dict"    : fin_inputs_params_dict,
+    "senti_inputs_params_dict"  : senti_inputs_params_dict,
+    "outputs_params_dict"       : outputs_params_dict,
+    "model_hyper_params"        : model_hyper_params
+    }
+
+
+#GLOBAL PARAMETERS
+global_input_cols_to_include_list = ["<CLOSE>", "<HIGH>"]
+global_index_cols_list = ["<DATE>","<TIME>"]
+global_index_col_str = "datetime"
+global_target_file_folder_path = ""
+global_feature_qty = 6
+global_outputs_folder_path = ".\\outputs\\"
+
+global_precalculated_assets_locations_dict = {
+    "root" : "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\precalculated_assets\\",
+    "topic_models"              : "topic_models\\",
+    "topic_company_sentiment"   : "topic_company_sentiment\\",
+    "predictive_model"          : "predictive_model\\",
+    "sentimental_data"          : "sentimental_data\\"
+    }
+
+
+
+#%% misc methods
+#misc methods
+def return_conbinations_or_lists(list_a, list_b):
+    unique_combinations = []
+    permut = it.permutations(list_a, len(list_b))
+    for comb in permut:
+        zipped = zip(comb, list_b)
+        unique_combinations.append(list(zipped))
+    return unique_combinations
+
+def return_conbinations_or_lists_fg(list_a,list_b):
+    combined_lists = []
+    for a in list_a:
+        for b in list_b:
+            if isinstance(a, list):
+                combined_lists = combined_lists + [a + [b]]
+            else:
+                combined_lists = combined_lists + [[a, b]]
+                
+    return combined_lists
+
+def return_topic_model_name(num_topics, topic_model_alpha, tweet_ratio_removed):
+    file_string = "tm_qty" + str(num_topics) + "_" + "tm_alpha" + str(topic_model_alpha) + "_" + "t_ratio_r" + str(tweet_ratio_removed)
+    return file_string
+
+def return_predictor_or_sentimental_data_name(company_symbol, period_start, period_end, time_step_seconds,topic_model_qty, rel_lifetime, rel_hlflfe,topic_model_alpha,tweet_ratio_removed):
+    name = "cs" + str(company_symbol) + "_" + "ps" + str(period_start) + "_" + "pe" + str(period_end) + "_" + "ts_sec" + str(time_step_seconds) + "_" + "tm_qty" + str(topic_model_qty)+ "_" + "r_lt" + str(rel_lifetime) + "_" + "r_hl" + str(rel_hlflfe) + "_" + "tm_alpha" + str(topic_model_alpha) + "_" + "t_ratio_r" + str(tweet_ratio_removed)
+    return name
+
+def return_annotated_tweets_name(company_symbol, period_start, period_end, weighted_topics, num_topics, topic_model_alpha, tweet_ratio_removed):
+    name = "cs" + company_symbol + "_ps" + period_start + "_pe" + period_end + "_" + weighted_topics + "_"
+    name = name + return_topic_model_name(num_topics, topic_model_alpha, tweet_ratio_removed)
+    return name
+
+#%%SubModule – Stock Market Data Prep 
+
+def import_financial_data(
+        target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], 
+        index_cols_list = [], 
+        input_cols_to_include_list=[]):
+    
+    df_financial_data = pd.DataFrame()
+    for folder in target_folder_path_list:
+        if os.path.isdir(folder) == True:
+            initial_list = os.listdir(folder)
+            for file in os.listdir(folder):
+                #extract values from file
+                df_temp = pd.read_csv(folder + file, parse_dates=True)
+                if len(input_cols_to_include_list)==2:
+                    df_temp[index_col_str] = df_temp[index_cols_list[0]].astype(str) + "_" + df_temp[index_cols_list[1]].astype(str)
+                    df_temp = df_temp.set_index(index_col_str)
+                elif len(input_cols_to_include_list)==1:
+                    df_temp = df_temp.set_index(index_col_str)
+                    
+                                        
+                df_temp = df_temp[input_cols_to_include_list]
+                
+                if initial_list[0] == file:
+                    df_financial_data   = copy.deepcopy(df_temp)
+                else:
+                    df_financial_data   = pd.concat([df_financial_data, df_temp], axis=1, ignore_index=False)
+                col_rename_dict = dict()
+                for col in input_cols_to_include_list:
+                    col_rename_dict[col] = return_ticker_code_1(file) + "_" + col
+                df_financial_data = df_financial_data.rename(columns=col_rename_dict)
+                
+                del df_temp
+                
+    return df_financial_data
+
+def populate_technical_indicators_2(df_financial_data, technicial_indicators_to_add_list):
+    #FG_Actions: to populate method
+    return df_financial_data
+
+
+
+#%% SubModule – Sentiment Data Prep
+
+def retrieve_or_generate_sentimental_data(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params):
+    #desc
+    
+    #general parameters
+    company_symbol      = outputs_params_dict["output_symbol_indicators_tuple"]
+    period_start        = temporal_params_dict["period_start"]
+    period_end          = temporal_params_dict["period_end"]
+    time_step_seconds   = temporal_params_dict["time_step_seconds"]
+    topic_model_qty     = senti_inputs_params_dict["topic_qty"]
+    rel_lifetime        = senti_inputs_params_dict["relative_lifetime"]
+    rel_hlflfe          = senti_inputs_params_dict["relative_halflife"]
+    topic_model_alpha   = senti_inputs_params_dict["topic_model_alpha"]
+    tweet_ratio_removed = senti_inputs_params_dict["topic_training_tweet_ratio_removed"]
+    
+    #method
+    #search for predictor
+    sentimental_data_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["sentimental_data"]
+    sentimental_data_name = return_predictor_or_sentimental_data_name(company_symbol, period_start, period_end, time_step_seconds,topic_model_qty, rel_lifetime, rel_hlflfe,topic_model_alpha,tweet_ratio_removed)
+    sentimental_data_location_file = sentimental_data_folder_location_string + sentimental_data_name
+    if os.path.exists(sentimental_data_location_file):
+        raise ValueError('retrieve is needed')
+        df_sentimental_data = retrieve_sentimental_data(predictor_location_file)
+    else:
+        raise ValueError('generate is needed')
+        df_sentimental_data = generate_sentimental_data(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+    
+    return df_sentimental_data
+
+def retrieve_sentimental_data():
+    raise ValueError('needs writing') 
+    return None
+
+def generate_sentimental_data(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params):
+    
+    #general parameters
+    global global_financial_history_folder_path, global_precalculated_assets_locations_dict
+    company_symbol      = outputs_params_dict["output_symbol_indicators_tuple"][0]
+    period_start        = temporal_params_dict["period_start"]
+    period_end          = temporal_params_dict["period_end"]
+    weighted_topics     = senti_inputs_params_dict["weighted_topics"]
+    num_topics          = senti_inputs_params_dict["topic_qty"]
+    topic_model_alpha   = senti_inputs_params_dict["topic_model_alpha"]
+    tweet_ratio_removed = senti_inputs_params_dict["topic_training_tweet_ratio_removed"]
+    
+    seconds_per_time_steps  = temporal_params_dict["time_step_seconds"]
+    relavance_lifetime      = senti_inputs_params_dict["relative_lifetime"]
+    relavance_halflife      = senti_inputs_params_dict["relative_halflife"]
+    weighted_topics         = senti_inputs_params_dict["weighted_topics"]
+    
+
+    #search for annotated tweets
+    annotated_tweets_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["annotated_tweets"]
+    annotated_tweets_name = return_annotated_tweets_name(company_symbol, period_start, period_end, weighted_topics, num_topics, topic_model_alpha, tweet_ratio_removed)
+    annotated_tweets_location_file = annotated_tweets_folder_location_string + annotated_tweets_name
+    if os.path.exists(annotated_tweets_location_file):
+        raise ValueError('retrieve is needed')
+        df_annotated_tweets = retrieve_annotated_tweets(annotated_tweets_location_file)
+    else:
+        raise ValueError('generate is needed')
+        df_annotated_tweets = generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+    
+    #generate sentimental data from topic model and annotate tweets
+    df_sentiment_data = return_sentimental_data(df_annotated_tweets, period_start, period_end, seconds_per_time_steps, num_topics, relavance_halflife, relavance_lifetime, weighted_topics = weighted_topics)
+    
+    return df_sentiment_data
+
+def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params):
+    #general parameters
+    global global_financial_history_folder_path, global_precalculated_assets_locations_dict
+    company_symbol      = outputs_params_dict["output_symbol_indicators_tuple"][0]
+    period_start        = temporal_params_dict["period_start"]
+    period_end          = temporal_params_dict["period_end"]
+    weighted_topics     = senti_inputs_params_dict["weighted_topics"]
+    num_topics          = senti_inputs_params_dict["topic_qty"]
+    topic_model_alpha   = senti_inputs_params_dict["topic_model_alpha"]
+    tweet_ratio_removed = senti_inputs_params_dict["topic_training_tweet_ratio_removed"]
+    
+    seconds_per_time_steps  = temporal_params_dict["time_step_seconds"]
+    relavance_lifetime      = senti_inputs_params_dict["relative_lifetime"]
+    relavance_halflife      = senti_inputs_params_dict["relative_halflife"]
+    weighted_topics         = senti_inputs_params_dict["weighted_topics"]
+    
+    
+    #search for topic_model
+    topic_model_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["topic_model"]
+    topic_model_name = return_annotated_tweets_name(company_symbol, period_start, period_end, weighted_topics, num_topics, topic_model_alpha, tweet_ratio_removed)
+    topic_model_location_file = topic_model_folder_location_string + topic_model_name
+    if os.path.exists(topic_model_location_file):
+        
+        topic_model = retrieve_topic_model(topic_model_location_file)
+    else:
+        topic_model = generate_topic_model(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+    
+    return annotated_tweets
+
+
+def return_sentimental_data(df_annotated_tweets, period_start, period_end, seconds_per_time_steps, num_topics, relavance_halflife, relavance_lifetime, weighted_topic = False):
+    index = generate_datetimes(period_start, period_end, seconds_per_time_steps)
+    #df_sentiment_scores = pd.DataFrame()
+    columns = []
+    for i in range(num_topics):
+        columns = columns + ["~senti_score_t" + str(i)]
+    df_sentiment_scores = pd.DataFrame(index=index, columns=columns)
+    
+    #create the initial cohort of tweets to be looked at in a time window
+    epoch_time          = datetime(1970, 1, 1)
+    tweet_cohort_start  = (period_start - epoch_time) - timedelta(seconds=relavance_lifetime)
+    tweet_cohort_end    = (period_start - epoch_time)
+    tweet_cohort_start  = tweet_cohort_start.total_seconds()
+    tweet_cohort_end    = tweet_cohort_end.total_seconds()
+    tweet_cohort        = update_tweet_cohort(df_annotated_tweets, tweet_cohort_start, tweet_cohort_end)
+    
+    for time_step in index:
+        senti_scores = list(np.zeros(num_topics))
+        pre_calc_time_overall = np.exp((- 3 / relavance_lifetime) * (tweet_cohort.loc[:, "post_date"] - tweet_cohort_start)) * tweet_cohort.loc[:, "~sent_overall"]
+        for topic_num in range(num_topics):
+            score_numer = sum(pre_calc_time_overall * tweet_cohort.loc[:, "~sent_topic_W" + str(topic_num)])
+            score_denom = sum(np.exp((- 3 / relavance_lifetime) * (tweet_cohort.loc[:, "post_date"] - tweet_cohort_start)) * tweet_cohort.loc[:, "~sent_topic_W" + str(topic_num)])
+            if score_numer > 0 and score_denom > 0:
+                senti_scores[topic_num] = score_numer / score_denom
+        #update table
+        df_sentiment_scores.loc[time_step, :] = senti_scores
+        #update tweet cohort
+        tweet_cohort_start += seconds_per_time_steps
+        tweet_cohort_end   += seconds_per_time_steps
+        tweet_cohort        = update_tweet_cohort(df_annotated_tweets, tweet_cohort_start, tweet_cohort_end)
+    
+    return df_sentiment_scores
+
+def update_tweet_cohort(df_tweets, cohort_start_secs, cohort_end_secs):
+    epoch_time          = datetime(1970, 1, 1)
+    df_tweets        = df_tweets[df_tweets["post_date"] <= cohort_end_secs]
+    df_tweets        = df_tweets[df_tweets["post_date"] >= cohort_start_secs]
+    return df_tweets
+
+def generate_datetimes(period_start, period_end, seconds_per_time_steps):
+    format_str = '%Y%m%d_%H%M%S'  # specify the desired format for the datetime strings
+    current_time = period_start
+    datetimes = []
+    while current_time <= period_end:
+        datetimes.append(current_time.strftime(format_str))
+        current_time += timedelta(seconds=seconds_per_time_steps)
+    return datetimes
+
+
+
+
+#%% main support methods
+
+def retrieve_model_and_training_scores():
+    global global_precalculated_assets_locations_dict
+    raise ValueError('retrieve is needed')
+    model = None
+    training_scores = None
+    return model, training_scores
+
+def generate_model_and_training_scores(temporal_params_dict,
+    fin_inputs_params_dict,
+    senti_inputs_params_dict,
+    outputs_params_dict,
+    model_hyper_params):
+    #desc
+    
+    
+    #general parameters
+    global global_index_cols_list, global_input_cols_to_include_list
+    
+    #stock market data prep
+    df_financial_data = import_financial_data(
+        target_folder_path_list=["C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Financial Data\\h_us_txt\\data\\hourly\\us\\nasdaq stocks\\1\\"], 
+        index_cols_list = global_index_cols_list, 
+        input_cols_to_include_list=global_input_cols_to_include_list)
+    
+    df_financial_data = populate_technical_indicators_2(df_financial_data, fin_inputs_params_dict["fin_indi"])
+   
+
+    #sentiment data prep
+    df_sentimental_data = retrieve_or_generate_sentimental_data(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+    
+    
+    #model training
+    
+    
+    
+    model = None
+    training_scores = None    
+    
+    return model, training_scores
+
+
+
+#%% main line
+
+def retrieve_or_generate_model_and_training_scores(
+    temporal_params_dict,
+    fin_inputs_params_dict,
+    senti_inputs_params_dict,
+    outputs_params_dict,
+    model_hyper_params):
+    
+    #global values
+    global global_financial_history_folder_path, global_precalculated_assets_locations_dict
+    
+    #general parameters
+    period_start        = temporal_params_dict["period_start"]
+    period_end          = temporal_params_dict["period_end"]
+    num_topics          = senti_inputs_params_dict["topic_qty"]
+    topic_model_alpha   = senti_inputs_params_dict["topic_model_alpha"]
+    tweet_ratio_removed = senti_inputs_params_dict["topic_training_tweet_ratio_removed"]
+    
+    #search for predictor
+    predictor_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["predictive_model"]
+    predictor_name = return_predictor_or_sentimental_data_name(num_topics, topic_model_alpha, tweet_ratio_removed)
+    predictor_location_file = predictor_folder_location_string + predictor_name
+    if os.path.exists(predictor_location_file):
+        raise ValueError('retrieve is needed')
+        predictor, training_scores = retrieve_model_and_training_scores(predictor_location_file)
+    else:
+        predictor, training_scores = generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+    
+    
+    predictor = None
+    training_scores = None
+    return predictor, training_scores
+
+retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
