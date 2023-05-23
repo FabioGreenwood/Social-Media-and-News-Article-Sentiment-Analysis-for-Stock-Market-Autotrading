@@ -164,10 +164,6 @@ def current_infer_values_method(df):
     return df, nan_values_removed
 
 
-    
-
-
-
 class BlockingTimeSeriesSplit():
     def __init__(self, n_splits):
         self.n_splits = n_splits
