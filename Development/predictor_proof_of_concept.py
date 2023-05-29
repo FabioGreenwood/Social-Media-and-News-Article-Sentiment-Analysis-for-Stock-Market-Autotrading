@@ -202,13 +202,14 @@ def fg_pickle_load(file_loc="C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Fin
     return pickle_dict
 
 """create_step_responces methods"""
-#this method populates each row with the next X output results, this is done so that, each time step can be trained
-#to predict the value of the next X steps
+
 def create_step_responces_and_split_training_test_set(
         df_financial_data=df_financial_data, 
         pred_output_and_tickers_combos_list = pred_output_and_tickers_combos_list,
         pred_steps_list=pred_steps_list,
         train_test_split=train_test_split):
+    #this method populates each row with the next X output results, this is done so that, each time step can be trained
+    #to predict the value of the next X steps
     
     new_col_str = "{}_{}_{}"
     old_col_str = "{}_{}"
