@@ -110,7 +110,7 @@ fin_inputs_params_dict      = {
 
 senti_inputs_params_dict    = {
     "topic_qty"             : 7,
-    "topic_training_tweet_ratio_removed" : int(5e4),
+    "topic_training_tweet_ratio_removed" : int(1e5),
     "relative_lifetime"     : 60*60*4, # 4 hours
     "relative_halflife"     : 60*60, #one hour
     "topic_model_alpha"     : 1,
@@ -130,15 +130,20 @@ outputs_params_dict         = {
     "pred_steps_ahead"                  : 1,
 }
 
+
+cohort_retention_rate_dict_strat1 = {
+            "£_close" : 1, #output value
+            "£_*": 1, #other OHLCV values
+            "$_*" : 0.5, # technical indicators
+            "match!_*" : 0.8, #pattern matchs
+            "~senti_*" : 0.5, #sentiment analysis
+            "*": 0.5} # other missed values
+
 model_hyper_params          = {
     "MLPRegressor" : { #Multi-layer Perceptron regressor
         "estimator__hidden_layer_sizes"    : (100,10), 
         "estimator__activation"            : 'relu',
-        "cohort_retention_rate_dict"       : {
-            "Output_indicator" : 1,
-            "Sentiment": 0.5,
-            "Technical" : 0.5,
-            "*" : 0.1}},
+        "cohort_retention_rate_dict"       : cohort_retention_rate_dict_strat1},
     "training_error_measure_main"   : 'neg_mean_squared_error',
     "time_series_blocking"          : "btscv",
     "time_series_split_qty"         : 5
@@ -353,7 +358,7 @@ def retrieve_or_generate_sentimental_data(index, temporal_params_dict, fin_input
         df_sentimental_data.set_index(df_sentimental_data.columns[0], inplace=True)
         df_sentimental_data.index.name = "datetime"
     else:
-        generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing=training_or_testing)
+        df_sentimental_data = generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing=training_or_testing)
         df_sentimental_data.to_csv(sentimental_data_location_file)      
     return df_sentimental_data
 
@@ -400,6 +405,7 @@ def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dic
         df_annotated_tweets.to_csv(annotated_tweets_location_file)
     
     print(datetime.now().strftime("%H:%M:%S") + " - generating sentimental data")
+    
     #generate sentimental data from topic model and annotate tweets
     #index = generate_datetimes(train_period_start, train_period_end, seconds_per_time_steps)
     #df_sentiment_scores = pd.DataFrame()
@@ -917,12 +923,10 @@ class DRSLinReg():
                 # randomly select features to drop out
                 n_features = X.shape[1]
                 dropout_cols = return_columns_to_remove(columns_list=X.columns, self=self)
-                #dropout_cols = np.random.choice(n_features, size=int(n_features * (1 - self.max_features)), replace=False)
-                #dropout_cols = X.columns[dropout_cols]
                 X_sel = X.loc[X.index[train_index].values].copy()
                 X_sel.loc[:, dropout_cols] = 0
                 y_sel= y.loc[y.index[train_index].values].copy()
-                #print(str(i_random) + "/" + str(self.n_estimators) + "--" + str(count) + "/" + str(self.training_time_splits))
+                
                 
             # add layers to the estimator
                 for j in range(self.max_depth):
@@ -1010,11 +1014,8 @@ def generate_model_and_training_scores(temporal_params_dict,
     X_train, y_train   = create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_list=outputs_params_dict["pred_steps_ahead"])
     model              = initiate_model(outputs_params_dict, model_hyper_params)
     model.fit(X_train, y_train)
-    
-    
-    
-    model = None
-    training_scores = None    
+    training_scores = model.evaluate(X_test=X_train , y_test=y_train)
+      
     
     #report timings
     print(datetime.now().strftime("%H:%M:%S") + " - complete generating model")
