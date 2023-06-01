@@ -20,6 +20,7 @@ from matplotlib.patches import Patch
 import seaborn as sns 
 import jupyter
 import sklearn
+import math
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.model_selection import KFold
 from sklearn.linear_model import ElasticNet
@@ -32,6 +33,7 @@ from sklearn.ensemble import BaggingClassifier
 from sklearn.ensemble import BaggingRegressor
 from sklearn.datasets import make_classification
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from sklearn.preprocessing import StandardScaler
 import seaborn as sns
 import copy
 from datetime import datetime
@@ -140,14 +142,16 @@ cohort_retention_rate_dict_strat1 = {
             "*": 0.5} # other missed values
 
 model_hyper_params          = {
-    "MLPRegressor" : { #Multi-layer Perceptron regressor
-        "estimator__hidden_layer_sizes"    : (100,10), 
-        "estimator__activation"            : 'relu',
-        "cohort_retention_rate_dict"       : cohort_retention_rate_dict_strat1},
+    "name" : "RandomSubspace_MLPRegressor ", #Multi-layer Perceptron regressor
+        #general hyperparameters
+    "n_estimators" : 2,
     "training_error_measure_main"   : 'neg_mean_squared_error',
     "time_series_blocking"          : "btscv",
-    "time_series_split_qty"         : 5
-}
+    "time_series_split_qty"         : 5, 
+        #model specific rows
+    "estimator__hidden_layer_sizes"    : (100,10), 
+    "estimator__activation"            : 'relu',
+    "cohort_retention_rate_dict"       : cohort_retention_rate_dict_strat1}
 
 input_dict = {
     "temporal_params_dict"      : temporal_params_dict,
@@ -169,6 +173,7 @@ global_financial_history_folder_path = "FG action, do I need to update this?"
 global_df_stocks_list_file           = pd.read_csv(r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\support data\stock_info.csv")
 global_start_time = datetime.now()
 global_error_str_1 = "the input {} is wrong for the input training_or_testing"
+global_random_state = 1
 
 global_precalculated_assets_locations_dict = {
     "root" : "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\precalculated_assets\\",
@@ -792,6 +797,8 @@ def create_step_responces(df_financial_data, df_sentimental_data, pred_output_an
     list_of_new_columns = []
     nan_values_replaced = 0
     train_test_split = 1
+    df_sentimental_data.index = pd.to_datetime(df_sentimental_data.index)
+    df_sentimental_data = df_sentimental_data.loc[list(df_financial_data.index)]
     data = pd.concat([df_financial_data, df_sentimental_data], axis=1)
     #this method has been removed cos its doesn't work with negative values
     #df_financial_data, nan_values_replaced = current_infer_values_method(df_financial_data)
@@ -811,7 +818,7 @@ def create_step_responces(df_financial_data, df_sentimental_data, pred_output_an
     #split regressors and responses
     #Features = 6
 
-    data = data[:-max(pred_steps_list)]
+    data = data.dropna(inplace=False)
 
     X = copy.deepcopy(data)
     y = copy.deepcopy(data[list_of_new_columns])
@@ -840,19 +847,18 @@ def current_infer_values_method(df):
 #create model
 
 def initiate_model(outputs_params_dict, model_hyper_params):
-    model_str = list(model_hyper_params.keys())
-    remove = ["training_error_measure_main", "time_series_blocking", "time_series_split_qty"]
-    for r in remove:
-        model_str.remove(r)
-    
-    match model_str[0]:
-        case "RandomSubspace":
-            keys = ["estimator__alpha", "estimator__l1_ratio", "enforced_features", "proportion_of_random_features"]
-            estimator = DRSLinReg(base_estimator=LinearRegression(),
-                      model_hyper_params=model_hyper_params, ticker_name=outputs_params_dict["output_symbol_indicators_tuple"][0])
+    match model_hyper_params["name"]:
+        case "RandomSubspace_MLPRegressor ":
+            estimator = DRSLinReg(base_estimator=MLPRegressor(
+                hidden_layer_sizes = model_hyper_params["estimator__hidden_layer_sizes"],
+                activation = model_hyper_params["estimator__activation"]
+                ),
+                model_hyper_params=model_hyper_params, 
+                ticker_name=outputs_params_dict["output_symbol_indicators_tuple"][0])
             
         
-        case "ElasticNet":
+        case "ElasticNet": 
+            raise ValueError("OLD SYSTEM WILL NOT WORK")
             keys = ["estimator__alpha", "estimator__l1_ratio"]
             #check_dict_keys_for_build_model(keys, input_dict, type_str)
             estimator = BaggingRegressor(
@@ -873,32 +879,36 @@ def initiate_model(outputs_params_dict, model_hyper_params):
                 )), n_estimators=10, random_state=0, max_features=0.5
             )
         case "MLPRegressor":
+            raise ValueError("OLD SYSTEM WILL NOT WORK")
             keys = ["estimator__hidden_layer_sizes", "estimator__activation"]
             #check_dict_keys_for_build_model(keys, input_dict, type_str)
             estimator = MLPRegressor(
-                MultiOutputRegressor(
                 activation          = model_hyper_params["MLPRegressor"]["estimator__activation"],
                 hidden_layer_sizes  = model_hyper_params["MLPRegressor"]["estimator__hidden_layer_sizes"],
                 alpha=0.001,
                 random_state=20,
                 early_stopping=False)
-            )
         case _:
-            raise ValueError("the model type: " + str(model_str[0]) + " was not found in the method")
+            raise ValueError("the model type: " + str(model_hyper_params["name"]) + " was not found in the method")
     
     return estimator
 
 class DRSLinReg():
-    def __init__(self, base_estimator=LinearRegression(),
-                 input_dict=dict(),
-                 ticker_name=[]):
+    def __init__(self, base_estimator=MLPRegressor(),
+                 model_hyper_params=model_hyper_params, 
+                 ticker_name=outputs_params_dict["output_symbol_indicators_tuple"][0]):
         #expected keys: training_time_splits, max_depth, max_features, random_state,        
-        for key in input_dict:
-           setattr(self, key, input_dict[key])
-        self.input_dict = input_dict
+        for key in model_hyper_params:
+           setattr(self, key, model_hyper_params[key])
+        self.model_hyper_params = model_hyper_params
         self.ticker_name = ticker_name
         self.base_estimator = base_estimator
         self.estimators_ = []
+        self.training_time_splits = model_hyper_params["time_series_split_qty"]
+        global global_random_state
+        self.random_state = global_random_state
+        global_random_state += 1
+        self.n_estimators = model_hyper_params["n_estimators"]
         
     def fit(self, X, y):
         tscv = BlockingTimeSeriesSplit(n_splits=self.training_time_splits)
@@ -907,14 +917,14 @@ class DRSLinReg():
             #these are the base values that will be updated if there isn't a passed value in the input dict
             estimator = BaggingRegressor(base_estimator=self.base_estimator,
                                           #the assignment of "one" estimator is overwritten by the rest of the method
-                                          n_estimators=1,
+                                          n_estimators=self.n_estimators,
                                           max_samples=1.0,
                                           max_features=1.0,
                                           bootstrap=True,
                                           bootstrap_features=False,
                                           random_state=self.random_state)
-            for key in self.input_dict:
-                setattr(estimator, key, self.input_dict[key])
+            for key in self.model_hyper_params:
+                setattr(estimator, key, self.model_hyper_params[key])
             
             estimator.base_estimator = self.base_estimator
             
@@ -937,30 +947,80 @@ class DRSLinReg():
             #self.estimators_.append(estimator)
         return self
 
+    def predict_ensemble(self, X, name_of_outputs=None):
+        
+        if name_of_outputs==None:
+            outputs_range = range(self.estimators_[0].predict(X).shape[1])
+        else:
+            outputs_range = name_of_outputs
+        output = pd.DataFrame(columns=outputs_range)
+
+        y_pred = []
+        for j in range(len(outputs_range)):
+            y_pred = y_pred + [np.zeros((X.shape[0], len(self.estimators_)))]
+            
+        for i, estimator in enumerate(self.estimators_):
+            # randomly select features to drop out
+            y_temp = estimator.predict(X)
+            if not len(outputs_range) == y_temp.shape[1]:
+                raise ValueError("the number of values in name_of_outputs must equals the number of outputs generated, please check this entry matches the outputs for the trained model")
+            
+            for j in range(len(outputs_range)):
+                y_pred[j][:,i] = y_temp[:,j]
+            
+        
+        for j in range(len(outputs_range)):
+            output[outputs_range[j]] = np.mean(y_pred[j], axis=1)
+        
+        return output
+    
+    def evaluate(self, X_test=None, y_test=None, y_pred=None, method="r2", return_high_good=False):
+        if y_pred==None:
+            y_pred = self.predict_ensemble(X_test).values
+        
+        match method:
+            case "r2":
+                output = r2_score(y_test, y_pred)
+                high_good = True
+            case "mse":
+                output = mean_squared_error(y_test, y_pred)
+                high_good = False
+            case "mae":
+                output = mean_absolute_error(y_test, y_pred)
+                high_good = False
+            case _:
+                raise ValueError("passed method string not found")
+        
+        if return_high_good==False:
+            return output
+        else:
+            return output, high_good
+
+
 def return_columns_to_remove(columns_list, self):
     
     columns_to_remove = list(copy.deepcopy(columns_list))
     retain_cols = []
-    retain_dict = self.input_dict["cohort_retention_rate_dict"]
-    max_features = self.max_features
+    retain_dict = self.model_hyper_params["cohort_retention_rate_dict"]
+    #max_features = self.max_features
     stock_strings_list = []
     columns_list = list(columns_list)
-    for a in self.ticker_name:
-        stock_strings_list = stock_strings_list + [a[0]]
+    #for a in self.ticker_name:
+    #    stock_strings_list = stock_strings_list + [a[0]]
     for key in retain_dict:
         cohort = []
         target_string = key
-        if len(fnmatch.filter([key], "STOCK_NAME*")) > 0:
-            for stock in stock_strings_list:
-                target_string = key
-                target_string = target_string.replace("STOCK_NAME", stock)
-                cohort = cohort + fnmatch.filter(columns_list, target_string)
-        else:
-            cohort = cohort + fnmatch.filter(columns_list, target_string)
+        #if len(fnmatch.filter([key], "STOCK_NAME*")) > 0:
+        #    for stock in stock_strings_list:
+        #        target_string = key
+        #        target_string = target_string.replace("STOCK_NAME", stock)
+        #        cohort = cohort + fnmatch.filter(columns_list, target_string)
+        #else:
+        cohort = cohort + fnmatch.filter(columns_list, target_string)
         if len(cohort) > 0:
             for col in cohort:
                 columns_list.remove(col)
-            retain_cols = retain_cols + list(np.random.choice(cohort, int(len(cohort) * retain_dict[key]), replace=False))
+            retain_cols = retain_cols + list(np.random.choice(cohort, math.ceil(len(cohort) * retain_dict[key]), replace=False))
 
     for value in retain_cols:
         columns_to_remove.remove(value)
