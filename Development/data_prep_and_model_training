@@ -144,7 +144,7 @@ cohort_retention_rate_dict_strat1 = {
 model_hyper_params          = {
     "name" : "RandomSubspace_MLPRegressor ", #Multi-layer Perceptron regressor
         #general hyperparameters
-    "n_estimators" : 2,
+    "n_estimators_per_time_series_blocking" : 2,
     "training_error_measure_main"   : 'neg_mean_squared_error',
     "time_series_blocking"          : "btscv",
     "time_series_split_qty"         : 5, 
@@ -905,14 +905,12 @@ class DRSLinReg():
         self.base_estimator = base_estimator
         self.estimators_ = []
         self.training_time_splits = model_hyper_params["time_series_split_qty"]
-        global global_random_state
-        self.random_state = global_random_state
-        global_random_state += 1
-        self.n_estimators = model_hyper_params["n_estimators"]
+        self.n_estimators = 1 #this is a hard coding as the n estimators is set by a random loop. this ensures that each version of the input (provided by the 'remove columns' function), is used to train just a single model
         
     def fit(self, X, y):
         tscv = BlockingTimeSeriesSplit(n_splits=self.training_time_splits)
         count = 0
+        global global_random_state
         for train_index, _ in tscv.split(X):
             #these are the base values that will be updated if there isn't a passed value in the input dict
             estimator = BaggingRegressor(base_estimator=self.base_estimator,
@@ -921,62 +919,54 @@ class DRSLinReg():
                                           max_samples=1.0,
                                           max_features=1.0,
                                           bootstrap=True,
-                                          bootstrap_features=False,
-                                          random_state=self.random_state)
+                                          bootstrap_features=False)
+                                          #random_state=self.random_state SET ELSEWHERE
             for key in self.model_hyper_params:
                 setattr(estimator, key, self.model_hyper_params[key])
             
             estimator.base_estimator = self.base_estimator
             
             count += 1
-            for i_random in range(self.n_estimators):
+            for i_random in range(model_hyper_params["n_estimators_per_time_series_blocking"]):
                 # randomly select features to drop out
                 n_features = X.shape[1]
                 dropout_cols = return_columns_to_remove(columns_list=X.columns, self=self)
                 X_sel = X.loc[X.index[train_index].values].copy()
                 X_sel.loc[:, dropout_cols] = 0
                 y_sel= y.loc[y.index[train_index].values].copy()
-                
-                
-            # add layers to the estimator
-                for j in range(self.max_depth):
-                    
-                    estimator.fit(X_sel, y_sel)
-                    self.estimators_ = self.estimators_ + [estimator]
+                #add max depth if it is a decision tree
+                estimator.random_state = global_random_state
+                global_random_state += 1
+                estimator.fit(X_sel, y_sel)
+                self.estimators_ = self.estimators_ + [estimator]
             
             #self.estimators_.append(estimator)
         return self
 
-    def predict_ensemble(self, X, name_of_outputs=None):
+    def predict_ensemble(self, X, output_name=None):
         
-        if name_of_outputs==None:
-            outputs_range = range(self.estimators_[0].predict(X).shape[1])
-        else:
-            outputs_range = name_of_outputs
-        output = pd.DataFrame(columns=outputs_range)
-
-        y_pred = []
-        for j in range(len(outputs_range)):
-            y_pred = y_pred + [np.zeros((X.shape[0], len(self.estimators_)))]
+        if output_name==None:
+            raise ValueError ("please ensure that the outputs are labelled")
+            output_name = ["output"]
+        
+        y_ave = []
+        y_ensemble = []
             
         for i, estimator in enumerate(self.estimators_):
             # randomly select features to drop out
-            y_temp = estimator.predict(X)
-            if not len(outputs_range) == y_temp.shape[1]:
-                raise ValueError("the number of values in name_of_outputs must equals the number of outputs generated, please check this entry matches the outputs for the trained model")
-            
-            for j in range(len(outputs_range)):
-                y_pred[j][:,i] = y_temp[:,j]
-            
+            y_ensemble.insert(len(y_ensemble), estimator.predict(X))
         
-        for j in range(len(outputs_range)):
-            output[outputs_range[j]] = np.mean(y_pred[j], axis=1)
+        y_ensemble = np.array(y_ensemble)
+        for ts in range(len(y_ensemble[0])):
+            y_ave = y_ave + [y_ensemble[:,ts].mean()]
+        
+        output = pd.DataFrame(y_ave, columns=[output_name], index=X.index)
         
         return output
     
     def evaluate(self, X_test=None, y_test=None, y_pred=None, method="r2", return_high_good=False):
         if y_pred==None:
-            y_pred = self.predict_ensemble(X_test).values
+            y_pred = self.predict_ensemble(X_test, output_name=["test output"]).values
         
         match method:
             case "r2":
