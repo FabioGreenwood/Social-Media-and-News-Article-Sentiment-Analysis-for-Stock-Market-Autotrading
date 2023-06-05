@@ -162,7 +162,7 @@ model_hyper_params          = {
         #general hyperparameters
     "n_estimators_per_time_series_blocking" : 2,
     "training_error_measure_main"   : 'neg_mean_squared_error',
-    "testing_scoring"               : "mae",
+    "testing_scoring"               : ["r2", "mse", "mae"],
     "time_series_blocking"          : "btscv",
     "time_series_split_qty"         : 5,
         #model specific rows
@@ -746,7 +746,7 @@ def save_topic_clusters(wordcloud=None, topic_model_dict=None, visualisation=Non
     if visualisation != None:
         pyLDAvis.save_html(visualisation, file_location_visualisation)
 
-def edit_scores_csv(predictor_name_entry, is_training_or_testing, score_type, mode="save", training_scores=None):
+def edit_scores_csv(predictor_name_entry, is_training_or_testing, score_types, mode="save", training_scores=None):
     global global_scores_database, global_strptime_str_filename
     DB_strptime_str = '%d/%m/%Y %H:%M:%S'
 
@@ -756,7 +756,7 @@ def edit_scores_csv(predictor_name_entry, is_training_or_testing, score_type, mo
     ERROR_multi_input = "There are multiple entries of the following experiment: {}"
     ERROR_mode_input_wrong = "'mode' input should be 'save' or 'load', recieved {}"
     ERROR_is_training_or_testing_input_wrong= "'is_training_or_testing' input should be 'training' or 'testing', recieved {}"
-    score_col       =  is_training_or_testing + "_" + score_type
+    score_col_str    =  is_training_or_testing + "_{}" # + score_type
     
     #expection handling
     if not is_training_or_testing == "training" and not is_training_or_testing == "testing":
@@ -782,8 +782,11 @@ def edit_scores_csv(predictor_name_entry, is_training_or_testing, score_type, mo
     
     
     if mode=="load":
+        output = dict()
         if len(previous_entries_indexes) == 1:
-            return df_scores_database.loc[previous_entries_indexes[0], is_training_or_testing + "_" + score_type]
+            for val in score_types:
+                output[val] = df_scores_database.loc[previous_entries_indexes[0], score_col_str.format(val)]
+            return output
         elif len(previous_entries_indexes) > 1:
             raise ValueError(ERROR_multi_input.format(str(predictor_name_entry)))
         else:
@@ -800,7 +803,8 @@ def edit_scores_csv(predictor_name_entry, is_training_or_testing, score_type, mo
             df_scores_database.loc[ID,first_col_str:last_col_str] = list(predictor_name_entry)
 
         #populate score
-        df_scores_database.loc[ID, score_col] = training_scores
+        for val in score_types:
+            df_scores_database.loc[ID, score_col_str.format(val)] = training_scores[val]
 
         #save
         try:
@@ -1052,27 +1056,24 @@ class DRSLinReg():
         
         return output
     
-    def evaluate(self, X_test=None, y_test=None, y_pred=None, method="r2", return_high_good=False):
+    def evaluate(self, X_test=None, y_test=None, y_pred=None, method=["r2"], return_high_good=False):
+        
+        output = dict()
+        
         if y_pred==None:
             y_pred = self.predict_ensemble(X_test, output_name=["test output"]).values
         
-        match method:
-            case "r2":
-                output = r2_score(y_test, y_pred)
-                high_good = True
-            case "mse":
-                output = mean_squared_error(y_test, y_pred)
-                high_good = False
-            case "mae":
-                output = mean_absolute_error(y_test, y_pred)
-                high_good = False
-            case _:
-                raise ValueError("passed method string not found")
-        
-        if return_high_good==False:
-            return output
-        else:
-            return output, high_good
+        for val in method:
+            match val:
+                case "r2":
+                    output[val] = r2_score(y_test, y_pred)
+                case "mse":
+                    output[val] = mean_squared_error(y_test, y_pred)
+                case "mae":
+                    output[val] = mean_absolute_error(y_test, y_pred)
+                case _:
+                    raise ValueError("passed method string not found")
+        return output
 
 
 def return_columns_to_remove(columns_list, self):
@@ -1112,7 +1113,9 @@ def retrieve_model_and_training_scores(predictor_location_file, predictor_name_e
     with open(predictor_location_file, 'rb') as file:
         predictor = pickle.load(file)
     training_score = edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="load")
-    if training_score is None:
+    
+    if any(math.isnan(value) for value in list(training_score.values())):
+    #if training_score is None:
         training_score = quick_training_score_rerun(predictor, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
         edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="save", training_scores=training_score)
 
