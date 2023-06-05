@@ -129,8 +129,8 @@ fin_inputs_params_dict      = {
 senti_inputs_params_dict    = {
     "topic_qty"             : 7,
     "topic_training_tweet_ratio_removed" : int(1e5),
-    "relative_lifetime"     : 60*60*4, # 4 hours
-    "relative_halflife"     : 60*60, #one hour
+    "relative_lifetime"     : 60*60*1, #  hours
+    "relative_halflife"     : 60*60*0.5, #one hour
     "topic_model_alpha"     : 1,
     "weighted_topics"       : False,
     "apply_IDF"             : True,
@@ -770,7 +770,12 @@ def edit_scores_csv(predictor_name_entry, is_training_or_testing, score_types, m
     predictor_name_entry = company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed
     
     #prep DB, try using dont touch
-    df_scores_database = pd.read_csv(global_scores_database + "DONTTOUCH", index_col=ID_str)
+    try:
+        df_scores_database = pd.read_csv(global_scores_database + "DONTTOUCH", index_col=ID_str)
+    except:
+        df_scores_database = pd.DataFrame(columns=[ID_str, "company_symbol (ps)", "train_period_start (ps)", "train_period_end (pe)", "time_step_seconds (ts_sec)", "topic_model_qty (tm_qty)", "rel_lifetime (r_lt)", "rel_hlflfe (r_hl)", "topic_model_alpha (tm_alpha)", "apply_IDF (IDF)", "tweet_ratio_removed (t_ratio_r)", "training_r2", "training_mse", "training_mae", "testing_r2", "testing_mse",  "testing_mae"])
+        df_scores_database = df_scores_database.set_index("ID")
+                
     #format datetimes
     df_scores_database['train_period_start (ps)'] = df_scores_database['train_period_start (ps)'].apply(lambda x: str(x))
     df_scores_database['train_period_end (pe)'] = df_scores_database['train_period_end (pe)'].apply(lambda x: str(x))
@@ -790,7 +795,8 @@ def edit_scores_csv(predictor_name_entry, is_training_or_testing, score_types, m
         elif len(previous_entries_indexes) > 1:
             raise ValueError(ERROR_multi_input.format(str(predictor_name_entry)))
         else:
-            return None
+            output["na"] = math.nan
+            return output
         
     elif mode=="save":
         #assign correct ID, given matches
@@ -800,6 +806,8 @@ def edit_scores_csv(predictor_name_entry, is_training_or_testing, score_types, m
             raise ValueError(ERROR_multi_input.format(str(predictor_name_entry)))
         else:
             ID = df_scores_database.index.max() + 1
+            if math.isnan(ID):
+                ID = 0
             df_scores_database.loc[ID,first_col_str:last_col_str] = list(predictor_name_entry)
 
         #populate score
