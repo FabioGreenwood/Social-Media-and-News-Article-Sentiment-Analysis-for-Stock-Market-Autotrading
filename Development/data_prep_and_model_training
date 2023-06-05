@@ -104,6 +104,7 @@ global_error_str_1 = "the input {} is wrong for the input training_or_testing"
 global_random_state = 1
 global_scores_database = r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\scores_database.csv"
 global_strptime_str = '%d/%m/%y %H:%M:%S'
+global_strptime_str_filename = '%d_%m_%y %H:%M:%S'
 
 temporal_params_dict    = {
     "train_period_start"    : datetime.strptime('04/06/18 00:00:00', global_strptime_str),
@@ -214,13 +215,13 @@ def return_topic_model_name(num_topics, topic_model_alpha, apply_IDF, tweet_rati
     return file_string
 
 def return_predictor_or_sentimental_data_name(company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed):
-    global global_strptime_str
-    name = company_symbol + "_ps" + train_period_start.strftime(global_strptime_str).replace(":","").replace(" ","_") + "_pe" + train_period_end.strftime(global_strptime_str).replace(":","").replace(" ","_") + "_ts_sec" + str(time_step_seconds) + "_tm_qty" + str(topic_model_qty)+ "_r_lt" + str(rel_lifetime) + "_r_hl" + str(rel_hlflfe) + "_tm_alpha" + str(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed)
+    global global_strptime_str, global_strptime_str_filename
+    name = company_symbol + "_ps" + train_period_start.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_pe" + train_period_end.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_ts_sec" + str(time_step_seconds) + "_tm_qty" + str(topic_model_qty)+ "_r_lt" + str(rel_lifetime) + "_r_hl" + str(rel_hlflfe) + "_tm_alpha" + str(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed)
     return name
 
 def return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, weighted_topics, num_topics, topic_model_alpha, apply_IDF, tweet_ratio_removed):
-    global global_strptime_str
-    name = company_symbol + "_ps" + train_period_start.strftime(global_strptime_str).replace(":","").replace(" ","_") + "_pe" + train_period_end.strftime(global_strptime_str).replace(":","").replace(" ","_") + "_" + str(weighted_topics) + "_"
+    global global_strptime_str, global_strptime_str_filename
+    name = company_symbol + "_ps" + train_period_start.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_pe" + train_period_end.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_" + str(weighted_topics) + "_"
     name = name + return_topic_model_name(num_topics, topic_model_alpha, apply_IDF, tweet_ratio_removed)
     return name
 
@@ -745,66 +746,72 @@ def save_topic_clusters(wordcloud=None, topic_model_dict=None, visualisation=Non
     if visualisation != None:
         pyLDAvis.save_html(visualisation, file_location_visualisation)
 
-def save_scores(predictor_name_entry, is_training_or_testing, score_type, training_scores):
-    global global_scores_database
+def edit_scores_csv(predictor_name_entry, is_training_or_testing, score_type, mode="save", training_scores=None):
+    global global_scores_database, global_strptime_str_filename
     DB_strptime_str = '%d/%m/%Y %H:%M:%S'
 
     ID_str          = "ID"
     first_col_str   = "company_symbol (ps)"
     last_col_str    = "tweet_ratio_removed (t_ratio_r)"
+    ERROR_multi_input = "There are multiple entries of the following experiment: {}"
+    ERROR_mode_input_wrong = "'mode' input should be 'save' or 'load', recieved {}"
+    ERROR_is_training_or_testing_input_wrong= "'is_training_or_testing' input should be 'training' or 'testing', recieved {}"
+    score_col       =  is_training_or_testing + "_" + score_type
     
+    #expection handling
+    if not is_training_or_testing == "training" and not is_training_or_testing == "testing":
+        raise ValueError(ERROR_is_training_or_testing_input_wrong.format(is_training_or_testing))
+        
     #format values
     company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed = predictor_name_entry
     train_period_start  = train_period_start.strftime(DB_strptime_str)
     train_period_end    = train_period_end.strftime(DB_strptime_str)
+    apply_IDF           = str(apply_IDF)
     predictor_name_entry = company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed
     
     #prep DB, try using dont touch
-    try:
-        df_scores_database = pd.read_csv(global_scores_database + "DONTTOUCH", index_col=ID_str)
-    except:
-        df_scores_database = pd.read_csv(global_scores_database, index_col=ID_str)
+    df_scores_database = pd.read_csv(global_scores_database + "DONTTOUCH", index_col=ID_str)
     #format datetimes
-    df_scores_database['train_period_start (ps)'] = df_scores_database['train_period_start (ps)'].apply(lambda x: str(x) + ":00")
-    df_scores_database['train_period_end (pe)'] = df_scores_database['train_period_end (pe)'].apply(lambda x: str(x) + ":00")
+    df_scores_database['train_period_start (ps)'] = df_scores_database['train_period_start (ps)'].apply(lambda x: str(x))
+    df_scores_database['train_period_end (pe)'] = df_scores_database['train_period_end (pe)'].apply(lambda x: str(x))
         
     #find matches
     value_qty = len(df_scores_database.loc[:,first_col_str:last_col_str].columns)
     previous_values = df_scores_database.loc[:,"company_symbol (ps)":"tweet_ratio_removed (t_ratio_r)"]==predictor_name_entry
     previous_entries_indexes = list((previous_values[previous_values.sum(axis=1) == value_qty]).index)
     
-    #assign correct ID, given matches
-    if len(previous_entries_indexes) == 1:
-        ID = previous_entries_indexes[0]
-    elif len(previous_entries_indexes) > 1:
-        raise ValueError("there are multiple entries of the following experiment: " + str(predictor_name_entry))
+    
+    if mode=="load":
+        if len(previous_entries_indexes) == 1:
+            return df_scores_database.loc[previous_entries_indexes[0], is_training_or_testing + "_" + score_type]
+        elif len(previous_entries_indexes) > 1:
+            raise ValueError(ERROR_multi_input.format(str(predictor_name_entry)))
+        else:
+            return None
+        
+    elif mode=="save":
+        #assign correct ID, given matches
+        if len(previous_entries_indexes) == 1:
+            ID = previous_entries_indexes[0]
+        elif len(previous_entries_indexes) > 1:
+            raise ValueError(ERROR_multi_input.format(str(predictor_name_entry)))
+        else:
+            ID = df_scores_database.index.max() + 1
+            df_scores_database.loc[ID,first_col_str:last_col_str] = list(predictor_name_entry)
+
+        #populate score
+        df_scores_database.loc[ID, score_col] = training_scores
+
+        #save
+        try:
+            df_scores_database.to_csv(global_scores_database)
+            df_scores_database.to_csv(global_scores_database + "DONTTOUCH")
+        except:
+            df_scores_database.to_csv(global_scores_database + "DONTTOUCH")
+            
+            
     else:
-        ID = df_scores_database.index.max() + 1
-        df_scores_database.loc[ID,first_col_str:last_col_str] = list(predictor_name_entry)
-    
-    #populate score
-    match (is_training_or_testing, score_type):
-        case ("training", "r2")   |   ("train", "r2"):
-            df_scores_database.loc[ID, "training_r2"] = training_scores
-        case ("training", "mse")  |   ("train", "mse"):
-            df_scores_database.loc[ID, "training_mse"] = training_scores
-        case ("training", "mae")  |   ("train", "mae"):
-            df_scores_database.loc[ID, "training_mae"] = training_scores
-        case ("testing", "r2")    |   ("test", "r2"):
-            df_scores_database.loc[ID, "testing_r2"] = training_scores
-        case ("testing", "mse")   |   ("test", "mse"):
-            df_scores_database.loc[ID, "testing_mse"] = training_scores
-        case ("testing", "mae")   |   ("test", "mae"):
-            df_scores_database.loc[ID, "testing_mae"] = training_scores
-        case _:
-            raise ValueError("is_training_or_testing is mispelt as" + str(is_training_or_testing))
-    
-    #save
-    try:
-        df_scores_database.to_csv(global_scores_database)
-        df_scores_database.to_csv(global_scores_database + "DONTTOUCH")
-    except:
-        df_scores_database.to_csv(global_scores_database + "DONTTOUCH")
+        ERROR_mode_input_wrong.format(mode)
     
     
 
@@ -1101,12 +1108,15 @@ def return_columns_to_remove(columns_list, self):
 
 #%% main support methods
 
-def retrieve_model_and_training_scores():
-    global global_precalculated_assets_locations_dict
-    raise ValueError('retrieve is needed')
-    model = None
-    training_scores = None
-    return model, training_scores
+def retrieve_model_and_training_scores(predictor_location_file, predictor_name_entry):
+    with open(predictor_location_file, 'rb') as file:
+        predictor = pickle.load(file)
+    training_score = edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="load")
+    if training_score is None:
+        training_score = quick_training_score_rerun(predictor, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+        edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="save", training_scores=training_score)
+
+    return predictor, training_score
 
 def generate_model_and_training_scores(temporal_params_dict,
     fin_inputs_params_dict,
@@ -1160,6 +1170,32 @@ def generate_model_and_training_scores(temporal_params_dict,
     return model, training_scores
 
 
+def quick_training_score_rerun(model, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params):
+
+    df_financial_data = import_financial_data(
+        target_folder_path          = fin_inputs_params_dict["historical_file"], 
+        input_cols_to_include_list  = fin_inputs_params_dict["cols_list"],
+        temporal_params_dict = temporal_params_dict, training_or_testing="training")
+    
+    df_financial_data = populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"])
+
+    #sentiment data prep
+    print(datetime.now().strftime("%H:%M:%S") + " - importing or prepping sentimental data")
+    df_sentimental_data = retrieve_or_generate_sentimental_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training")
+    
+    
+    #model training - time series blocking
+    match model_hyper_params["time_series_blocking"]:
+        case "btscv":
+            time_series_spliting = BlockingTimeSeriesSplit(n_splits=model_hyper_params["time_series_split_qty"])
+        case _:
+            raise ValueError("model_hyper_params['time_series_blocking'], not recognised")
+        
+    #model training - create regressors
+    X_train, y_train   = create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_list=outputs_params_dict["pred_steps_ahead"])
+    training_scores = model.evaluate(X_test=X_train , y_test=y_train, method=model_hyper_params["testing_scoring"])
+    return training_scores
+
 
 #%% main line
 
@@ -1193,23 +1229,16 @@ def retrieve_or_generate_model_and_training_scores(
     predictor_name_entry = company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed
     predictor_name = return_predictor_or_sentimental_data_name(company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed)
     predictor_location_file = predictor_folder_location_string + predictor_name + ".pred"
+    #previous_score = edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="load")
     if os.path.exists(predictor_location_file):
-        with open(predictor_location_file, 'rb') as file:
-            predictor = pickle.load(file)
-        #raise ValueError('retrieve is needed')
-        print("hhe")
-    
-        predictor, training_scores = retrieve_model_and_training_scores(predictor_location_file)
+        predictor, training_scores = retrieve_model_and_training_scores(predictor_location_file, predictor_name_entry)
     else:
         print(datetime.now().strftime("%H:%M:%S") + " - generating model and testing scores")
         predictor, training_scores = generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
         with open(predictor_location_file, "wb") as file:
             pickle.dump(predictor, file)
-        save_scores(predictor_name_entry, "training", model_hyper_params["testing_scoring"], training_scores)
+        edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="save", training_scores=training_scores)
 
-    
-    predictor = None
-    training_scores = None
     return predictor, training_scores
 
 retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
