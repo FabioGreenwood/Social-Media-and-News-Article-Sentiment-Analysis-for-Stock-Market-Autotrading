@@ -291,45 +291,45 @@ def populate_technical_indicators(df, tech_indi_dict, match_doji):
         in zip(df.index, df['£_open'], df['£_high'], df['£_low'], df['£_close'], df['£_volume'])
     ]
     for key in tech_indi_dict:
-        match key:
-            case "sma":
-                for value in tech_indi_dict[key]:
-                    col_str = "$_sma_" + str(value)
-                    df[col_str] = ""
-                    results = indicators.get_sma(quotes_list, value)
-                    for r in results:
+        if key == "sma":
+            for value in tech_indi_dict[key]:
+                col_str = "$_sma_" + str(value)
+                df[col_str] = ""
+                results = indicators.get_sma(quotes_list, value)
+                for r in results:
                         df.at[r.date, col_str] = r.sma
-            case "ema":
-                for value in tech_indi_dict[key]:
+        elif key == "ema":
+            for value in tech_indi_dict[key]:
                     col_str = "$_ema_" + str(value)
                     df[col_str] = ""
                     results = indicators.get_ema(quotes_list, value)
                     for r in results:
                         df.at[r.date, col_str] = r.ema
-            case _:
-                raise ValueError("technical indicator " + key + " not programmed")
+        else:
+            raise ValueError("technical indicator " + key + " not programmed")
     if match_doji == True:
         results = indicators.get_doji(quotes_list)
         df["match!_doji"] = ""
         for r in results:
             mat = r.match
-            match mat:
-                case Match.BULL_CONFIRMED:
-                    val = 3
-                case Match.BULL_SIGNAL:
-                    val = 2
-                case Match.BULL_BASIS:
-                    val = 1
-                case Match.NEUTRAL:
-                    val = 0
-                case Match.NONE:
-                    val = 0
-                case Match.BEAR_BASIS:
-                    val = -1
-                case Match.BEAR_SIGNAL:
-                    val = -2
-                case Match.BEAR_CONFIRMED:
-                    val = -3
+            if mat == Match.BULL_CONFIRMED:
+                val = 3
+            elif mat == Match.BULL_SIGNAL:
+                val = 2
+            elif mat == Match.BULL_BASIS:
+                val = 1
+            elif mat == Match.NEUTRAL:
+                val = 0
+            elif mat == Match.NONE:
+                val = 0
+            elif mat == Match.BEAR_BASIS:
+                val = -1
+            elif mat == Match.BEAR_SIGNAL:
+                val = -2
+            elif mat == Match.BEAR_CONFIRMED:
+                val = -3
+            else:
+                raise ValueError(str(mat) + "not found in list")
             df.at[r.date, "match!_doji"] = val
     
     return df
@@ -935,8 +935,7 @@ def current_infer_values_method(df):
 #create model
 
 def initiate_model(outputs_params_dict, model_hyper_params):
-    match model_hyper_params["name"]:
-        case "RandomSubspace_MLPRegressor ":
+    if model_hyper_params["name"] == "RandomSubspace_MLPRegressor ":
             estimator = DRSLinReg(base_estimator=MLPRegressor(
                 hidden_layer_sizes  = model_hyper_params["estimator__hidden_layer_sizes"],
                 activation          = model_hyper_params["estimator__activation"],
@@ -944,9 +943,9 @@ def initiate_model(outputs_params_dict, model_hyper_params):
                 ),
                 model_hyper_params=model_hyper_params, 
                 ticker_name=outputs_params_dict["output_symbol_indicators_tuple"][0])
-            
         
-        case "ElasticNet": 
+    
+    elif model_hyper_params["name"] == "ElasticNet": 
             raise ValueError("OLD SYSTEM WILL NOT WORK")
             keys = ["estimator__alpha", "estimator__l1_ratio"]
             #check_dict_keys_for_build_model(keys, input_dict, type_str)
@@ -967,7 +966,7 @@ def initiate_model(outputs_params_dict, model_hyper_params):
                     selection='random'
                 )), n_estimators=10, random_state=0, max_features=0.5
             )
-        case "MLPRegressor":
+    elif model_hyper_params["name"] == "MLPRegressor":
             raise ValueError("OLD SYSTEM WILL NOT WORK")
             keys = ["estimator__hidden_layer_sizes", "estimator__activation"]
             #check_dict_keys_for_build_model(keys, input_dict, type_str)
@@ -977,8 +976,8 @@ def initiate_model(outputs_params_dict, model_hyper_params):
                 alpha=0.001,
                 random_state=20,
                 early_stopping=False)
-        case _:
-            raise ValueError("the model type: " + str(model_hyper_params["name"]) + " was not found in the method")
+    else:
+        raise ValueError("the model type: " + str(model_hyper_params["name"]) + " was not found in the method")
     
     return estimator
 
@@ -1061,17 +1060,15 @@ class DRSLinReg():
             y_pred = self.predict_ensemble(X_test, output_name=["test output"]).values
         
         for val in method:
-            match val:
-                case "r2":
-                    output[val] = r2_score(y_test, y_pred)
-                case "mse":
-                    output[val] = mean_squared_error(y_test, y_pred)
-                case "mae":
-                    output[val] = mean_absolute_error(y_test, y_pred)
-                case _:
-                    raise ValueError("passed method string not found")
+            if val == "r2":
+                output[val] = r2_score(y_test, y_pred)
+            elif val == "mse":
+                output[val] = mean_squared_error(y_test, y_pred)
+            elif val == "mae":
+                output[val] = mean_absolute_error(y_test, y_pred)
+            else:
+                raise ValueError("passed method string not found")
         return output
-
 
 def return_columns_to_remove(columns_list, self):
     
@@ -1145,11 +1142,10 @@ def generate_model_and_training_scores(temporal_params_dict,
     
     
     #model training - time series blocking
-    match model_hyper_params["time_series_blocking"]:
-        case "btscv":
-            time_series_spliting = BlockingTimeSeriesSplit(n_splits=model_hyper_params["time_series_split_qty"])
-        case _:
-            raise ValueError("model_hyper_params['time_series_blocking'], not recognised")
+    if model_hyper_params["time_series_blocking"] == "btscv":
+        time_series_spliting = BlockingTimeSeriesSplit(n_splits=model_hyper_params["time_series_split_qty"])
+    else:
+        raise ValueError("model_hyper_params['time_series_blocking'], not recognised")
         
     #model training - create regressors
     X_train, y_train   = create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_list=outputs_params_dict["pred_steps_ahead"])
@@ -1185,11 +1181,10 @@ def quick_training_score_rerun(model, temporal_params_dict, fin_inputs_params_di
     
     
     #model training - time series blocking
-    match model_hyper_params["time_series_blocking"]:
-        case "btscv":
-            time_series_spliting = BlockingTimeSeriesSplit(n_splits=model_hyper_params["time_series_split_qty"])
-        case _:
-            raise ValueError("model_hyper_params['time_series_blocking'], not recognised")
+    if model_hyper_params["time_series_blocking"] == "btscv":
+        time_series_spliting = BlockingTimeSeriesSplit(n_splits=model_hyper_params["time_series_split_qty"])
+    else:
+        raise ValueError("model_hyper_params['time_series_blocking'], not recognised")
         
     #model training - create regressors
     X_train, y_train   = create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_list=outputs_params_dict["pred_steps_ahead"])
@@ -1241,4 +1236,4 @@ def retrieve_or_generate_model_and_training_scores(
 
     return predictor, training_scores
 
-#retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
