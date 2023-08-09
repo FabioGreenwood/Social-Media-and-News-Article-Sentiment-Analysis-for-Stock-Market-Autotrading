@@ -1104,6 +1104,7 @@ def return_columns_to_remove(columns_list, self):
 #%% main support methods
 
 def retrieve_model_and_training_scores(predictor_location_file, predictor_name_entry):
+    #predictor_location_file = "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\precalculated_assets\\predictive_model\\aapl_ps04_06_18_000000_pe01_09_20_000000_ts_sec300_tm_qty7_r_lt3600_r_hl3600_tm_alpha1_IDF-True_t_ratio_r100000.pred"
     with open(predictor_location_file, 'rb') as file:
         predictor = pickle.load(file)
     training_score = edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="load")
@@ -1133,7 +1134,7 @@ def generate_model_and_training_scores(temporal_params_dict,
         target_folder_path          = fin_inputs_params_dict["historical_file"], 
         input_cols_to_include_list  = fin_inputs_params_dict["cols_list"],
         temporal_params_dict = temporal_params_dict, training_or_testing="training")
-    
+    print(datetime.now().strftime("%H:%M:%S") + " - populate_technical_indicators")
     df_financial_data = populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"])
 
     #sentiment data prep
@@ -1236,4 +1237,5 @@ def retrieve_or_generate_model_and_training_scores(
 
     return predictor, training_scores
 
-retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+if __name__ == '__main__':
+    retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)

@@ -21,31 +21,10 @@ import numpy as np
 import pandas as pd
 import fnmatch
 import pickle
-import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
 import seaborn as sns 
-import jupyter
-import sklearn
-import math
-from sklearn.model_selection import TimeSeriesSplit
-from sklearn.model_selection import KFold
-from sklearn.linear_model import ElasticNet
-from sklearn.multioutput import MultiOutputRegressor
-from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import GridSearchCV
-from sklearn.neural_network import MLPRegressor
-from sklearn.svm import SVC
-from sklearn.ensemble import BaggingClassifier
-from sklearn.ensemble import BaggingRegressor
-from sklearn.datasets import make_classification
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
-from sklearn.preprocessing import StandardScaler
 import seaborn as sns
 import copy
 from datetime import datetime
-from sklearn.ensemble import BaggingRegressor
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import TimeSeriesSplit
 from datetime import datetime, timedelta
 import os
 import warnings
@@ -54,32 +33,9 @@ if not sys.warnoptions:
     warnings.simplefilter("ignore")
     os.environ["PYTHONWARNINGS"] = "ignore"
 
-import pyLDAvis
-import pyLDAvis.gensim_models as gensimvis
-import pickle 
-from gensim.models.ldamulticore import LdaMulticore
-import gensim.models.ldamodel
 
-
-from gensim.corpora import Dictionary
-from gensim.models import TfidfModel
-import gensim.corpora as corpora
-from pprint import pprint
-from wordcloud import WordCloud
-import os
-from time import strftime, localtime
-import gensim
-from gensim.utils import simple_preprocess
-import nltk
-nltk.download('stopwords')
-from nltk.corpus import stopwords
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-import multiprocessing
-from multiprocessing import Process
-import itertools as it
-from stock_indicators import indicators, Quote
-from stock_indicators.indicators.common.quote import Quote
-from stock_indicators.indicators.common.enums import Match
+
 
 
 #%% Standard Parameters
@@ -132,7 +88,7 @@ default_fin_inputs_params_dict      = {
 }
 default_senti_inputs_params_dict    = {
     "topic_qty"             : 7,
-    "topic_training_tweet_ratio_removed" : int(1e5),
+    "topic_training_tweet_ratio_removed" : int(1e6),
     "relative_lifetime"     : 60*60*1, #  hours
     "relative_halflife"     : 60*60*0.5, #one hour
     "topic_model_alpha"     : 1,
@@ -183,23 +139,30 @@ default_input_dict = {
 experiment_record = dict() # contains the runs, their inputs and outputs (inculding scores and models)
 
 
+#%% misc methods
+
+def find_largest_number(mixed_list):
+    numbers = [x for x in mixed_list if isinstance(x, (int, float))]
+    
+    if not numbers:
+        return -1
+    
+    largest_number = max(numbers)
+    return largest_number
 
 
 #%% Experiment Parameters
 
 DoE_1 = dict()
 
-experiment_instructions = {
-    "DoE" : {
-        "default_senti_inputs_params_dict" : {
-            "topic_qty" : range(4,9,1),
-            "relative_halflife" : [SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR]
-        }
+DoE_dict = {
+    "senti_inputs_params_dict" : {
+        "topic_qty" : range(4,9,1),
+        "relative_halflife" : [SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR]
     },
-    "default_model_hyper_params" : {
+    "model_hyper_params" : {
         "estimator__hidden_layer_sizes" : [(100,10), (50,20,10), (20,10)]
-    },
-    "optimisation" : False
+    }
 }
 
 def return_list_of_experimental_params(experiment_instructions):
@@ -212,44 +175,44 @@ def return_list_of_experimental_params(experiment_instructions):
 
 
 
-def convert_experiment_instructions_to_GPyOpt_bounds_list(exp_instr):
+def convert_DoE_dict_to_GPyOpt_bounds_list(DoE_dict):
     output = []
     blank_parameter = {'name': None, 'type': None, 'domain': None}
     
-    for key in exp_instr:
-        for subkey in exp_instr[key]:
+    for key in DoE_dict:
+        for subkey in DoE_dict[key]:
             name = key + "~" + subkey
-            py_type = type(exp_instr[key][subkey])
-            value = exp_instr[key][subkey]
-            if isinstance(py_type, list) == True and isinstance(py_type,value[0], str):
-                type = "categorical"
-            elif isinstance(py_type, list) == True:
-                type = "descrete"
-            elif isinstance(py_type, range) == True:
-                type = "descrete"
+            py_type = type(DoE_dict[key][subkey])
+            value = DoE_dict[key][subkey]
+            if py_type == list and type(value[0]) == str:
+                type_str = "categorical"
+            elif py_type == list:
+                type_str = "discrete"
+            elif py_type == range:
+                type_str = "discrete"
                 value = list(value)
-            elif isinstance(py_type, tuple) == True:
-                type = "continuous"
+            elif py_type == tuple:
+                type_str = "continuous"
             else:
                 raise ValueError("unrecognised input")
-            output = output + [{'name': name, 'type': type, 'domain': value}]
+            output = output + [{'name': name, 'type': type_str, 'domain': value}]
     
     return output
 
 def return_edited_input_dict(GPyOpt_input, exp_instr, default_input_dict):
-    output_input_dict = copy.deepcopy(output_input_dict)
+    output_input_dict = copy.deepcopy(default_input_dict)
     input_index = 0
     for key in exp_instr:
         for subkey in exp_instr[key]:
-            default_input_dict[key][subkey] = GPyOpt_input[input_index]
+            output_input_dict[key][subkey] = GPyOpt_input[input_index]
             input_index += 1
     
-    return GPyOpt_input
+    return output_input_dict
 
             
-def experiment_handler(GPyOpt_input, experiment_instructions, default_input_dict=default_input_dict, experiment_method=FG_model_training.retrieve_or_generate_model_and_training_scores):
+def template_experiment_requester(GPyOpt_input, DoE_dict, default_input_dict=default_input_dict, experiment_method=FG_model_training.retrieve_or_generate_model_and_training_scores):
     
-    prepped_input_dict = return_edited_input_dict(GPyOpt_input, experiment_instructions, default_input_dict)
+    prepped_input_dict = return_edited_input_dict(GPyOpt_input, DoE_dict, default_input_dict)
     
     prepped_temporal_params_dict      = prepped_input_dict["temporal_params_dict"]
     prepped_fin_inputs_params_dict    = prepped_input_dict["fin_inputs_params_dict"]
@@ -260,19 +223,40 @@ def experiment_handler(GPyOpt_input, experiment_instructions, default_input_dict
     predictor, training_scores = experiment_method(prepped_temporal_params_dict, prepped_fin_inputs_params_dict, prepped_senti_inputs_params_dict, prepped_outputs_params_dict, prepped_model_hyper_params)
     return predictor, training_scores
     
-
-
+def return_experiment_requester(DoE_dict, default_input_dict=default_input_dict, experiment_method=FG_model_training.retrieve_or_generate_model_and_training_scores):
+    output_method = lambda GPyOpt_input: template_experiment_requester(GPyOpt_input, DoE_dict, default_input_dict=default_input_dict, experiment_method=experiment_method)
+    return output_method
+    
+def define_DoE(bounds, DoE_size):
+    DoE = []
+    for params in bounds:
+        if params["type"] == "categorical" or params["type"] == "discrete":
+            values_for_params = np.random.choice(params["domain"], size=(DoE_size, 1))
+        elif params["type"] == "continuous":
+            values_for_params = np.random.rand(iter, 1)
+            lwr_lim, upr_lim = params["domain"]
+            values_for_params = values_for_params * (upr_lim - lwr_lim) + lwr_lim
+        else:
+            raise ValueError("unrecognised param['type'] input")
+        if bounds[0] == params:
+            DoE = values_for_params
+        else:
+            DoE = np.hstack((DoE, values_for_params))
+    return DoE
 
 
 #%% Module - Experiment Handler
 
 
+def PLACEHOLDER_objective_function(x):
+    return (x[:, 0] - 2)**2 + (x[:, 1] - 3)**2
 
-def experiment_hander(
+
+def experiment_manager(
     optim_run_name,
-    experiment_instructions,
+    DoE_dict,
     model_training_method=FG_model_training.retrieve_or_generate_model_and_training_scores,
-    initial_doe_size=10,
+    initial_doe_size=5,
     max_iter=20,
     optimisation_method=None,
     default_input_dict = default_input_dict,
@@ -283,27 +267,40 @@ def experiment_hander(
     #parameters
     global global_precalculated_assets_locations_dict
     potential_experiment_records_path = os.path.join(global_precalculated_assets_locations_dict["root"], global_precalculated_assets_locations_dict["experiment_records"], optim_run_name)
-    experi_params_list = return_list_of_experimental_params(experiment_instructions)
-    bounds = convert_experiment_instructions_to_GPyOpt_bounds_list
-    bo = GPyOpt.methods.BayesianOptimization(f=model_training_method, domain=bounds)
+    experi_params_list = return_list_of_experimental_params(DoE_dict)
+    bounds = convert_DoE_dict_to_GPyOpt_bounds_list(DoE_dict)
+    experiment_requester = return_experiment_requester(DoE_dict, default_input_dict=default_input_dict, experiment_method=FG_model_training.retrieve_or_generate_model_and_training_scores)
+    #bo = GPyOpt.methods.BayesianOptimization(f=experiment_requester, domain=bounds)
     
     #variables
-    X_init, Y_init = None
+    X_init, Y_init = None, None
+    design_history_dict = {"DoE_dict" : DoE_dict, "default_input_dict" : default_input_dict}
     
     # load previous work
     if os.path.exists(potential_experiment_records_path) and force_restart_run == False:
         raise SyntaxError("this isn't designed yet")
+    #insert the completion of the DoE if not completed
     else:
         print("hello")
-        #X_init = 
+        X_init = define_DoE(bounds, initial_doe_size)
+        X_init = np.array([[7, 7200, (20, 10)], [5, 3600, (20, 10)]]) #FG_Placeholder
+        Y_init = []
+        for row in X_init:
+            exp_id = find_largest_number(design_history_dict.keys()) + 1
+            design_history_dict[exp_id] = dict()
+            design_history_dict[exp_id]["X"] = row
+            predictor, training_scores = experiment_requester(row)
+            design_history_dict[exp_id]["predictor"], design_history_dict[exp_id]["training_scores"] = predictor, training_scores
             
-        #X_init = np.random.rand(initial_points, 2) * 5
-        #Y_init = objective_function(X_init)
+            if len(Y_init) == 0:
+                Y_init = [[predictor, training_scores]]
+            else:
+                Y_init = np.vstack((Y_init, [predictor, training_scores]))
         
         
-    minimized_value, optimal_params, bo = "hello"
     
-    return minimized_value, optimal_params, bo
+    
+    return "hello"
 
 
 
@@ -317,9 +314,9 @@ def experiment_hander(
 
 #%% main line
 
-experiment_hander(
+experiment_manager(
     "test",
-    experiment_instructions
+    DoE_dict
     )
 
 
