@@ -184,7 +184,8 @@ global_precalculated_assets_locations_dict = {
     "topic_models"              : "topic_models\\",
     "annotated_tweets"          : "annotated_tweets\\",
     "predictive_model"          : "predictive_model\\",
-    "sentimental_data"          : "sentimental_data\\"
+    "sentimental_data"          : "sentimental_data\\",
+    "technical_indicators"      : "technical_indicators\\"
     }
 
 
@@ -231,7 +232,7 @@ def return_ticker_code_1(filename):
 #%%SubModule – Stock Market Data Prep 
 
 def import_financial_data(
-        target_folder_path=[], 
+        target_file_path=None, 
         input_cols_to_include_list=[],
         temporal_params_dict=None, training_or_testing="training"):
     #set the import period
@@ -245,12 +246,13 @@ def import_financial_data(
         raise ValueError("value " + str(training_or_testing) + " for 'training_or_testing' input not recognised")
     
     #format the data
-    df_financial_data = pd.read_csv(target_folder_path)
+    df_financial_data = pd.read_csv(target_file_path)
     df_financial_data["date"] = df_financial_data["date"].str.replace("T", " ")
     df_financial_data["date"] = df_financial_data["date"].str.replace("Z", "")
     df_financial_data["date"] = df_financial_data["date"].str.replace(".000", "")
     df_financial_data["date"] = pd.to_datetime(df_financial_data["date"], format='%Y-%m-%d %H:%M:%S')
     df_financial_data.set_index("date", inplace=True)
+    df_financial_data.index.names = ['datetime']
     index = list(df_financial_data.index)
     
     #check for faulty time windows
@@ -284,54 +286,77 @@ def import_financial_data(
         
     return df_financial_data
 
-def populate_technical_indicators(df, tech_indi_dict, match_doji):
+def return_technical_indicators_name(df, tech_indi_dict, match_doji, target_file_path):
+    file_name = os.path.split(target_file_path)[1].split(".")[0]
+    file_string = "fn_" + file_name + "_" + min(df.index).strftime('%d%m%y') + "to" + max(df.index).strftime('%d%m%y')
+    for key in tech_indi_dict:
+        file_string = file_string + "_" + key
+        for val in tech_indi_dict[key]:
+            file_string = file_string + "_" + str(val)
+    file_string = file_string + "_" + str(match_doji)
+    return file_string
+    
+
+
+def retrieve_or_generate_then_populate_technical_indicators(df, tech_indi_dict, match_doji, target_file_path):
     quotes_list = [
         Quote(d,o,h,l,c,v) 
         for d,o,h,l,c,v 
         in zip(df.index, df['£_open'], df['£_high'], df['£_low'], df['£_close'], df['£_volume'])
     ]
-    for key in tech_indi_dict:
-        if key == "sma":
-            for value in tech_indi_dict[key]:
-                col_str = "$_sma_" + str(value)
-                df[col_str] = ""
-                results = indicators.get_sma(quotes_list, value)
-                for r in results:
-                        df.at[r.date, col_str] = r.sma
-        elif key == "ema":
-            for value in tech_indi_dict[key]:
-                    col_str = "$_ema_" + str(value)
-                    df[col_str] = ""
-                    results = indicators.get_ema(quotes_list, value)
-                    for r in results:
-                        df.at[r.date, col_str] = r.ema
-        else:
-            raise ValueError("technical indicator " + key + " not programmed")
-    if match_doji == True:
-        results = indicators.get_doji(quotes_list)
-        df["match!_doji"] = ""
-        for r in results:
-            mat = r.match
-            if mat == Match.BULL_CONFIRMED:
-                val = 3
-            elif mat == Match.BULL_SIGNAL:
-                val = 2
-            elif mat == Match.BULL_BASIS:
-                val = 1
-            elif mat == Match.NEUTRAL:
-                val = 0
-            elif mat == Match.NONE:
-                val = 0
-            elif mat == Match.BEAR_BASIS:
-                val = -1
-            elif mat == Match.BEAR_SIGNAL:
-                val = -2
-            elif mat == Match.BEAR_CONFIRMED:
-                val = -3
-            else:
-                raise ValueError(str(mat) + "not found in list")
-            df.at[r.date, "match!_doji"] = val
     
+    technical_indicators_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["technical_indicators"]
+    technical_indicators_name = return_technical_indicators_name(df, tech_indi_dict, match_doji, target_file_path)
+    technical_indicators_location_file = technical_indicators_folder_location_string + technical_indicators_name + ".csv"
+    if os.path.exists(technical_indicators_location_file):
+        df = pd.read_csv(technical_indicators_location_file)
+        df.set_index(df.columns[0], inplace=True)
+        df.index.name = "datetime"
+    else:
+        for key in tech_indi_dict:
+            if key == "sma":
+                for value in tech_indi_dict[key]:
+                    col_str = "$_sma_" + str(value)
+                    df[col_str] = ""
+                    results = indicators.get_sma(quotes_list, value)
+                    for r in results:
+                        df.at[r.date, col_str] = r.sma
+            elif key == "ema":
+                for value in tech_indi_dict[key]:
+                        col_str = "$_ema_" + str(value)
+                        df[col_str] = ""
+                        results = indicators.get_ema(quotes_list, value)
+                        for r in results:
+                            df.at[r.date, col_str] = r.ema
+            else:
+                raise ValueError("technical indicator " + key + " not programmed")
+        if match_doji == True:
+            results = indicators.get_doji(quotes_list)
+            df["match!_doji"] = ""
+            for r in results:
+                mat = r.match
+                if mat == Match.BULL_CONFIRMED:
+                    val = 3
+                elif mat == Match.BULL_SIGNAL:
+                    val = 2
+                elif mat == Match.BULL_BASIS:
+                    val = 1
+                elif mat == Match.NEUTRAL:
+                    val = 0
+                elif mat == Match.NONE:
+                    val = 0
+                elif mat == Match.BEAR_BASIS:
+                    val = -1
+                elif mat == Match.BEAR_SIGNAL:
+                    val = -2
+                elif mat == Match.BEAR_CONFIRMED:
+                    val = -3
+                else:
+                    raise ValueError(str(mat) + "not found in list")
+            df.at[r.date, "match!_doji"] = val
+        df.to_csv(technical_indicators_location_file)      
+
+
     return df
 
 
@@ -1100,6 +1125,11 @@ def return_columns_to_remove(columns_list, self):
     
     return columns_to_remove
 
+#%% Module - Model Testing and Standard Reporting
+
+
+
+
 
 #%% main support methods
 
@@ -1131,11 +1161,11 @@ def generate_model_and_training_scores(temporal_params_dict,
     #stock market data prep
     print(datetime.now().strftime("%H:%M:%S") + " - importing and prepping financial data")
     df_financial_data = import_financial_data(
-        target_folder_path          = fin_inputs_params_dict["historical_file"], 
+        target_file_path          = fin_inputs_params_dict["historical_file"], 
         input_cols_to_include_list  = fin_inputs_params_dict["cols_list"],
         temporal_params_dict = temporal_params_dict, training_or_testing="training")
     print(datetime.now().strftime("%H:%M:%S") + " - populate_technical_indicators")
-    df_financial_data = populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"])
+    df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"], fin_inputs_params_dict["historical_file"])
 
     #sentiment data prep
     print(datetime.now().strftime("%H:%M:%S") + " - importing or prepping sentimental data")
@@ -1174,7 +1204,7 @@ def quick_training_score_rerun(model, temporal_params_dict, fin_inputs_params_di
         input_cols_to_include_list  = fin_inputs_params_dict["cols_list"],
         temporal_params_dict = temporal_params_dict, training_or_testing="training")
     
-    df_financial_data = populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"])
+    df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"])
 
     #sentiment data prep
     print(datetime.now().strftime("%H:%M:%S") + " - importing or prepping sentimental data")
@@ -1238,4 +1268,4 @@ def retrieve_or_generate_model_and_training_scores(
     return predictor, training_scores
 
 if __name__ == '__main__':
-    retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+    predictor, training_scores = retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
