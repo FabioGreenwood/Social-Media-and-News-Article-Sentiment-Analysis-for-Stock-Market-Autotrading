@@ -239,7 +239,7 @@ def import_financial_data(
     if training_or_testing=="training" or training_or_testing=="train":
         period_start = temporal_params_dict["train_period_start"]
         period_end   = temporal_params_dict["train_period_end"]
-    elif training_or_testing=="training" or training_or_testing=="train":
+    elif training_or_testing=="testing" or training_or_testing=="test":
         period_start = temporal_params_dict["test_period_start"]
         period_end   = temporal_params_dict["test_period_end"]
     else:
@@ -354,7 +354,7 @@ def retrieve_or_generate_then_populate_technical_indicators(df, tech_indi_dict, 
                     val = -3
                 else:
                     raise ValueError(str(mat) + "not found in list")
-            df.at[r.date, "match!_doji"] = val
+                df.at[r.date, "match!_doji"] = val
         df.to_csv(technical_indicators_location_file)      
 
 
@@ -1081,7 +1081,7 @@ class DRSLinReg():
         
         output = dict()
         
-        if y_pred==None:
+        if y_pred is None:
             y_pred = self.predict_ensemble(X_test, output_name=["test output"]).values
         
         for val in method:
@@ -1147,7 +1147,7 @@ def generate_testing_scores(predictor, temporal_params_dict, fin_inputs_params_d
         
     # step 3: generate y_pred
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 3: generate y_pred")
-    Y_preds_testing = predictor.predict_ensemble(X_testing)
+    Y_preds_testing = predictor.predict_ensemble(X_testing, output_name=["77777777"])
     
     # step 4: generate score
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 4: generate score")
@@ -1226,11 +1226,11 @@ def generate_model_and_training_scores(temporal_params_dict,
 def quick_training_score_rerun(model, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params):
 
     df_financial_data = import_financial_data(
-        target_folder_path          = fin_inputs_params_dict["historical_file"], 
+        target_file_path          = fin_inputs_params_dict["historical_file"], 
         input_cols_to_include_list  = fin_inputs_params_dict["cols_list"],
         temporal_params_dict = temporal_params_dict, training_or_testing="training")
     
-    df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"])
+    df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"], fin_inputs_params_dict["historical_file"])
 
     #sentiment data prep
     print(datetime.now().strftime("%H:%M:%S") + " - importing or prepping sentimental data")
