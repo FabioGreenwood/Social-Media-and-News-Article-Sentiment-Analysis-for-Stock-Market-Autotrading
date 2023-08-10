@@ -312,6 +312,7 @@ def retrieve_or_generate_then_populate_technical_indicators(df, tech_indi_dict, 
         df = pd.read_csv(technical_indicators_location_file)
         df.set_index(df.columns[0], inplace=True)
         df.index.name = "datetime"
+        df.index = pd.to_datetime(df.index)
     else:
         for key in tech_indi_dict:
             if key == "sma":
@@ -902,7 +903,7 @@ class BlockingTimeSeriesSplit():
             mid = int(0.5 * (stop - start)) + start
             yield indices[start: mid], indices[mid + margin: stop]
 
-def create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list, pred_steps_list):
+def create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list, pred_steps_ahead):
     #this method populates each row with the next X output results, this is done so that, each time step can be trained
     #to predict the value of the next X steps
     
@@ -912,7 +913,7 @@ def create_step_responces(df_financial_data, df_sentimental_data, pred_output_an
     train_test_split = 1
     df_sentimental_data.index = pd.to_datetime(df_sentimental_data.index)
     df_sentimental_data = df_sentimental_data.loc[list(df_financial_data.index)]
-    data = pd.concat([df_financial_data, df_sentimental_data], axis=1)
+    data = pd.concat([df_financial_data, df_sentimental_data], axis=1, ignore_index=False)
     #this method has been removed cos its doesn't work with negative values
     #df_financial_data, nan_values_replaced = current_infer_values_method(df_financial_data)
     
@@ -920,13 +921,12 @@ def create_step_responces(df_financial_data, df_sentimental_data, pred_output_an
     symbol, old_col = pred_output_and_tickers_combos_list
     old_col = "£_" + old_col
     
-    if not isinstance(pred_steps_list,list):
-        pred_steps_list = [pred_steps_list]
-    
-    for step in pred_steps_list:
-        new_col = new_col_str.format(old_col, step)
-        list_of_new_columns = list_of_new_columns + [new_col]
-        data[new_col] = data[old_col].shift(-step)
+    if isinstance(pred_steps_ahead,list):
+        raise ValueError("only runs with singluar pred_steps_list values are allow, no lists")
+        
+    new_col = new_col_str.format(old_col, pred_steps_ahead)
+    list_of_new_columns = list_of_new_columns + [new_col]
+    data[new_col] = data[old_col].shift(-pred_steps_ahead)
 
     #split regressors and responses
     #Features = 6
@@ -1127,7 +1127,33 @@ def return_columns_to_remove(columns_list, self):
 
 #%% Module - Model Testing and Standard Reporting
 
+def generate_testing_scores(predictor, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params):
+    
+    # step 1a: generate testing input data (finanical)
+    print(datetime.now().strftime("%H:%M:%S") + " - testing - step 1a: generate testing input data")
+    df_financial_data = import_financial_data(
+        target_file_path          = fin_inputs_params_dict["historical_file"], 
+        input_cols_to_include_list  = fin_inputs_params_dict["cols_list"],
+        temporal_params_dict = temporal_params_dict, training_or_testing="testing")
+    df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"], fin_inputs_params_dict["historical_file"])
 
+    # step 1b: generate testing input data (sentimental)
+    print(datetime.now().strftime("%H:%M:%S") + " - testing - step 1b: generate testing input data (sentimental)")
+    df_sentimental_data = retrieve_or_generate_sentimental_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="testing")
+
+    # step 2: generate testing output data
+    print(datetime.now().strftime("%H:%M:%S") + " - testing - step 2: generate testing output data")
+    X_testing, y_testing   = create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
+        
+    # step 3: generate y_pred
+    print(datetime.now().strftime("%H:%M:%S") + " - testing - step 3: generate y_pred")
+    Y_preds_testing = predictor.predict_ensemble(X_testing)
+    
+    # step 4: generate score
+    print(datetime.now().strftime("%H:%M:%S") + " - testing - step 4: generate score")
+    testing_scores = predictor.evaluate(y_test=y_testing, y_pred=Y_preds_testing, method=model_hyper_params["testing_scoring"])
+    
+    return testing_scores
 
 
 
@@ -1179,7 +1205,7 @@ def generate_model_and_training_scores(temporal_params_dict,
         raise ValueError("model_hyper_params['time_series_blocking'], not recognised")
         
     #model training - create regressors
-    X_train, y_train   = create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_list=outputs_params_dict["pred_steps_ahead"])
+    X_train, y_train   = create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
     model              = initiate_model(outputs_params_dict, model_hyper_params)
     model.fit(X_train, y_train)
     training_scores = model.evaluate(X_test=X_train , y_test=y_train, method=model_hyper_params["testing_scoring"])
@@ -1218,7 +1244,7 @@ def quick_training_score_rerun(model, temporal_params_dict, fin_inputs_params_di
         raise ValueError("model_hyper_params['time_series_blocking'], not recognised")
         
     #model training - create regressors
-    X_train, y_train   = create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_list=outputs_params_dict["pred_steps_ahead"])
+    X_train, y_train   = create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
     training_scores = model.evaluate(X_test=X_train , y_test=y_train, method=model_hyper_params["testing_scoring"])
     return training_scores
 
@@ -1268,4 +1294,5 @@ def retrieve_or_generate_model_and_training_scores(
     return predictor, training_scores
 
 if __name__ == '__main__':
-    predictor, training_scores = retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+    predictor, training_scores  = retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+    testing_scores              = generate_testing_scores(predictor, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
