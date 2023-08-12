@@ -44,6 +44,8 @@ from datetime import datetime, timedelta
 import os
 import warnings
 import sys
+from keras.models import Sequential
+from keras.layers import SimpleRNN, Dense
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
     os.environ["PYTHONWARNINGS"] = "ignore"
@@ -106,6 +108,8 @@ global_scores_database = r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Proje
 global_strptime_str = '%d/%m/%y %H:%M:%S'
 global_strptime_str_filename = '%d_%m_%y %H:%M:%S'
 
+
+
 temporal_params_dict    = {
     "train_period_start"    : datetime.strptime('04/06/18 00:00:00', global_strptime_str),
     "train_period_end"      : datetime.strptime('01/09/20 00:00:00', global_strptime_str),
@@ -148,7 +152,6 @@ outputs_params_dict         = {
     "pred_steps_ahead"                  : 1,
 }
 
-
 cohort_retention_rate_dict_strat1 = {
             "£_close" : 1, #output value
             "£_*": 1, #other OHLCV values
@@ -158,7 +161,7 @@ cohort_retention_rate_dict_strat1 = {
             "*": 0.5} # other missed values
 
 model_hyper_params          = {
-    "name" : "RandomSubspace_MLPRegressor ", #Multi-layer Perceptron regressor
+    "name" : "RandomSubspace_MLPRegressor", #Multi-layer Perceptron regressor
         #general hyperparameters
     "n_estimators_per_time_series_blocking" : 2,
     "training_error_measure_main"   : 'neg_mean_squared_error',
@@ -960,7 +963,7 @@ def current_infer_values_method(df):
 #create model
 
 def initiate_model(outputs_params_dict, model_hyper_params):
-    if model_hyper_params["name"] == "RandomSubspace_MLPRegressor ":
+    if model_hyper_params["name"] == "RandomSubspace_MLPRegressor":
             estimator = DRSLinReg(base_estimator=MLPRegressor(
                 hidden_layer_sizes  = model_hyper_params["estimator__hidden_layer_sizes"],
                 activation          = model_hyper_params["estimator__activation"],
@@ -968,7 +971,6 @@ def initiate_model(outputs_params_dict, model_hyper_params):
                 ),
                 model_hyper_params=model_hyper_params, 
                 ticker_name=outputs_params_dict["output_symbol_indicators_tuple"][0])
-        
     
     elif model_hyper_params["name"] == "ElasticNet": 
             raise ValueError("OLD SYSTEM WILL NOT WORK")
@@ -1050,6 +1052,7 @@ class DRSLinReg():
                 #add max depth if it is a decision tree
                 estimator.random_state = global_random_state
                 global_random_state += 1
+                estimator.dropout_cols_ = dropout_cols
                 estimator.fit(X_sel, y_sel)
                 self.estimators_ = self.estimators_ + [estimator]
             
@@ -1064,10 +1067,10 @@ class DRSLinReg():
         
         y_ave = []
         y_ensemble = []
-            
-        for i, estimator in enumerate(self.estimators_):
+        
+        for i, estimator_local in enumerate(self.estimators_):
             # randomly select features to drop out
-            y_ensemble.insert(len(y_ensemble), estimator.predict(X))
+            y_ensemble.insert(len(y_ensemble), estimator_local.predict(X))
         
         y_ensemble = np.array(y_ensemble)
         for ts in range(len(y_ensemble[0])):
@@ -1127,7 +1130,13 @@ def return_columns_to_remove(columns_list, self):
 
 #%% Module - Model Testing and Standard Reporting
 
-def generate_testing_scores(predictor, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params):
+def generate_testing_scores(predictor, input_dict):
+                            
+    temporal_params_dict    = input_dict["temporal_params_dict"]
+    fin_inputs_params_dict  = input_dict["fin_inputs_params_dict"]
+    senti_inputs_params_dict = input_dict["senti_inputs_params_dict"]
+    outputs_params_dict     = input_dict["outputs_params_dict"]
+    model_hyper_params      = input_dict["model_hyper_params"]
     
     # step 1a: generate testing input data (finanical)
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 1a: generate testing input data")
@@ -1153,13 +1162,13 @@ def generate_testing_scores(predictor, temporal_params_dict, fin_inputs_params_d
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 4: generate score")
     testing_scores = predictor.evaluate(y_test=y_testing, y_pred=Y_preds_testing, method=model_hyper_params["testing_scoring"])
     
-    return testing_scores
+    return testing_scores, Y_preds_testing
 
 
 
 #%% main support methods
 
-def retrieve_model_and_training_scores(predictor_location_file, predictor_name_entry):
+def retrieve_model_and_training_scores(predictor_location_file, predictor_name_entry, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params):
     #predictor_location_file = "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\precalculated_assets\\predictive_model\\aapl_ps04_06_18_000000_pe01_09_20_000000_ts_sec300_tm_qty7_r_lt3600_r_hl3600_tm_alpha1_IDF-True_t_ratio_r100000.pred"
     with open(predictor_location_file, 'rb') as file:
         predictor = pickle.load(file)
@@ -1251,12 +1260,7 @@ def quick_training_score_rerun(model, temporal_params_dict, fin_inputs_params_di
 
 #%% main line
 
-def retrieve_or_generate_model_and_training_scores(
-    temporal_params_dict,
-    fin_inputs_params_dict,
-    senti_inputs_params_dict,
-    outputs_params_dict,
-    model_hyper_params):
+def retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params):
     
     #global values
     global global_financial_history_folder_path, global_precalculated_assets_locations_dict
@@ -1265,7 +1269,6 @@ def retrieve_or_generate_model_and_training_scores(
     company_symbol      = outputs_params_dict["output_symbol_indicators_tuple"][0]
     train_period_start  = temporal_params_dict["train_period_start"]
     train_period_end    = temporal_params_dict["train_period_end"]
-    num_topics          = senti_inputs_params_dict["topic_qty"]
     topic_model_alpha   = senti_inputs_params_dict["topic_model_alpha"]
     tweet_ratio_removed = senti_inputs_params_dict["topic_training_tweet_ratio_removed"]
     time_step_seconds   = temporal_params_dict["time_step_seconds"]
@@ -1283,7 +1286,7 @@ def retrieve_or_generate_model_and_training_scores(
     predictor_location_file = predictor_folder_location_string + predictor_name + ".pred"
     #previous_score = edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="load")
     if os.path.exists(predictor_location_file):
-        predictor, training_scores = retrieve_model_and_training_scores(predictor_location_file, predictor_name_entry)
+        predictor, training_scores = retrieve_model_and_training_scores(predictor_location_file, predictor_name_entry, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
     else:
         print(datetime.now().strftime("%H:%M:%S") + " - generating model and testing scores")
         predictor, training_scores = generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
@@ -1294,5 +1297,5 @@ def retrieve_or_generate_model_and_training_scores(
     return predictor, training_scores
 
 if __name__ == '__main__':
-    predictor, training_scores  = retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
-    testing_scores              = generate_testing_scores(predictor, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+    predictor, training_scores      = retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+    testing_scores, Y_preds_testing = generate_testing_scores(predictor, input_dict)
