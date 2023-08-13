@@ -217,7 +217,6 @@ def run_DoE_return_models_and_result(DoE_orders_dict, prepped_fin_input,
     
     #create folders for outputs
     now = datetime.now()
-    #model_start_time = now.strftime("%Y_%m_%d_%H_%M_%S")
     model_start_time = now.strftime("%Y%m%d_%H%M")
     output_parent_path = r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs"
     outputs_path = os.path.join(output_parent_path, model_start_time + "_" + DoE_orders_dict["name"])# + "\\")

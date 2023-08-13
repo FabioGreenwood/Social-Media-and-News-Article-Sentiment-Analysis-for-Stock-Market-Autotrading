@@ -32,11 +32,7 @@ import sys
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
     os.environ["PYTHONWARNINGS"] = "ignore"
-
-
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-
-
 
 #%% Standard Parameters
 
@@ -69,6 +65,7 @@ SECS_IN_A_DAY = 60*60*24
 SECS_IN_AN_HOUR = 60*60
 
 #%% Default Input Parameters
+
 default_temporal_params_dict    = {
     "train_period_start"    : datetime.strptime('04/06/18 00:00:00', global_strptime_str),
     "train_period_end"      : datetime.strptime('01/09/20 00:00:00', global_strptime_str),
@@ -137,9 +134,6 @@ default_input_dict = {
 
 
 
-
-
-
 #%% misc methods
 
 def find_largest_number(mixed_list):
@@ -164,13 +158,10 @@ def return_keys_within_2_level_dict(input_dict):
 def save_designs_record_csv_and_dict(potential_experiment_records_path, df_designs_record=None, design_history_dict=None):
     if type(df_designs_record) == pd.core.frame.DataFrame:
         try:
-            with open(potential_experiment_records_path + ".csv", "wb") as file:
-                pickle.dump(df_designs_record, file)
-            with open(potential_experiment_records_path + ".csvBACKUP", "wb") as file:
-                pickle.dump(df_designs_record, file)
+            df_designs_record.to_csv(potential_experiment_records_path + ".csv", index=False)
+            df_designs_record.to_csv(potential_experiment_records_path + ".csvBACKUP", index=False)
         except:
-            with open(potential_experiment_records_path + ".csvBACKUP", "wb") as file:
-                pickle.dump(df_designs_record, file)
+            df_designs_record.to_csv(potential_experiment_records_path + ".csvBACKUP", index=False)
             print("please close the csv")
     if design_history_dict != None:
         with open(potential_experiment_records_path + ".py_dict", "wb") as file:
@@ -178,7 +169,6 @@ def save_designs_record_csv_and_dict(potential_experiment_records_path, df_desig
 
 def update_df_designs_record(df_designs_record, design_history_dict, DoE_dict):
     global global_designs_record_final_columns_list
-    
     
     if not all(df_designs_record.columns == return_keys_within_2_level_dict(DoE_dict) + global_designs_record_final_columns_list):
         raise ValueError("the schema for the design records table doesn't match, please review")
@@ -196,10 +186,9 @@ def update_df_designs_record(df_designs_record, design_history_dict, DoE_dict):
                 df_designs_record.loc[ID, "training_r2"] = design_history_dict[ID][subkey]["r2"]
                 df_designs_record.loc[ID, "training_mae"] = design_history_dict[ID][subkey]["mae"]
                 df_designs_record.loc[ID, "training_mse"] = design_history_dict[ID][subkey]["mse"]
-            elif subkey != "X" and subkey != "predictor":
+            elif subkey != "X" and subkey != "predictor" and subkey != "Y":
                 df_designs_record.loc[ID, subkey] = design_history_dict[ID][subkey]
     return df_designs_record
-
         
         
 #%% Experiment Parameters
@@ -212,9 +201,17 @@ DoE_dict = {
         "relative_halflife" : [SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR]
     },
     "model_hyper_params" : {
-        "estimator__hidden_layer_sizes" : ["100_10", "50_20_10", "20_10"]
+        #"estimator__hidden_layer_sizes" : ["100_10", "50_20_10", "20_10"]
+        #"estimator__hidden_layer_sizes" : ["100_10", "15_10", "20_10"]
         #"estimator__hidden_layer_sizes" : [10, 10, 10]
-    }
+        #"estimator__hidden_layer_sizes" : [(100, 10), (50, 20, 10), (20, 10)]
+        "estimator__hidden_layer_sizes" : {0 : (10, 10),
+                                           1 : (20, 10),
+                                           2 : (100, 10),
+                                           3 : (50, 20, 10),
+                                           4 : (20, 10)}
+    },
+    "string_key" : {}
 }
 
 def return_list_of_experimental_params(experiment_instructions):
@@ -234,17 +231,11 @@ def convert_DoE_dict_to_GPyOpt_bounds_list(DoE_dict):
             name = key + "~" + subkey
             py_type = type(DoE_dict[key][subkey])
             value = DoE_dict[key][subkey]
-            if py_type == list and type(value[0]) == str:
-                type_str = "categorical"
-                value = tuple(value)
-            elif py_type == list and type(value[0]) == tuple:
-                raise ValueError("Warning you can't enter tuple for the number of hidden layers yuo need to do a string of format 'X_X_X'")
-                type_str = "categorical"
-                value = tuple(value)
-            elif py_type == list:
+            if py_type == dict:
+                #type_str = "categorical" fg_placeholder
                 type_str = "discrete"
-                value = tuple(value)
-            elif py_type == range:
+                value = tuple(value.keys())
+            elif py_type == list or py_type == range:
                 type_str = "discrete"
                 value = tuple(value)
             elif py_type == tuple:
@@ -260,7 +251,12 @@ def return_edited_input_dict(GPyOpt_input, exp_instr, default_input_dict):
     input_index = 0
     for key in exp_instr:
         for subkey in exp_instr[key]:
-            output_input_dict[key][subkey] = GPyOpt_input[input_index]
+            options = exp_instr[key][subkey]
+            selection = GPyOpt_input[input_index]
+            if type(options) == dict:
+                output_input_dict[key][subkey] = options[selection]
+            else:
+                output_input_dict[key][subkey] = selection
             input_index += 1
     
     return output_input_dict
@@ -308,15 +304,15 @@ def define_DoE(bounds, DoE_size):
             DoE = np.hstack((DoE, values_for_params))
     return DoE
 
-def transfer_X_and_Y_to_GPyOpt_optimisation(design_history_dict, opt_obj):
-    for ID in range(find_largest_number(design_history_dict.keys())+1):
+def return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, opt_obj):
+    output_X, output_Y = [], []
+    for ID in range(1, find_largest_number(design_history_dict.keys())+1):
         if "Y" in design_history_dict[ID].keys():
-            opt_obj.X = np.vstack((opt_obj.X, design_history_dict[ID]["X"]))
-            opt_obj.Y = np.vstack((opt_obj.Y, design_history_dict[ID]["Y"]))
-    return opt_obj
+            output_X = output_X + [design_history_dict[ID]["X"]]
+            output_Y = output_Y + [design_history_dict[ID]["Y"]]
+    return output_X, output_Y
 
-
-def run_experiment_and_update_record(design_history_dict_single, experiment_requester, model_testing_method, testing_measure="mae"):
+def run_experiment_and_return_updated_design_history_dict(design_history_dict_single, experiment_requester, model_testing_method, testing_measure="mae"):
     if not "training_scores" in design_history_dict_single.keys():
         predictor, training_scores = experiment_requester(design_history_dict_single["X"])
         design_history_dict_single["predictor"], design_history_dict_single["training_scores"] = predictor, training_scores
@@ -328,9 +324,7 @@ def run_experiment_and_update_record(design_history_dict_single, experiment_requ
         design_history_dict_single["Y"] = design_history_dict_single["testing_scores"][testing_measure]
     
     return design_history_dict_single
-    
-    
-    
+
 
 
 #%% Module - Experiment Handler
@@ -338,13 +332,24 @@ def run_experiment_and_update_record(design_history_dict_single, experiment_requ
 def PLACEHOLDER_objective_function(x):
     return (x[:, 0] - 2)**2 + (x[:, 1] - 3)**2
 
+def convert_floats_to_int_if_whole(input_list):
+    output_list = copy.deepcopy(input_list)
+    for i in range(len(output_list)):
+        if output_list[i] % 1 == 0:
+            output_list[i] = int(output_list[i])
+    return output_list 
+
+def f2f(x1):
+    return np.random.rand()
+
 def experiment_manager(
     optim_run_name,
     DoE_dict,
+    model_start_time = datetime.now().strftime("%Y%m%d_%H%M"),
     model_training_method=FG_model_training.retrieve_or_generate_model_and_training_scores,
     model_testing_method=FG_model_training.generate_testing_scores,
     initial_doe_size=5,
-    max_iter=20,
+    max_iter=5,
     optimisation_method=None,
     default_input_dict = default_input_dict,
     minimise=True,
@@ -377,7 +382,8 @@ def experiment_manager(
         
         # populate initial DoE
         X_init = define_DoE(bounds, initial_doe_size)
-        X_init = np.array([[5, 3600, "20_10"], [7, 7200, "20_10"]]) #FG_Placeholder
+        #X_init = np.array([[5, 3600, "20_10"], [7, 7200, "20_10"]]) #FG_Placeholder
+        X_init = [[5, 3600, 0], [7, 7200, 0], [5, 3600, 1]]
         for ID in range(len(X_init)):
             design_history_dict[ID] = dict()
             design_history_dict[ID]["X"] = X_init[ID]
@@ -388,42 +394,47 @@ def experiment_manager(
     # complete all incomplete experiment runs (DoE or otherwise)
     df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, DoE_dict)
     for ID in range(find_largest_number(design_history_dict.keys()) + 1):
-        
-        design_history_dict[ID] = run_experiment_and_update_record(design_history_dict[ID], experiment_requester, model_testing_method, testing_measure="mae")
-        
-        #update records
+        design_history_dict[ID] = run_experiment_and_return_updated_design_history_dict(design_history_dict[ID], experiment_requester, model_testing_method, testing_measure="mae")
+        # save
         df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, DoE_dict)
+        save_designs_record_csv_and_dict(potential_experiment_records_path, df_designs_record=df_designs_record, design_history_dict=design_history_dict)
     
     # continue optimisation
-    bo = GPyOpt.methods.BayesianOptimization(f=PLACEHOLDER_objective_function, domain=bounds)
+    bo = GPyOpt.methods.BayesianOptimization(f=PLACEHOLDER_objective_function, domain=bounds, initial_design_numdata=0)
     continue_optimisation = True
     iter_count = 0
     while continue_optimisation == True:
-        bo = transfer_X_and_Y_to_GPyOpt_optimisation(design_history_dict, bo)
+        X, Y = return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, bo)
+        bo.X = np.array(X)
+        bo.Y = np.array(Y).reshape(-1,1)
         bo.run_optimization()
         # find next design
         x_next = bo.acquisition.optimize()
         # save and run design
-        predictor, training_scores = experiment_requester(design_history_dict[ID]["X"])
-        design_history_dict[ID]["predictor"], design_history_dict[ID]["training_scores"] = predictor, training_scores
-        
-        y_next = experiment_requester(x_next[0].reshape(1, -1))
-        
-        
+        ID = find_largest_number(design_history_dict.keys()) + 1
+        design_history_dict[ID] = dict()
+        design_history_dict[ID]["X"] = convert_floats_to_int_if_whole(list(x_next[0][0]))#[:len(design_history_dict[ID-1]["X"])]
+        # FG_placeholder
+        design_history_dict[ID] = run_experiment_and_return_updated_design_history_dict(design_history_dict[ID], experiment_requester, model_testing_method, testing_measure="mae")
+        # save
+        df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, DoE_dict)
+        save_designs_record_csv_and_dict(potential_experiment_records_path, df_designs_record=df_designs_record, design_history_dict=design_history_dict)
+        # check loop
         iter_count += 1
         if iter_count >= max_iter:
             continue_optimisation = False
         
-        
-        
-        
-
 
 #%% main line
+
+now = datetime.now()
+model_start_time = now.strftime(global_strptime_str_filename)
+    
 
 experiment_manager(
     "test",
     DoE_dict,
+    model_start_time = model_start_time,
     force_restart_run = True
     )
 
