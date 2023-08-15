@@ -18,7 +18,7 @@ if not sys.warnoptions:
     warnings.simplefilter("ignore")
     os.environ["PYTHONWARNINGS"] = "ignore"
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-
+import matplotlib.pyplot as plt
 
 
 
@@ -233,11 +233,21 @@ def return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_li
 #%% main line
 
 
-def run_additional_reporting(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, DoE_orders_dict, model_type_name, outputs_path, model_start_time):
+def run_additional_reporting(preds=None,
+ X_test = None, 
+ pred_steps_list = None, 
+ pred_output_and_tickers_combos_list = None, 
+ DoE_orders_dict = None, 
+ model_type_name = None, 
+ outputs_path = None, 
+ model_start_time = None
+ ):
 
     df_realigned_dict                   = return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
     results_tables_dict                 = return_results_X_day_plus_minus_accuracy( df_realigned_dict, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting_PC=[0, 0.01], model_type_name=model_type_name, model_start_time = model_start_time, output_name="Test2", outputs_folder_path = outputs_path, figure_name = "test_output2")
     plt, df_realigned_dict              = return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_list, results_tables_dict, DoE_name = DoE_orders_dict["name"], model_type_name=model_type_name, model_start_time = model_start_time, outputs_folder_path = outputs_path, timestamp = False)
+    
+    return results_tables_dict, plt, df_realigned_dict
 
 
 

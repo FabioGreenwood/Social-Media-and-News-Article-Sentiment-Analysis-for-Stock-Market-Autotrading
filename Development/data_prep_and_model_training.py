@@ -1130,7 +1130,11 @@ def return_columns_to_remove(columns_list, self):
 
 #%% Module - Model Testing and Standard Reporting
 
-def generate_testing_scores(predictor, input_dict):
+def return_testing_scores_and_testing_time_series(predictor, input_dict):
+    testing_scores, X_testing, y_testing, Y_preds_testing = generate_testing_scores(predictor, input_dict, return_time_series=True)
+    return testing_scores, X_testing, y_testing, Y_preds_testing
+
+def generate_testing_scores(predictor, input_dict, return_time_series=False):
                             
     temporal_params_dict    = input_dict["temporal_params_dict"]
     fin_inputs_params_dict  = input_dict["fin_inputs_params_dict"]
@@ -1161,8 +1165,10 @@ def generate_testing_scores(predictor, input_dict):
     # step 4: generate score
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 4: generate score")
     testing_scores = predictor.evaluate(y_test=y_testing, y_pred=Y_preds_testing, method=model_hyper_params["testing_scoring"])
-    
-    return testing_scores, Y_preds_testing
+    if return_time_series == False:
+        return testing_scores
+    else:
+        return testing_scores, X_testing, y_testing, Y_preds_testing
 
 
 

@@ -16,6 +16,7 @@ Dev notes:
 
 #%% Import Methods
 import data_prep_and_model_training as FG_model_training
+import additional_reporting_and_model_trading_runs as FG_additional_reporting
 import GPyOpt
 import numpy as np
 import pandas as pd
@@ -33,6 +34,7 @@ if not sys.warnoptions:
     warnings.simplefilter("ignore")
     os.environ["PYTHONWARNINGS"] = "ignore"
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+import matplotlib.pyplot as plt
 
 #%% Standard Parameters
 
@@ -184,7 +186,7 @@ def update_df_designs_record(df_designs_record, design_history_dict, design_spac
     for ID in range(find_largest_number(design_history_dict.keys())+1):
         df_designs_record.loc[ID, input_param_cols] = design_history_dict[ID]["X"]
         for subkey in design_history_dict[ID]:
-            if subkey != "X" and subkey != "predictor" and subkey != "Y":
+            if not subkey in ["X", "predictor", "Y"]:
                 df_designs_record.loc[ID, subkey] = design_history_dict[ID][subkey]
     return df_designs_record
         
@@ -315,10 +317,21 @@ def run_experiment_and_return_updated_design_history_dict(design_history_dict_si
         design_history_dict_single["training_r2"], design_history_dict_single["training_mse"], design_history_dict_single["training_mae"] = training_scores["r2"], training_scores["mse"], training_scores["mae"]
     if design_history_dict_single[col_testing_str] == None:
         temp_input_dict = return_edited_input_dict(design_history_dict_single["X"], design_space_dict, default_input_dict)
-        testing_scores, Y_preds_testing = model_testing_method(predictor, temp_input_dict)
+        testing_scores, X_testing, y_testing, Y_preds = model_testing_method(predictor, temp_input_dict)
         del temp_input_dict
         design_history_dict_single["testing_r2"], design_history_dict_single["testing_mse"], design_history_dict_single["testing_mae"] = testing_scores["r2"], testing_scores["mse"], testing_scores["mae"]
         design_history_dict_single["Y"] = testing_scores[testing_measure]
+        # custom testing
+        results_tables_dict, plt, df_realigned_dict = FG_additional_reporting.run_additional_reporting(preds=Y_preds,                                                                   
+                X_test = X_testing, 
+                pred_steps_list = [1], 
+                pred_output_and_tickers_combos_list = ("company", "close"), 
+                DoE_orders_dict = None, 
+                model_type_name = "xxxModel_namexxx", 
+                outputs_path = "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\outputs",
+                model_start_time = datetime.now())
+        
+        
     design_history_dict_single["experiment_timestamp"] = datetime.now().strftime(global_strptime_str)
     
     return design_history_dict_single
@@ -354,7 +367,7 @@ def experiment_manager(
     design_space_dict,
     model_start_time = datetime.now(),
     model_training_method=FG_model_training.retrieve_or_generate_model_and_training_scores,
-    model_testing_method=FG_model_training.generate_testing_scores,
+    model_testing_method=FG_model_training.return_testing_scores_and_testing_time_series,
     initial_doe_size_or_DoE=5,
     max_iter=5,
     optimisation_method=None,
@@ -391,6 +404,7 @@ def experiment_manager(
         #check that the previous designs table, matches the format for this experiment
         if not sum(df_designs_record.columns == return_keys_within_2_level_dict(design_space_dict) + global_designs_record_final_columns_list) == len(df_designs_record.columns):
             raise ValueError("previous designs table, doesn't match the format for this experiment")
+        
         
         
     #insert the completion of the DoE if not completed
@@ -432,6 +446,12 @@ def experiment_manager(
             # save
             df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
             save_designs_record_csv_and_dict(list_of_save_locations, df_designs_record=df_designs_record, design_history_dict=design_history_dict, optim_run_name=optim_run_name)
+            # fg_placeholder - new functionality
+            
+            
+            
+            
+            
     
     # continue optimisation
     bo = GPyOpt.methods.BayesianOptimization(f=PLACEHOLDER_objective_function, domain=bounds, initial_design_numdata=0)
@@ -465,8 +485,8 @@ def experiment_manager(
 #%% save dict for export testing
 
 
-preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, DoE_orders_dict, model_type_name, outputs_path, model_start_time
-
+#preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, DoE_orders_dict, model_type_name, outputs_path, model_start_time
+    
     
     
     
@@ -522,7 +542,7 @@ experiment_manager(
     design_space_dict,
     initial_doe_size_or_DoE=5,
     model_start_time = model_start_time,
-    force_restart_run = False
+    force_restart_run = True
     )
 
 
