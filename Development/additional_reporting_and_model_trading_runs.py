@@ -46,17 +46,24 @@ def return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_
     
     return reaglined_plus_minus_dict
 
-def return_results_X_day_plus_minus_accuracy(df_temp_dict, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting_PC=[0, 0.01], model_type_name="", save=True, model_start_time = "", output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2"):
+def return_results_X_day_plus_minus_accuracy(y_preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting_PC=[0, 0.01], model_type_name="", save=True, model_start_time = "", output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2"):
+    output_col = "£_close"
     
-    
+    df_temp = pd.DataFrame()
+    pred_str = dict()
+    ticker = dict()
+    actual_values = dict()
     #df_realigned_temp = copy.deepcopy(df_realigned)
-    pred_str = "{}_{}_{}_before"
-    record_str = "{}_{}"
+    if type(pred_steps_list) == int:
+        pred_steps_list = [pred_steps_list]
     
-    results_x_day_plus_minus_PC                         = dict() 
+    time_series_index = X_test.index
+    
+    results_bets_with_confidence_proportion             = dict()
+    results_x_day_plus_minus_PC                         = dict()
     results_x_day_plus_minus_PC_confindence             = dict()
-    results_x_day_plus_minus_score_confidence           = dict() 
-    results_x_day_plus_minus_score_confidence_weighted  = dict() 
+    results_x_day_plus_minus_score_confidence           = dict()
+    results_x_day_plus_minus_score_confidence_weighted  = dict()
     
     count_bets_with_confidence               = dict()
     count_correct_bets_with_confidence       = dict()
@@ -64,100 +71,85 @@ def return_results_X_day_plus_minus_accuracy(df_temp_dict, X_test, pred_steps_li
     count_correct_bets_with_confidence_score_weight = dict()
     count_correct_bets_with_confidence_score_weight_total = dict()
     
-    for ticker in list(df_temp_dict.keys()):
+    time_series_index = X_test.index
+    
+    for steps_back in pred_steps_list:
+        #initialise variables
         
-        df_temp = df_temp_dict[ticker]
-        results_x_day_plus_minus_PC                       [ticker]  = dict()
-        results_x_day_plus_minus_PC_confindence           [ticker]  = dict()
-        results_x_day_plus_minus_score_confidence         [ticker]  = dict()
-        results_x_day_plus_minus_score_confidence_weighted[ticker]  = dict()
+        # count values
+        count           = 0
+        count_correct   = 0
+        count_bets_with_confidence[steps_back]               = dict()
+        count_correct_bets_with_confidence[steps_back]       = dict()
+        count_correct_bets_with_confidence_score[steps_back] = dict()
+        count_correct_bets_with_confidence_score_weight[steps_back] = dict()
+        count_correct_bets_with_confidence_score_weight_total[steps_back] = dict()
         
-        count_bets_with_confidence[ticker]               = dict()
-        count_correct_bets_with_confidence[ticker]       = dict()
-        count_correct_bets_with_confidence_score[ticker] = dict()
-        count_correct_bets_with_confidence_score_weight[ticker] = dict()
-        count_correct_bets_with_confidence_score_weight_total[ticker] = dict()
+        results_x_day_plus_minus_PC[steps_back]                      = dict()
+        results_bets_with_confidence_proportion[steps_back]          = dict()
+        results_x_day_plus_minus_PC_confindence[steps_back]          = dict()
+        results_x_day_plus_minus_score_confidence[steps_back]        = dict()
+        results_x_day_plus_minus_score_confidence_weighted[steps_back] = dict()
         
-        time_series_index = X_test.index
         
-        for steps_back in pred_steps_list:
-            #initialise variables
+        for confidence_threshold in confidences_before_betting_PC:
+            count_bets_with_confidence              [steps_back][confidence_threshold] = 0
+            count_correct_bets_with_confidence      [steps_back][confidence_threshold] = 0
+            count_correct_bets_with_confidence_score[steps_back][confidence_threshold] = 0
+            count_correct_bets_with_confidence_score_weight[steps_back][confidence_threshold] = 0
+            count_correct_bets_with_confidence_score_weight_total[steps_back][confidence_threshold] = 0
+
+        
+        # values
+        max_pred_value = max(pred_steps_list)
+        x_values = list(X_test[output_col].values)
+        y_values = list(y_preds.values.reshape((1,-1))[0])
+        
+        for time_step in range(max(pred_steps_list), len(X_test.index)):
             
-            col_name = df_temp.columns[pred_steps_list.index(steps_back)]
-            count           = 0
-            count_correct   = 0
-            count_bets_with_confidence              [ticker][steps_back] = dict()
-            count_correct_bets_with_confidence      [ticker][steps_back] = dict()
-            count_correct_bets_with_confidence_score[ticker][steps_back] = dict()
-            count_correct_bets_with_confidence_score_weight[ticker][steps_back] = dict()
-            count_correct_bets_with_confidence_score_weight_total[ticker][steps_back] = dict()
+            count += 1
+            #basic values
             
-            results_x_day_plus_minus_PC                     [ticker][steps_back] = dict()
-            results_x_day_plus_minus_PC_confindence         [ticker][steps_back] = dict()
-            results_x_day_plus_minus_score_confidence       [ticker][steps_back] = dict()
-            results_x_day_plus_minus_score_confidence_weighted[ticker][steps_back] = dict()
+            original_value      = x_values[time_step - steps_back]
+            expected_difference = y_values[time_step] - x_values[time_step - steps_back]
+            actual_difference   = x_values[time_step] - x_values[time_step - steps_back]
+            relative_confidence = expected_difference / original_value
             
+            #basic count scoring 
+            if actual_difference * expected_difference > 0:
+                count_correct += 1
             
+            #bets with confidence scoring
             for confidence_threshold in confidences_before_betting_PC:
-                count_bets_with_confidence              [ticker][steps_back][confidence_threshold] = 0
-                count_correct_bets_with_confidence      [ticker][steps_back][confidence_threshold] = 0
-                count_correct_bets_with_confidence_score[ticker][steps_back][confidence_threshold] = 0
-                count_correct_bets_with_confidence_score_weight[ticker][steps_back][confidence_threshold] = 0
-                count_correct_bets_with_confidence_score_weight_total[ticker][steps_back][confidence_threshold] = 0
+                if   abs(relative_confidence) > confidence_threshold and actual_difference * expected_difference > 0:
+                    count_bets_with_confidence              [steps_back][confidence_threshold] += 1
+                    count_correct_bets_with_confidence      [steps_back][confidence_threshold] += 1
+                    count_correct_bets_with_confidence_score[steps_back][confidence_threshold] += abs(actual_difference)
+                    count_correct_bets_with_confidence_score_weight[steps_back][confidence_threshold] += abs(actual_difference) * (abs(relative_confidence) - confidence_threshold)
+                    count_correct_bets_with_confidence_score_weight_total[steps_back][confidence_threshold] += (abs(relative_confidence) - confidence_threshold)
+                    
+                elif abs(relative_confidence) > confidence_threshold and actual_difference * expected_difference < 0:
+                    count_bets_with_confidence              [steps_back][confidence_threshold] += 1
+                    count_correct_bets_with_confidence      [steps_back][confidence_threshold] += 0
+                    count_correct_bets_with_confidence_score[steps_back][confidence_threshold] -= abs(actual_difference)
+                    count_correct_bets_with_confidence_score_weight[steps_back][confidence_threshold] -= abs(actual_difference) * (abs(relative_confidence) - confidence_threshold)
+                    count_correct_bets_with_confidence_score_weight_total[steps_back][confidence_threshold] += (abs(relative_confidence) - confidence_threshold)
+                    
 
-            actual_values = X_test[record_str.format(ticker[0], ticker[1])]
-            
-            max_pred_steps = max(pred_steps_list)
-            for row_num in range(max(pred_steps_list), len(X_test.index)):
-                
-                count += 1
-
-                
-                #basic values
-                prediction_vector   = df_temp[pred_str.format(ticker[0], ticker[1], steps_back)]
-                original_vaule      = actual_values[row_num - steps_back]
-                expected_difference = prediction_vector[row_num]
-                actual_difference   = actual_values[row_num] - actual_values[row_num - steps_back]
-                relative_confidence = expected_difference / original_vaule
-                
-                #basic count scoring 
-                if actual_difference * expected_difference > 0:
-                    count_correct += 1
-                
-                #bets with confidence scoring
-                for confidence_threshold in confidences_before_betting_PC:
-                    if   abs(relative_confidence) > confidence_threshold and actual_difference * expected_difference > 0:
-                        count_bets_with_confidence              [ticker][steps_back][confidence_threshold] += 1
-                        count_correct_bets_with_confidence      [ticker][steps_back][confidence_threshold] += 1
-                        count_correct_bets_with_confidence_score[ticker][steps_back][confidence_threshold] += abs(actual_difference)
-                        count_correct_bets_with_confidence_score_weight[ticker][steps_back][confidence_threshold] += abs(actual_difference) * (abs(relative_confidence) - confidence_threshold)
-                        count_correct_bets_with_confidence_score_weight_total[ticker][steps_back][confidence_threshold] += (abs(relative_confidence) - confidence_threshold)
-                        
-                    elif abs(relative_confidence) > confidence_threshold and actual_difference * expected_difference < 0:
-                        count_bets_with_confidence              [ticker][steps_back][confidence_threshold] += 1
-                        count_correct_bets_with_confidence      [ticker][steps_back][confidence_threshold] += 0
-                        count_correct_bets_with_confidence_score[ticker][steps_back][confidence_threshold] -= abs(actual_difference)
-                        count_correct_bets_with_confidence_score_weight[ticker][steps_back][confidence_threshold] -= abs(actual_difference) * (abs(relative_confidence) - confidence_threshold)
-                        count_correct_bets_with_confidence_score_weight_total[ticker][steps_back][confidence_threshold] += (abs(relative_confidence) - confidence_threshold)
-                        
-
-            results_x_day_plus_minus_PC
-            results_x_day_plus_minus_PC_confindence
-            results_x_day_plus_minus_score_confidence
-            results_x_day_plus_minus_score_confidence_weighted
-
-            #Total scores for ticker steps_back conbination
-            results_x_day_plus_minus_PC[ticker][steps_back] = count_correct / count
-            for confidence_threshold in confidences_before_betting_PC:
-                results_x_day_plus_minus_PC_confindence           [ticker][steps_back][confidence_threshold] = count_correct_bets_with_confidence             [ticker][steps_back][confidence_threshold] / count_bets_with_confidence[ticker][steps_back][confidence_threshold]
-                results_x_day_plus_minus_score_confidence         [ticker][steps_back][confidence_threshold] = count_correct_bets_with_confidence_score       [ticker][steps_back][confidence_threshold] / count_bets_with_confidence[ticker][steps_back][confidence_threshold]
-                results_x_day_plus_minus_score_confidence_weighted[ticker][steps_back][confidence_threshold] = count_correct_bets_with_confidence_score_weight[ticker][steps_back][confidence_threshold] / count_correct_bets_with_confidence_score_weight_total[ticker][steps_back][confidence_threshold]
-        
+        #Total scores for ticker steps_back conbination
+        results_x_day_plus_minus_PC = count_correct / count
+        for confidence_threshold in confidences_before_betting_PC:
+            results_bets_with_confidence_proportion           [steps_back][confidence_threshold] = count_bets_with_confidence[steps_back][confidence_threshold] / count
+            results_x_day_plus_minus_PC_confindence           [steps_back][confidence_threshold] = count_correct_bets_with_confidence             [steps_back][confidence_threshold] / count_bets_with_confidence                           [steps_back][confidence_threshold]
+            results_x_day_plus_minus_score_confidence         [steps_back][confidence_threshold] = count_correct_bets_with_confidence_score       [steps_back][confidence_threshold] / count_bets_with_confidence                           [steps_back][confidence_threshold]
+            results_x_day_plus_minus_score_confidence_weighted[steps_back][confidence_threshold] = count_correct_bets_with_confidence_score_weight[steps_back][confidence_threshold] / count_correct_bets_with_confidence_score_weight_total[steps_back][confidence_threshold]
+    
+    #xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     results_dict = dict()
-    results_dict["results_x_day_plus_minus_PC"]                         = results_x_day_plus_minus_PC
-    results_dict["results_x_day_plus_minus_PC_confindence"]             = results_x_day_plus_minus_PC_confindence
-    results_dict["results_x_day_plus_minus_score_confidence"]           = results_x_day_plus_minus_score_confidence 
-    results_dict["results_x_day_plus_minus_score_confidence_weighted"]  = results_x_day_plus_minus_score_confidence_weighted
+    results_dict["results_bets_with_confidence_proportion"]              = results_bets_with_confidence_proportion
+    results_dict["results_x_mins_plus_minus_PC_confindence"]             = results_x_day_plus_minus_PC_confindence
+    results_dict["results_x_mins_plus_minus_score_confidence"]           = results_x_day_plus_minus_score_confidence 
+    results_dict["results_x_mins_plus_minus_score_confidence_weighted"]  = results_x_day_plus_minus_score_confidence_weighted
     
     print("Hello")
     
@@ -234,20 +226,21 @@ def return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_li
 
 
 def run_additional_reporting(preds=None,
- X_test = None, 
- pred_steps_list = None, 
- pred_output_and_tickers_combos_list = None, 
- DoE_orders_dict = None, 
- model_type_name = None, 
- outputs_path = None, 
- model_start_time = None
- ):
-
-    df_realigned_dict                   = return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
-    results_tables_dict                 = return_results_X_day_plus_minus_accuracy( df_realigned_dict, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting_PC=[0, 0.01], model_type_name=model_type_name, model_start_time = model_start_time, output_name="Test2", outputs_folder_path = outputs_path, figure_name = "test_output2")
-    plt, df_realigned_dict              = return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_list, results_tables_dict, DoE_name = DoE_orders_dict["name"], model_type_name=model_type_name, model_start_time = model_start_time, outputs_folder_path = outputs_path, timestamp = False)
+                            X_test = None, 
+                            pred_steps_list = None, 
+                            pred_output_and_tickers_combos_list = None, 
+                            DoE_orders_dict = None, 
+                            model_type_name = None, 
+                            outputs_path = None, 
+                            model_start_time = None,
+                            confidences_before_betting_PC=None
+                            ):
+    pred_output_and_tickers_combos_list = [("£", "close")]
+    #df_realigned_dict                   = return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
+    results_tables_dict                 = return_results_X_day_plus_minus_accuracy(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting_PC=confidences_before_betting_PC, model_type_name=model_type_name, model_start_time = model_start_time, output_name="Test2", outputs_folder_path = outputs_path, figure_name = "test_output2")
+    #plt, df_realigned_dict              = return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_list, results_tables_dict, DoE_name = DoE_orders_dict["name"], model_type_name=model_type_name, model_start_time = model_start_time, outputs_folder_path = outputs_path, timestamp = False)
     
-    return results_tables_dict, plt, df_realigned_dict
+    return results_tables_dict#, plt, df_realigned_dict
 
 
 
