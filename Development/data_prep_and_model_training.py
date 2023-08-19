@@ -76,6 +76,7 @@ import itertools as it
 from stock_indicators import indicators, Quote
 from stock_indicators.indicators.common.quote import Quote
 from stock_indicators.indicators.common.enums import Match
+from stock_indicators import PeriodSize, PivotPointType 
 
 #%% EXAMPLE INPUTS FOR MAIN METHOD
 
@@ -302,6 +303,7 @@ def return_technical_indicators_name(df, tech_indi_dict, match_doji, target_file
 
 
 def retrieve_or_generate_then_populate_technical_indicators(df, tech_indi_dict, match_doji, target_file_path):
+    global global_strptime_str_filename
     quotes_list = [
         Quote(d,o,h,l,c,v) 
         for d,o,h,l,c,v 
@@ -318,22 +320,46 @@ def retrieve_or_generate_then_populate_technical_indicators(df, tech_indi_dict, 
         df.index = pd.to_datetime(df.index)
     else:
         for key in tech_indi_dict:
-            if key == "sma":
-                for value in tech_indi_dict[key]:
-                    col_str = "$_sma_" + str(value)
-                    df[col_str] = ""
+            for value in tech_indi_dict[key]:
+                #calculate indicators
+                if key == "sma":
                     results = indicators.get_sma(quotes_list, value)
+                    attr = ["sma"]
+                    col_pref = ""
+                elif key == "ema":
+                    results = indicators.get_ema(quotes_list, value)
+                    attr = ["ema"]
+                    col_pref = ""
+                elif key == "macd":
+                    if not len(value) == 3:
+                        raise ValueError("the entries for macd, must be lists of a 3 value length")
+                    results = indicators.get_macd(quotes_list, value[0], value[1], value[2])
+                    attr = ["macd", "signal", "histogram", "fast_ema", "slow_ema"]
+                    col_pref = "macd_"
+                elif key == "BollingerBands":
+                    if not len(value) == 2:
+                        raise ValueError("the entries for BollingerBands, must be lists of a 2 value length")
+                    results = indicators.get_macd(quotes_list, value[0], value[1])
+                    attr = ["upper_band", "lower_band", "percent_b", "z_score", "width"]
+                    col_pref = "Bollinger_"
+                elif key == "PivotPoints":
+                    results = indicators.get_pivot_points(quotes_list, PeriodSize.MONTH, PivotPointType.WOODIE);
+                    attr = ["r3", "r2", "r1", "pp", "s1", "s2", "s3"]
+                    col_pref = "PivotPoints"
+                else:
+                    raise ValueError("technical indicator " + key + " not programmed")
+                # populate indicator
+                for at in attr:
+                    col_str = "$_" + col_pref + at + "_" + str(value)
+                    df[col_str] = ""
                     for r in results:
-                        df.at[r.date, col_str] = r.sma
-            elif key == "ema":
-                for value in tech_indi_dict[key]:
-                        col_str = "$_ema_" + str(value)
-                        df[col_str] = ""
-                        results = indicators.get_ema(quotes_list, value)
-                        for r in results:
-                            df.at[r.date, col_str] = r.ema
-            else:
-                raise ValueError("technical indicator " + key + " not programmed")
+                        df.at[r.date, col_str] = getattr(r,at)
+                    print("tech indy: " + str(key) + " " + str(value) +  " " + str(at) + " done " + print(datetime.now().strftime(global_strptime_str_filename)))
+            
+            
+            
+            
+            
         if match_doji == True:
             results = indicators.get_doji(quotes_list)
             df["match!_doji"] = ""
