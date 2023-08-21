@@ -15,6 +15,7 @@ Dev notes:
 """
 
 #%% Import Methods|
+import random
 import data_prep_and_model_training as FG_model_training
 import additional_reporting_and_model_trading_runs as FG_additional_reporting
 import GPyOpt
@@ -82,8 +83,8 @@ default_fin_inputs_params_dict      = {
     "index_cols"        : "date",    
     "cols_list"         : ["open", "high", "low", "close", "volume"],
     "fin_indi"          : {#additional financial indicators to generate
-        "sma" : [5, 15, 20, 0.5*SECS_IN_A_DAY, SECS_IN_A_DAY],
-        "ema" : [5, 15, 20, 0.5*SECS_IN_A_DAY, SECS_IN_A_DAY],
+        "sma" : [5, 15, 20, int(0.5*SECS_IN_A_DAY), int(SECS_IN_A_DAY)],
+        "ema" : [5, 15, 20, int(0.5*SECS_IN_A_DAY), int(SECS_IN_A_DAY)],
         "macd" : [[12, 26, 9]],
         "BollingerBands" : [[20, 2]],
         "PivotPoints" : [0]
@@ -304,7 +305,7 @@ def template_experiment_requester(GPyOpt_input, design_space_dict, default_input
     global global_run_count
     
     print("xxxxxxxxxxxxxx" + str(global_run_count))
-    
+    print(GPyOpt_input)
     global_run_count += 1
     
     predictor, training_scores = experiment_method(prepped_temporal_params_dict, prepped_fin_inputs_params_dict, prepped_senti_inputs_params_dict, prepped_outputs_params_dict, prepped_model_hyper_params)
@@ -349,7 +350,7 @@ def return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, opt_obj, inverse
         coff = 1
     
         
-    for ID in range(1, find_largest_number(design_history_dict.keys())+1):
+    for ID in range(0, find_largest_number(design_history_dict.keys())+1):
         output_X = output_X + [design_history_dict[ID]["X"]]
         if type(objective_function_name) == str:
             output_Y = output_Y + [design_history_dict[ID][objective_function_name] * coff]
@@ -400,8 +401,9 @@ def run_experiment_and_return_updated_design_history_dict(design_history_dict_si
 
 #%% Module - Experiment Handler
 
-def PLACEHOLDER_objective_function(x):
-    return (x[:, 0] - 2)**2 + (x[:, 1] - 3)**2
+def PLACEHOLDER_objective_function(x1, x2, x3, x4, x5):
+    #return (x[:, 0] - 2)**2 + (x[:, 1] - 3)**2
+    return 5
 
 def is_integer_num(n):
     if isinstance(n, int):
@@ -429,7 +431,7 @@ def trim_string_from_substring(string, substring="_params_"):
     x = string.find(substring) + len(substring)
     return string[x:]
 
-def print_desired_scores(design_history, df_designs_record, design_space_dict, optim_scores_vec):
+def print_desired_scores(design_history, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_minimise_vec):
     # this method produces the desired output at the end of a run, informing the user of:
     # number of design runs, last score, best scores of each high-lighted score and best run with each score in question
     # last score info
@@ -440,26 +442,66 @@ def print_desired_scores(design_history, df_designs_record, design_space_dict, o
         pareto design scores:
         ID: X scores:
     """
-    last_ID = find_largest_number(find_largest_number(design_history.keys()))
+    last_ID = find_largest_number(design_history.keys())
     print("ID: ", str(last_ID))
     output_string_2 = "inputs - "
     for name_1, val_1 in zip(return_keys_within_2_level_dict(design_space_dict), design_history[last_ID]["X"]):
-        output_string_2 = output_string_2 + trim_string_from_substring(name_1) + ": " + val_1 + ", "
+        output_string_2 = output_string_2 + trim_string_from_substring(name_1) + ": " + str(val_1) + ", "
     print(output_string_2[:-2])
+    print("short form - " + str(design_history[last_ID]["X"]))
     output_string_3 = "outputs - "
     for score_name in optim_scores_vec:
-        output_string_3 = output_string_3 + score_name + ": " + df_designs_record[score_name][last_ID] + ", "
+        if type(score_name) == str:
+            temp_str = score_name
+        else:
+            temp_str = return_name_of_additional_reporting_col(score_name[1], score_name[2], score_name[3])
+        output_string_3 = output_string_3 + str(temp_str) + ": " + "{:.5f}".format(df_designs_record[temp_str][last_ID]) + ", "
+            #output_string_3 = output_string_3 + str(temp_str) + ": " + str(df_designs_record[temp_str][last_ID]) + ", "
     print(output_string_3[:-2])
     # pareto designs
     print("pareto designs")
-    for objective in optim_scores_vec:
-        pareto_index = df_designs_record[objective].idxmax()
-        output_string_4a = "pareto " + objective + " ID: " + str(pareto_index)
+    for objective, polarity in zip(optim_scores_vec, inverse_for_minimise_vec):
+        if type(objective) == str:
+            temp_str = objective
+        else:
+            temp_str = return_name_of_additional_reporting_col(objective[1], objective[2], objective[3])
+        if inverse_for_minimise_vec == True:
+            pareto_index = df_designs_record[temp_str].idxmin()
+        else:
+            pareto_index = df_designs_record[temp_str].idxmax()
+        
+        output_string_4a = "pareto " + temp_str + ": " + "{:.5f}".format(df_designs_record[temp_str][last_ID]) + ", ID: " + str(pareto_index)
         output_string_4b = "inputs - "
         for name_4, val_4 in zip(return_keys_within_2_level_dict(design_space_dict), design_history[pareto_index]["X"]):
-            output_string_2 = output_string_2 + trim_string_from_substring(name_4) + ": " + val_4 + ", "
+            output_string_4b = output_string_4b + trim_string_from_substring(name_4) + ": " + str(val_4) + ", "
+        print("----")
         print(output_string_4a)
-        print(output_string_4b[:-2])
+        print(output_string_4b)
+        
+        
+        
+def return_if_design_unique(x_next, design_history_dict):
+    try:
+        x_next = x_next[0][0]
+    except:
+        x_next = x_next
+    
+    largest_ID = find_largest_number(design_history_dict.keys())
+    unique = True
+    for ID in range(0, largest_ID):
+        if all(design_history_dict[ID]["X"] == x_next):
+            unique = False
+    return unique
+    
+
+def check_if_experiment_already_ran_if_so_return_random_unique_design(x_next, design_history_dict, bounds):
+    unique = return_if_design_unique(x_next, design_history_dict)
+    if unique == False:
+        x_next = define_DoE(bounds, 1)
+        x_next = x_next[0]
+        
+    return x_next
+        
 
 
 def experiment_manager(
@@ -498,8 +540,15 @@ def experiment_manager(
     if os.path.exists(potential_experiment_records_path + optim_run_name + ".py_dict") and force_restart_run == False:
         # load previous work
         df_designs_record = pd.read_csv(potential_experiment_records_path + optim_run_name + ".csvBACKUP")
-        with open(potential_experiment_records_path + optim_run_name + ".py_dict", 'rb') as file:
-            design_history_dict = pickle.load(file)
+        try:
+            with open(potential_experiment_records_path + optim_run_name + ".py_dict", 'rb') as file:
+                design_history_dict = pickle.load(file)
+        except:
+            designs_record_cols = ["ID"] + return_keys_within_2_level_dict(design_space_dict) + return_cols_for_additional_reporting(default_input_dict) + global_designs_record_final_columns_list
+            df_designs_record = pd.DataFrame(columns=designs_record_cols)
+            df_designs_record.set_index("ID", inplace=True)
+            design_history_dict = {"design_space_dict" : design_space_dict, "default_input_dict" : default_input_dict}    
+            save_designs_record_csv_and_dict(list_of_save_locations, df_designs_record=df_designs_record, design_history_dict=design_history_dict, optim_run_name=optim_run_name)
         
         #check that the previous designs table, matches the format for this experiment
         if not sum(df_designs_record.columns == return_keys_within_2_level_dict(design_space_dict) + return_cols_for_additional_reporting(default_input_dict) + global_designs_record_final_columns_list) == len(df_designs_record.columns):
@@ -556,37 +605,48 @@ def experiment_manager(
         overall_max_runs = initial_doe_size_or_DoE + max_iter
     
     while continue_optimisation == True:
-        confidence_scoring_measure_tuple_1 = ("additional_results_dict","results_x_mins_plus_minus_score_confidence_weighted",1,0.02)
-        confidence_scoring_measure_tuple_2 = ("additional_results_dict","results_x_mins_plus_minus_PC_confindence",1,0.02)
+        confidence_scoring_measure_tuple_1 = ("additional_results_dict","results_x_mins_plus_minus_score_confidence_weighted",1,0.05)
+        confidence_scoring_measure_tuple_2 = ("additional_results_dict","results_x_mins_plus_minus_PC_confindence",1,0.05)
         optim_scores_vec = ["testing_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2]
-        X, Y = return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, bo, inverse_for_minimise=[True, False, False], objective_function_name=optim_scores_vec)
+        inverse_for_minimise_vec=[True, False, False]
+        X, Y = return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, bo, inverse_for_minimise=inverse_for_minimise_vec, objective_function_name=optim_scores_vec)
         bo.X = np.array(X)
         bo.Y = np.array(Y).reshape(-1,1)
         bo.run_optimization()
         # find next design
-        x_next = bo.acquisition.optimize()
+        dice_roll = random.random()
+        print("dice_roll: " + str(dice_roll))
+        if  dice_roll < 0.25:
+            x_next = define_DoE(bounds, 1)
+            x_next = x_next[0]
+        else:
+            x_next = bo.acquisition.optimize()
+            x_next = x_next[0][0]
+        x_next = check_if_experiment_already_ran_if_so_return_random_unique_design(x_next, design_history_dict, bounds)
         # save and run design
         ID = find_largest_number(design_history_dict.keys()) + 1
         design_history_dict[ID] = dict()
-        design_history_dict[ID]["X"] = convert_floats_to_int_if_whole(list(x_next[0][0]))#[:len(design_history_dict[ID-1]["X"])]
-        
+        design_history_dict[ID]["X"] = convert_floats_to_int_if_whole(list(x_next))#[:len(design_history_dict[ID-1]["X"])]
         design_history_dict[ID], results_tables_dict = run_experiment_and_return_updated_design_history_dict(design_history_dict[ID], experiment_requester, model_testing_method, testing_measure="mae", confidences_before_betting_PC=default_input_dict["reporting_dict"]["confidence_thresholds"])
         # save
         df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
         save_designs_record_csv_and_dict(list_of_save_locations, df_designs_record=df_designs_record, design_history_dict=design_history_dict, optim_run_name=optim_run_name)
-        print_desired_scores(design_history_dict, df_designs_record, design_space_dict, optim_scores_vec)
+        print_desired_scores(design_history_dict, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_minimise_vec)
         # check loop
         
         if len(df_designs_record.index) >= overall_max_runs:
             continue_optimisation = False
         
+
+        
 #%% save dict for export testing
+
 
 
         
     
-
     
+    return 
     
     
     
@@ -639,10 +699,21 @@ design_space_dict = {
 
 global_run_count = 0
 
+init_doe =[[7, 0.3, 1, 25200, 2, 0.1],
+            [9, 0.3, 1, 7200, 3, 0.01],
+            [5, 0.3, 1, 7200, 2, 0.1],
+            [7, 0.3, 0, 25200, 0, 0.1],
+            [5, 0.3, 1, 1800, 1, 0.05],
+            [5, 0.7, 1, 7200, 2, 0.1],
+            [5, 0.3, 1, 7200, 2, 0.1],
+            [5, 0.3, 1, 7200, 2, 0.05],
+            [5, 0.3, 1, 7200, 2, 0.05],
+            [5, 0.3, 1, 7200, 2, 0.05]]
+
 experiment_manager(
-    "test",
+    "standard_run",
     design_space_dict,
-    initial_doe_size_or_DoE=1,
+    initial_doe_size_or_DoE=init_doe,
     max_iter=20,
     model_start_time = model_start_time,
     force_restart_run = False

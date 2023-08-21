@@ -296,6 +296,8 @@ def return_technical_indicators_name(df, tech_indi_dict, match_doji, target_file
     for key in tech_indi_dict:
         file_string = file_string + "_" + key
         for val in tech_indi_dict[key]:
+            if type(val) == float:
+                val = int(val)
             file_string = file_string + "_" + str(val)
     file_string = file_string + "_" + str(match_doji)
     return file_string
@@ -323,23 +325,23 @@ def retrieve_or_generate_then_populate_technical_indicators(df, tech_indi_dict, 
             for value in tech_indi_dict[key]:
                 #calculate indicators
                 if key == "sma":
-                    results = indicators.get_sma(quotes_list, value)
+                    results = indicators.get_sma(quotes_list, int(value))
                     attr = ["sma"]
                     col_pref = ""
                 elif key == "ema":
-                    results = indicators.get_ema(quotes_list, value)
+                    results = indicators.get_ema(quotes_list, int(value))
                     attr = ["ema"]
                     col_pref = ""
                 elif key == "macd":
                     if not len(value) == 3:
                         raise ValueError("the entries for macd, must be lists of a 3 value length")
-                    results = indicators.get_macd(quotes_list, value[0], value[1], value[2])
+                    results = indicators.get_macd(quotes_list, int(value[0]), int(value[1]), int(value[2]))
                     attr = ["macd", "signal", "histogram", "fast_ema", "slow_ema"]
                     col_pref = "macd_"
                 elif key == "BollingerBands":
                     if not len(value) == 2:
                         raise ValueError("the entries for BollingerBands, must be lists of a 2 value length")
-                    results = indicators.get_macd(quotes_list, value[0], value[1])
+                    results = indicators.get_bollinger_bands(quotes_list, int(value[0]), int(value[1]))
                     attr = ["upper_band", "lower_band", "percent_b", "z_score", "width"]
                     col_pref = "Bollinger_"
                 elif key == "PivotPoints":
@@ -354,9 +356,8 @@ def retrieve_or_generate_then_populate_technical_indicators(df, tech_indi_dict, 
                     df[col_str] = ""
                     for r in results:
                         df.at[r.date, col_str] = getattr(r,at)
-                    print("tech indy: " + str(key) + " " + str(value) +  " " + str(at) + " done " + print(datetime.now().strftime(global_strptime_str_filename)))
-            
-            
+                    print("tech indy")    
+                    print("tech indy: " + str(key) + " " + str(value) +  " " + str(at) + " done " + datetime.now().strftime(global_strptime_str_filename))
             
             
             
