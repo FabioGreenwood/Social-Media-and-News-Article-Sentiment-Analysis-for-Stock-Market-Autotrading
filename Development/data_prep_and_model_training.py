@@ -219,10 +219,22 @@ def return_topic_model_name(num_topics, topic_model_alpha, apply_IDF, tweet_rati
     file_string = "tm_qty" + str(num_topics) + "_tm_alpha" + str(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed)
     return file_string
 
-def return_predictor_or_sentimental_data_name(company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed):
+def return_sentimental_data_name(company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed):
     global global_strptime_str, global_strptime_str_filename
-    name = company_symbol + "_ps" + train_period_start.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_pe" + train_period_end.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_ts_sec" + str(time_step_seconds) + "_tm_qty" + str(topic_model_qty)+ "_r_lt" + str(rel_lifetime) + "_r_hl" + str(rel_hlflfe) + "_tm_alpha" + str(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed)
+    if not type(pred_steps_ahead) == list:
+        pred_steps_ahead = [pred_steps_ahead]
+    name = company_symbol + "_steps" + str(pred_steps_ahead) + "_ps" + train_period_start.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_pe" + train_period_end.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_ts_sec" + str(time_step_seconds) + "_tm_qty" + str(topic_model_qty)+ "_r_lt" + str(rel_lifetime) + "_r_hl" + str(rel_hlflfe) + "_tm_alpha" + str(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed)
     return name
+
+def return_predictor_name(company_symbol, pred_steps_ahead, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed):
+    global global_strptime_str, global_strptime_str_filename
+    if not type(pred_steps_ahead) == list:
+        pred_steps_ahead = [pred_steps_ahead]
+    name = company_symbol + "_steps" + str(pred_steps_ahead) + "_ps" + train_period_start.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_pe" + train_period_end.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_ts_sec" + str(time_step_seconds) + "_tm_qty" + str(topic_model_qty)+ "_r_lt" + str(rel_lifetime) + "_r_hl" + str(rel_hlflfe) + "_tm_alpha" + str(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed)
+    return name
+
+
+
 
 def return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, weighted_topics, num_topics, topic_model_alpha, apply_IDF, tweet_ratio_removed):
     global global_strptime_str, global_strptime_str_filename
@@ -405,6 +417,7 @@ def retrieve_or_generate_sentimental_data(index, temporal_params_dict, fin_input
     topic_model_alpha   = senti_inputs_params_dict["topic_model_alpha"]
     tweet_ratio_removed = senti_inputs_params_dict["topic_training_tweet_ratio_removed"]
     apply_IDF           = senti_inputs_params_dict["apply_IDF"]
+    pred_steps          = outputs_params_dict["pred_steps_ahead"]
     #set period start/ends
     if training_or_testing == "training" or training_or_testing == "train":
         train_period_start  = temporal_params_dict["train_period_start"]
@@ -419,7 +432,7 @@ def retrieve_or_generate_sentimental_data(index, temporal_params_dict, fin_input
     #search for predictor
     sentimental_data_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["sentimental_data"]
     #FG_action: check that the train_period_start is only used and not the test version, that is an error
-    sentimental_data_name = return_predictor_or_sentimental_data_name(company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed)
+    sentimental_data_name = return_sentimental_data_name(company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed)
     sentimental_data_location_file = sentimental_data_folder_location_string + sentimental_data_name + ".csv"
     if os.path.exists(sentimental_data_location_file):
         df_sentimental_data = pd.read_csv(sentimental_data_location_file)
@@ -998,6 +1011,10 @@ def initiate_model(outputs_params_dict, model_hyper_params):
                 ),
                 model_hyper_params=model_hyper_params, 
                 ticker_name=outputs_params_dict["output_symbol_indicators_tuple"][0])
+    #elif model_hyper_params["name"] == "SimpleRNN":
+    #    estimator = Sequential()
+    #    estimator.add(SimpleRNN(units=32, activation='relu', input_shape=(sequence_length, input_dim)))
+    #    estimator.add(Dense(output_dim))
     
     elif model_hyper_params["name"] == "ElasticNet": 
             raise ValueError("OLD SYSTEM WILL NOT WORK")
@@ -1034,6 +1051,20 @@ def initiate_model(outputs_params_dict, model_hyper_params):
         raise ValueError("the model type: " + str(model_hyper_params["name"]) + " was not found in the method")
     
     return estimator
+
+class custom_simpleRNN():
+    def __init__(self, base_estimator=MLPRegressor(),
+                 model_hyper_params=model_hyper_params, 
+                 ticker_name=outputs_params_dict["output_symbol_indicators_tuple"][0]):
+        #expected keys: training_time_splits, max_depth, max_features, random_state,        
+        for key in model_hyper_params:
+           setattr(self, key, model_hyper_params[key])
+        self.model_hyper_params = model_hyper_params
+        self.ticker_name = ticker_name
+        self.base_estimator = base_estimator
+        self.estimators_ = []
+        self.training_time_splits = model_hyper_params["time_series_split_qty"]
+        self.n_estimators = 1 #this is a hard coding as the n estimators is set by a random loop. this ensures that each version of the input (provided by the 'remove columns' function), is used to train just a single model
 
 class DRSLinReg():
     def __init__(self, base_estimator=MLPRegressor(),
@@ -1300,6 +1331,7 @@ def retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inp
     
     #general parameters
     company_symbol      = outputs_params_dict["output_symbol_indicators_tuple"][0]
+    pred_steps          = outputs_params_dict["pred_steps_ahead"]
     train_period_start  = temporal_params_dict["train_period_start"]
     train_period_end    = temporal_params_dict["train_period_end"]
     topic_model_alpha   = senti_inputs_params_dict["topic_model_alpha"]
@@ -1315,7 +1347,7 @@ def retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inp
     #search for predictor
     predictor_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["predictive_model"]
     predictor_name_entry = company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed
-    predictor_name = return_predictor_or_sentimental_data_name(company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed)
+    predictor_name = return_predictor_name(company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed)
     predictor_location_file = predictor_folder_location_string + predictor_name + ".pred"
     #previous_score = edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="load")
     if os.path.exists(predictor_location_file):

@@ -112,7 +112,7 @@ default_senti_inputs_params_dict    = {
 }
 default_outputs_params_dict         = {
     "output_symbol_indicators_tuple"    : ("aapl", "close"), # fg_action: do I use this?
-    "pred_steps_ahead"                  : 1,
+    "pred_steps_ahead"                  : 5,
 }
 default_cohort_retention_rate_dict = {
             "£_close" : 1, #output value
@@ -646,7 +646,7 @@ def experiment_manager(
         
     
     
-    return 
+    
     
     
     
@@ -708,10 +708,16 @@ init_doe =[[7, 0.3, 1, 25200, 2, 0.1],
             [5, 0.3, 1, 7200, 2, 0.1],
             [5, 0.3, 1, 7200, 2, 0.05],
             [5, 0.3, 1, 7200, 2, 0.05],
-            [5, 0.3, 1, 7200, 2, 0.05]]
+            [5, 0.3, 1, 7200, 2, 0.05],
+            [9, 1, 1, 1800, 4, 0.02],
+            [9, 1, 0, 25200, 2, 0.05],
+            [5, 0.3, 1, 1800, 1, 0.1]]
+
+
+            
 
 experiment_manager(
-    "standard_run",
+    "standard_run_5mins",
     design_space_dict,
     initial_doe_size_or_DoE=init_doe,
     max_iter=20,
