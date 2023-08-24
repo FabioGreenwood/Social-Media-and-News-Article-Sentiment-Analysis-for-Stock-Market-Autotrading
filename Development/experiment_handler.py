@@ -112,7 +112,7 @@ default_senti_inputs_params_dict    = {
 }
 default_outputs_params_dict         = {
     "output_symbol_indicators_tuple"    : ("aapl", "close"), # fg_action: do I use this?
-    "pred_steps_ahead"                  : 5,
+    "pred_steps_ahead"                  : 1,
 }
 default_cohort_retention_rate_dict = {
             "£_close" : 1, #output value
@@ -442,7 +442,7 @@ def print_desired_scores(design_history, df_designs_record, design_space_dict, o
         pareto design scores:
         ID: X scores:
     """
-    last_ID = find_largest_number(design_history.keys())
+    last_ID = max(df_designs_record[df_designs_record["testing_mse"] > 0].index)
     print("ID: ", str(last_ID))
     output_string_2 = "inputs - "
     for name_1, val_1 in zip(return_keys_within_2_level_dict(design_space_dict), design_history[last_ID]["X"]):
@@ -465,12 +465,14 @@ def print_desired_scores(design_history, df_designs_record, design_space_dict, o
             temp_str = objective
         else:
             temp_str = return_name_of_additional_reporting_col(objective[1], objective[2], objective[3])
-        if inverse_for_minimise_vec == True:
-            pareto_index = df_designs_record[temp_str].idxmin()
+        if polarity == True:
+            temp_col = df_designs_record[temp_str].fillna(np.inf)
+            pareto_index = temp_col.idxmin()
         else:
-            pareto_index = df_designs_record[temp_str].idxmax()
+            temp_col = df_designs_record[temp_str].fillna(np.inf)
+            pareto_index = temp_col.idxmax()
         
-        output_string_4a = "pareto " + temp_str + ": " + "{:.5f}".format(df_designs_record[temp_str][last_ID]) + ", ID: " + str(pareto_index)
+        output_string_4a = "pareto " + temp_str + ": " + "{:.5f}".format(df_designs_record[temp_str][pareto_index]) + ", ID: " + str(pareto_index)
         output_string_4b = "inputs - "
         for name_4, val_4 in zip(return_keys_within_2_level_dict(design_space_dict), design_history[pareto_index]["X"]):
             output_string_4b = output_string_4b + trim_string_from_substring(name_4) + ": " + str(val_4) + ", "
@@ -516,7 +518,9 @@ def experiment_manager(
     default_input_dict = default_input_dict,
     minimise=True,
     force_restart_run = False,
-    testing_measure = "mae"
+    testing_measure = "mae",
+    inverse_for_minimise_vec = None,
+    optim_scores_vec = None,
     ):
     
     #parameters
@@ -589,6 +593,7 @@ def experiment_manager(
             # save
             df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
             save_designs_record_csv_and_dict(list_of_save_locations, df_designs_record=df_designs_record, design_history_dict=design_history_dict, optim_run_name=optim_run_name)
+            print_desired_scores(design_history_dict, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_minimise_vec)
             
             
             
@@ -605,10 +610,6 @@ def experiment_manager(
         overall_max_runs = initial_doe_size_or_DoE + max_iter
     
     while continue_optimisation == True:
-        confidence_scoring_measure_tuple_1 = ("additional_results_dict","results_x_mins_plus_minus_score_confidence_weighted",1,0.05)
-        confidence_scoring_measure_tuple_2 = ("additional_results_dict","results_x_mins_plus_minus_PC_confindence",1,0.05)
-        optim_scores_vec = ["testing_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2]
-        inverse_for_minimise_vec=[True, False, False]
         X, Y = return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, bo, inverse_for_minimise=inverse_for_minimise_vec, objective_function_name=optim_scores_vec)
         bo.X = np.array(X)
         bo.Y = np.array(Y).reshape(-1,1)
@@ -711,18 +712,38 @@ init_doe =[[7, 0.3, 1, 25200, 2, 0.1],
             [5, 0.3, 1, 7200, 2, 0.05],
             [9, 1, 1, 1800, 4, 0.02],
             [9, 1, 0, 25200, 2, 0.05],
-            [5, 0.3, 1, 1800, 1, 0.1]]
+            [5, 0.3, 1, 1800, 1, 0.1],
+            [7, 0.7, 0, 25200, 0, 0.1],
+            [7, 0.3, 1, 7200, 0, 0.05]]
+
+""" experiment checklist:
+1. ensure that the value for steps ahead is updated on the dictionary line below
+2. ensure the same is for the name of the run
 
 
-            
+"""
+
+testing_measure = "mae"
+pred_steps = 3
+default_input_dict["outputs_params_dict"]["pred_steps_ahead"] = pred_steps
+
+confidence_scoring_measure_tuple_1 = ("additional_results_dict","results_x_mins_plus_minus_score_confidence_weighted",pred_steps,0.05)
+confidence_scoring_measure_tuple_2 = ("additional_results_dict","results_x_mins_plus_minus_PC_confindence",pred_steps,0.05)
+optim_scores_vec = ["testing_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2]
+inverse_for_minimise_vec=[True, False, False]    
+
+
 
 experiment_manager(
-    "standard_run_5mins",
+    "standard_run_3mins",
     design_space_dict,
     initial_doe_size_or_DoE=init_doe,
     max_iter=20,
     model_start_time = model_start_time,
-    force_restart_run = False
+    force_restart_run = False,
+    inverse_for_minimise_vec = inverse_for_minimise_vec,
+    optim_scores_vec = optim_scores_vec,
+    testing_measure = testing_measure
     )
 
 

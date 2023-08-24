@@ -221,9 +221,7 @@ def return_topic_model_name(num_topics, topic_model_alpha, apply_IDF, tweet_rati
 
 def return_sentimental_data_name(company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed):
     global global_strptime_str, global_strptime_str_filename
-    if not type(pred_steps_ahead) == list:
-        pred_steps_ahead = [pred_steps_ahead]
-    name = company_symbol + "_steps" + str(pred_steps_ahead) + "_ps" + train_period_start.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_pe" + train_period_end.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_ts_sec" + str(time_step_seconds) + "_tm_qty" + str(topic_model_qty)+ "_r_lt" + str(rel_lifetime) + "_r_hl" + str(rel_hlflfe) + "_tm_alpha" + str(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed)
+    name = company_symbol + "_ps" + train_period_start.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_pe" + train_period_end.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_ts_sec" + str(time_step_seconds) + "_tm_qty" + str(topic_model_qty)+ "_r_lt" + str(rel_lifetime) + "_r_hl" + str(rel_hlflfe) + "_tm_alpha" + str(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed)
     return name
 
 def return_predictor_name(company_symbol, pred_steps_ahead, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed):
@@ -232,8 +230,6 @@ def return_predictor_name(company_symbol, pred_steps_ahead, train_period_start, 
         pred_steps_ahead = [pred_steps_ahead]
     name = company_symbol + "_steps" + str(pred_steps_ahead) + "_ps" + train_period_start.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_pe" + train_period_end.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_ts_sec" + str(time_step_seconds) + "_tm_qty" + str(topic_model_qty)+ "_r_lt" + str(rel_lifetime) + "_r_hl" + str(rel_hlflfe) + "_tm_alpha" + str(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed)
     return name
-
-
 
 
 def return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, weighted_topics, num_topics, topic_model_alpha, apply_IDF, tweet_ratio_removed):
@@ -1347,7 +1343,7 @@ def retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inp
     #search for predictor
     predictor_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["predictive_model"]
     predictor_name_entry = company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed
-    predictor_name = return_predictor_name(company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed)
+    predictor_name = return_predictor_name(company_symbol, pred_steps, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed)
     predictor_location_file = predictor_folder_location_string + predictor_name + ".pred"
     #previous_score = edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="load")
     if os.path.exists(predictor_location_file):

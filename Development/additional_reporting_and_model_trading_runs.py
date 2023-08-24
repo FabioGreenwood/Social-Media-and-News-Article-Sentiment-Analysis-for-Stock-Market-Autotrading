@@ -140,9 +140,16 @@ def return_results_X_day_plus_minus_accuracy(y_preds, X_test, pred_steps_list, p
         results_x_day_plus_minus_PC = count_correct / count
         for confidence_threshold in confidences_before_betting_PC:
             results_bets_with_confidence_proportion           [steps_back][confidence_threshold] = count_bets_with_confidence[steps_back][confidence_threshold] / count
-            results_x_day_plus_minus_PC_confindence           [steps_back][confidence_threshold] = count_correct_bets_with_confidence             [steps_back][confidence_threshold] / count_bets_with_confidence                           [steps_back][confidence_threshold]
-            results_x_day_plus_minus_score_confidence         [steps_back][confidence_threshold] = count_correct_bets_with_confidence_score       [steps_back][confidence_threshold] / count_bets_with_confidence                           [steps_back][confidence_threshold]
-            results_x_day_plus_minus_score_confidence_weighted[steps_back][confidence_threshold] = count_correct_bets_with_confidence_score_weight[steps_back][confidence_threshold] / count_correct_bets_with_confidence_score_weight_total[steps_back][confidence_threshold]
+            if count_bets_with_confidence                           [steps_back][confidence_threshold] > 0:
+                results_x_day_plus_minus_PC_confindence           [steps_back][confidence_threshold] = count_correct_bets_with_confidence             [steps_back][confidence_threshold] / count_bets_with_confidence                           [steps_back][confidence_threshold]
+                results_x_day_plus_minus_score_confidence         [steps_back][confidence_threshold] = count_correct_bets_with_confidence_score       [steps_back][confidence_threshold] / count_bets_with_confidence                           [steps_back][confidence_threshold]
+                results_x_day_plus_minus_score_confidence_weighted[steps_back][confidence_threshold] = count_correct_bets_with_confidence_score_weight[steps_back][confidence_threshold] / count_correct_bets_with_confidence_score_weight_total[steps_back][confidence_threshold]
+            else:
+                results_x_day_plus_minus_PC_confindence           [steps_back][confidence_threshold] = 0
+                results_x_day_plus_minus_score_confidence         [steps_back][confidence_threshold] = 0
+                results_x_day_plus_minus_score_confidence_weighted[steps_back][confidence_threshold] = 0
+                
+                
     
     #xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     results_dict = dict()
