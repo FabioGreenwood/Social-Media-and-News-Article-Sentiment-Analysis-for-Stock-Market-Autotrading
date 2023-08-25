@@ -231,7 +231,6 @@ def return_predictor_name(company_symbol, pred_steps_ahead, train_period_start, 
     name = company_symbol + "_steps" + str(pred_steps_ahead) + "_ps" + train_period_start.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_pe" + train_period_end.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_ts_sec" + str(time_step_seconds) + "_tm_qty" + str(topic_model_qty)+ "_r_lt" + str(rel_lifetime) + "_r_hl" + str(rel_hlflfe) + "_tm_alpha" + str(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed)
     return name
 
-
 def return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, weighted_topics, num_topics, topic_model_alpha, apply_IDF, tweet_ratio_removed):
     global global_strptime_str, global_strptime_str_filename
     name = company_symbol + "_ps" + train_period_start.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_pe" + train_period_end.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_" + str(weighted_topics) + "_"
@@ -547,7 +546,7 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     #search for topic_model
     topic_model_folder_folder = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["topic_models"]
     
-    topic_model_name = return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, weighted_topics, num_topics, topic_model_alpha, apply_IDF, tweet_ratio_removed)
+    topic_model_name = return_topic_model_name(num_topics, topic_model_alpha, apply_IDF, tweet_ratio_removed)
     topic_model_location_file = topic_model_folder_folder + topic_model_name
     if os.path.exists(topic_model_location_file + "topic_model_dict_" + topic_model_name + ".pkl"):
         with open(topic_model_location_file + "topic_model_dict_" + topic_model_name + ".pkl", "rb") as file:
@@ -616,6 +615,8 @@ def generate_and_save_topic_model(run_name, temporal_params_dict, fin_inputs_par
     wordcloud, topic_model_dict, visualisation  = return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty = num_topics, topic_model_alpha=topic_model_alpha, apply_IDF=apply_IDF,
                                                                       enforced_topics_dict=enforced_topics_dict, return_LDA_model=True, return_png_visualisation=True, return_html_visualisation=True)
     save_topic_clusters(wordcloud, topic_model_dict, visualisation, file_location_wordcloud, file_location_topic_model_dict, file_location_visualisation)
+    print("-------------------------------- Complete Subject Keys --------------------------------")
+    print(datetime.now().strftime("%H:%M:%S"))
     return wordcloud, topic_model_dict, visualisation
 
 def import_twitter_data_period(target_file, period_start, period_end, relavance_lifetime, tweet_ratio_removed):

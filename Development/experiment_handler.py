@@ -96,7 +96,7 @@ default_fin_inputs_params_dict      = {
 }
 default_senti_inputs_params_dict    = {
     "topic_qty"             : 7,
-    "topic_training_tweet_ratio_removed" : int(1e5),
+    "topic_training_tweet_ratio_removed" : int(1e4),
     "relative_lifetime"     : 60*60*24*7, # units are seconds
     "relative_halflife"     : 60*60*0.5, # units are seconds
     "topic_model_alpha"     : 1,
@@ -735,7 +735,7 @@ inverse_for_minimise_vec=[True, False, False]
 
 
 experiment_manager(
-    "standard_run_3mins",
+    "standard_run_3mins_re4",
     design_space_dict,
     initial_doe_size_or_DoE=init_doe,
     max_iter=20,
