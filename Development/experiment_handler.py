@@ -14,7 +14,7 @@ Dev notes:
 
 """
 
-#%% Import Methods|
+#%% Import Methods
 import random
 import data_prep_and_model_training as FG_model_training
 import additional_reporting_and_model_trading_runs as FG_additional_reporting
@@ -61,7 +61,9 @@ global_precalculated_assets_locations_dict = {
     "annotated_tweets"          : "annotated_tweets\\",
     "predictive_model"          : "predictive_model\\",
     "sentimental_data"          : "sentimental_data\\",
-    "experiment_records"         : "experiment_records\\"
+    "technical_indicators"      : "technical_indicators\\",
+    "experiment_records"        : "experiment_records\\",
+    "clean_tweets"              : "cleaned_tweets_ready_for_subject_discovery\\"
     }
 global_outputs_folder = "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\outputs\\"
 global_designs_record_final_columns_list = ["experiment_timestamp", "training_r2", "training_mse", "training_mae", "testing_r2", "testing_mse", "testing_mae", "profitability", "predictor_names"]
@@ -108,7 +110,8 @@ default_senti_inputs_params_dict    = {
     ['risk', 'exposure', 'liability'],
     ["financial forces" , "growth", "interest rates"]],
     "sentiment_method"      : SentimentIntensityAnalyzer(),
-    "tweet_file_location"   : r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\twitter data\Tweets about the Top Companies from 2015 to 2020\Tweet.csv\Tweet.csv"
+    "tweet_file_location"   : r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\twitter data\Tweets about the Top Companies from 2015 to 2020\Tweet.csv\Tweet.csv",
+    "regenerate_cleaned_tweets_for_subject_discovery" : False
 }
 default_outputs_params_dict         = {
     "output_symbol_indicators_tuple"    : ("aapl", "close"), # fg_action: do I use this?

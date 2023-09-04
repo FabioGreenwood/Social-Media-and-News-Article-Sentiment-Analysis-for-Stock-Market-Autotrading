@@ -1,6 +1,6 @@
 """
 Required actions:
-1. 
+1. check that topic weight functionality is working
 2. 
 3. 
 4. 
@@ -145,7 +145,8 @@ senti_inputs_params_dict    = {
     ['risk', 'exposure', 'liability'],
     ["financial forces" , "growth", "interest rates"]],
     "sentiment_method"      : SentimentIntensityAnalyzer(),
-    "tweet_file_location"   : r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\twitter data\Tweets about the Top Companies from 2015 to 2020\Tweet.csv\Tweet.csv"
+    "tweet_file_location"   : r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\twitter data\Tweets about the Top Companies from 2015 to 2020\Tweet.csv\Tweet.csv",
+    "regenerate_cleaned_tweets_for_subject_discovery" : False
 }
 
 outputs_params_dict         = {
@@ -189,7 +190,9 @@ global_precalculated_assets_locations_dict = {
     "annotated_tweets"          : "annotated_tweets\\",
     "predictive_model"          : "predictive_model\\",
     "sentimental_data"          : "sentimental_data\\",
-    "technical_indicators"      : "technical_indicators\\"
+    "technical_indicators"      : "technical_indicators\\",
+    "experiment_records"        : "experiment_records\\",
+    "clean_tweets"              : "cleaned_tweets_ready_for_subject_discovery\\tweets.pkl"
     }
 
 
@@ -585,7 +588,6 @@ def return_topic_weight(text_body, id2word, lda_model):
     doc_topics = lda_model.get_document_topics(bow_doc)
     return doc_topics
 
-
 def generate_and_save_topic_model(run_name, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params):
     folder_path = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["topic_models"]
     file_location_wordcloud         = folder_path + "wordcloud_" + run_name + ".png"
@@ -601,21 +603,28 @@ def generate_and_save_topic_model(run_name, temporal_params_dict, fin_inputs_par
     relavance_lifetime              = senti_inputs_params_dict["relative_lifetime"]
     tweet_ratio_removed             = senti_inputs_params_dict["topic_training_tweet_ratio_removed"]
     apply_IDF                       = senti_inputs_params_dict["apply_IDF"]
+    reclean_tweets                  = senti_inputs_params_dict["regenerate_cleaned_tweets_for_subject_discovery"]
     
     print(datetime.now().strftime("%H:%M:%S") + " - generating topic model")
     print("-------------------------------- Importing Sentiment Data --------------------------------")
-    print(datetime.now().strftime("%H:%M:%S"))
     df_prepped_tweets                           = import_twitter_data_period(tweet_file_location, train_period_start, train_period_end, relavance_lifetime, tweet_ratio_removed)
+    print(datetime.now().strftime("%H:%M:%S"))
     print("-------------------------------- Prepping Sentiment Data --------------------------------")
-    print(datetime.now().strftime("%H:%M:%S"))
+    #quick fix to reduce the amount of wasted time cleaning tweets
     global global_df_stocks_list_file
-    df_prepped_tweets_company_agnostic          = prep_twitter_text_for_subject_discovery(df_prepped_tweets["body"], df_stocks_list_file=global_df_stocks_list_file)
-    print("-------------------------------- Creating Subject Keys --------------------------------")
+    df_prepped_tweets_company_agnostic_file_path = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["clean_tweets"]
+    if reclean_tweets == True:
+        df_prepped_tweets_company_agnostic          = prep_and_save_twitter_text_for_subject_discovery(df_prepped_tweets["body"], df_stocks_list_file=global_df_stocks_list_file, df_prepped_tweets_company_agnostic_file_path=df_prepped_tweets_company_agnostic_file_path)
+    else:
+        with open(df_prepped_tweets_company_agnostic_file_path, 'rb') as file:
+            df_prepped_tweets_company_agnostic = pickle.load(file)
     print(datetime.now().strftime("%H:%M:%S"))
+    print("-------------------------------- Creating Subject Keys --------------------------------")
     wordcloud, topic_model_dict, visualisation  = return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty = num_topics, topic_model_alpha=topic_model_alpha, apply_IDF=apply_IDF,
                                                                       enforced_topics_dict=enforced_topics_dict, return_LDA_model=True, return_png_visualisation=True, return_html_visualisation=True)
     save_topic_clusters(wordcloud, topic_model_dict, visualisation, file_location_wordcloud, file_location_topic_model_dict, file_location_visualisation)
-    print("-------------------------------- Complete Subject Keys --------------------------------")
+    print(datetime.now().strftime("%H:%M:%S"))
+    print("-------------------------------- Completed Subject Keys --------------------------------")
     print(datetime.now().strftime("%H:%M:%S"))
     return wordcloud, topic_model_dict, visualisation
 
@@ -637,7 +646,8 @@ def import_twitter_data_period(target_file, period_start, period_end, relavance_
     
     return input_df
 
-def prep_twitter_text_for_subject_discovery(input_list, df_stocks_list_file=None):
+def prep_and_save_twitter_text_for_subject_discovery(input_list, df_stocks_list_file=None, df_prepped_tweets_company_agnostic_file_path=None):
+    global global_precalculated_assets_locations_dict
     #prep parameters
     death_characters    = ["$", "amazon", "apple", "goog", "tesla", "http", "@", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", ".", "'s", "compile", "www"]
     stocks_list         = list(df_stocks_list_file["Name"].map(lambda x: x.lower()).values)
@@ -694,7 +704,13 @@ def prep_twitter_text_for_subject_discovery(input_list, df_stocks_list_file=None
             recombined_tweet = recombined_tweet.replace(stock_name, "")
         output = output + [recombined_tweet]
     
+    
+    if not df_prepped_tweets_company_agnostic_file_path == None:
+        with open(df_prepped_tweets_company_agnostic_file_path, "wb") as file:
+            pickle.dump(output, file)
+    
     return output
+
 
 
 def update_shortened_company_file(df_stocks_list_file, corp_stopwords, file_location=None):
@@ -713,7 +729,6 @@ def update_shortened_company_file(df_stocks_list_file, corp_stopwords, file_loca
             stocks_list_shortened_dict[stock_name] = " ".join(stock_name_split)
     
     return stocks_list_shortened_dict
-
 
 def return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty = 10, enforced_topics_dict=None, stock_names_list=None, words_to_remove = None, 
                         return_LDA_model=True, return_png_visualisation=False, return_html_visualisation=False, 
@@ -796,7 +811,6 @@ def return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty = 10, enfo
         output = output + [None]
     
     return tuple(output)
-
 
 def save_topic_clusters(wordcloud=None, topic_model_dict=None, visualisation=None, file_location_wordcloud=None, file_location_topic_model_dict=None, file_location_visualisation=None):
     if wordcloud != None:
@@ -892,11 +906,9 @@ def edit_scores_csv(predictor_name_entry, is_training_or_testing, score_types, m
     else:
         ERROR_mode_input_wrong.format(mode)
     
-
 def sent_to_words(sentences):
     for sentence in sentences:
         yield(gensim.utils.simple_preprocess(str(sentence), deacc=True))
-
 
 def update_tweet_cohort(tweet_cohort, df_annotated_tweets_temp, tweet_cohort_start, tweet_cohort_end):
     epoch_time          = datetime(1970, 1, 1)
@@ -909,7 +921,6 @@ def update_tweet_cohort(tweet_cohort, df_annotated_tweets_temp, tweet_cohort_sta
     tweet_cohort                = pd.concat([tweet_cohort, new_tweets], axis=0)
     
     return tweet_cohort, df_annotated_tweets_temp
-
 
 def generate_datetimes(train_period_start, train_period_end, seconds_per_time_steps):
     format_str = '%Y%m%d_%H%M%S'  # specify the desired format for the datetime strings
