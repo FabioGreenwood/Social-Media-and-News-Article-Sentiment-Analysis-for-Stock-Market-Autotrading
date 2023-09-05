@@ -436,9 +436,11 @@ def retrieve_or_generate_sentimental_data(index, temporal_params_dict, fin_input
         df_sentimental_data = pd.read_csv(sentimental_data_location_file)
         df_sentimental_data.set_index(df_sentimental_data.columns[0], inplace=True)
         df_sentimental_data.index.name = "datetime"
-    else:
+    elif not os.path.exists(sentimental_data_location_file) and topic_model_qty > 0:
         df_sentimental_data = generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing=training_or_testing)
-        df_sentimental_data.to_csv(sentimental_data_location_file)      
+        df_sentimental_data.to_csv(sentimental_data_location_file)
+    else:
+        df_sentimental_data = None
     return df_sentimental_data
 
 def retrieve_sentimental_data():
@@ -561,7 +563,7 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     print(datetime.now().strftime("%H:%M:%S") + " - generating annotated tweets")
     df_annotated_tweets   = import_twitter_data_period(senti_inputs_params_dict["tweet_file_location"], train_period_start, train_period_end, relavance_lifetime, tweet_ratio_removed)
     columns_to_add = ["~sent_overall"]
-    for num in range(topic_model_dict["lda_model"].num_topics):
+    for num in range(num_topics):
         columns_to_add = columns_to_add + ["~sent_topic_W" + str(num)]
     
     df_annotated_tweets[columns_to_add] = float("nan")
@@ -571,11 +573,11 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
         
         text = df_annotated_tweets["body"][tweet_id]
         sentiment_value = sentiment_method.polarity_scores(text)["compound"] #FG_Action: this needs to be checked 
-        topic_tuples = return_topic_weight(text, topic_model_dict["id2word"], topic_model_dict["lda_model"])
-        if len(topic_tuples) == topic_model_dict["lda_model"].num_topics:
+        topic_tuples = return_topic_weight(text, topic_model_dict, num_topics)
+        if len(topic_tuples) == num_topics:
             topic_weights = [t[1] for t in topic_tuples]
         else:
-            topic_weights = list(np.zeros(topic_model_dict["lda_model"].num_topics))
+            topic_weights = list(np.zeros(num_topics))
             for tup in topic_tuples:
                 topic_weights[tup[0]] = tup[1]
         sentiment_analysis = [sentiment_value] + topic_weights
@@ -583,9 +585,14 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     
     return df_annotated_tweets
 
-def return_topic_weight(text_body, id2word, lda_model):
-    bow_doc = id2word.doc2bow(text_body.split(" "))
-    doc_topics = lda_model.get_document_topics(bow_doc)
+def return_topic_weight(text_body, topic_model_dict, num_topics):
+    if num_topics > 1:
+        id2word = topic_model_dict["id2word"]
+        lda_model = topic_model_dict["lda_model"]
+        bow_doc = id2word.doc2bow(text_body.split(" "))
+        doc_topics = lda_model.get_document_topics(bow_doc)
+    else:
+        doc_topics = [(0,1)]
     return doc_topics
 
 def generate_and_save_topic_model(run_name, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params):
@@ -805,7 +812,10 @@ def return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty = 10, enfo
             
     if return_html_visualisation==True:
         pyLDAvis.enable_notebook
-        LDAvis_prepared = gensimvis.prepare(lda_model, corpus, id2word)
+        if topic_qty > 1:
+            LDAvis_prepared = gensimvis.prepare(lda_model, corpus, id2word)
+        else:
+            LDAvis_prepared = None
         output = output + [LDAvis_prepared]
     else:
         output = output + [None]
@@ -962,8 +972,9 @@ def create_step_responces(df_financial_data, df_sentimental_data, pred_output_an
     list_of_new_columns = []
     nan_values_replaced = 0
     train_test_split = 1
-    df_sentimental_data.index = pd.to_datetime(df_sentimental_data.index)
-    df_sentimental_data = df_sentimental_data.loc[list(df_financial_data.index)]
+    if isinstance(df_sentimental_data, pd.DataFrame):
+        df_sentimental_data.index = pd.to_datetime(df_sentimental_data.index)
+        df_sentimental_data = df_sentimental_data.loc[list(df_financial_data.index)]
     data = pd.concat([df_financial_data, df_sentimental_data], axis=1, ignore_index=False)
     #this method has been removed cos its doesn't work with negative values
     #df_financial_data, nan_values_replaced = current_infer_values_method(df_financial_data)
@@ -1274,10 +1285,12 @@ def generate_model_and_training_scores(temporal_params_dict,
     print(datetime.now().strftime("%H:%M:%S") + " - populate_technical_indicators")
     df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"], fin_inputs_params_dict["historical_file"])
 
-    #sentiment data prep
-    print(datetime.now().strftime("%H:%M:%S") + " - importing or prepping sentimental data")
-    df_sentimental_data = retrieve_or_generate_sentimental_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training")
-    
+    if senti_inputs_params_dict["topic_qty"] >= 1:
+        #sentiment data prep
+        print(datetime.now().strftime("%H:%M:%S") + " - importing or prepping sentimental data")
+        df_sentimental_data = retrieve_or_generate_sentimental_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training")
+    elif senti_inputs_params_dict["topic_qty"] == 0:
+        df_sentimental_data = None
     
     #model training - time series blocking
     if model_hyper_params["time_series_blocking"] == "btscv":

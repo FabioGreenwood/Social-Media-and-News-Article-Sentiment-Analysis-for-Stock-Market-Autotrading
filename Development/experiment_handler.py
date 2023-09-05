@@ -98,7 +98,7 @@ default_fin_inputs_params_dict      = {
 }
 default_senti_inputs_params_dict    = {
     "topic_qty"             : 7,
-    "topic_training_tweet_ratio_removed" : int(1e4),
+    "topic_training_tweet_ratio_removed" : int(1e5),
     "relative_lifetime"     : 60*60*24*7, # units are seconds
     "relative_halflife"     : 60*60*0.5, # units are seconds
     "topic_model_alpha"     : 1,
@@ -235,6 +235,22 @@ def return_cols_for_additional_reporting(input_dict):
                 output_cols = output_cols + [return_name_of_additional_reporting_col(result_type, pred_steps, confidence)]
     
     return output_cols
+
+def add_missing_designs_to_design_history_dict(design_history_dict, initial_doe_size_or_DoE):
+    #check if any designs
+    for new_design in initial_doe_size_or_DoE:
+        design_found = False
+        largest_existing_ID = find_largest_number(design_history_dict)
+        for existing_design_ID in range(largest_existing_ID + 1):
+            if design_history_dict[existing_design_ID]["X"] == new_design:
+                design_found = True
+                
+        if design_found == False:
+            design_history_dict[existing_design_ID]["X"] = new_design
+            for k in global_designs_record_final_columns_list:
+                design_history_dict[largest_existing_ID][k] = None
+    return design_history_dict
+
 
         
 #%% Experiment Parameters
@@ -402,7 +418,7 @@ def run_experiment_and_return_updated_design_history_dict(design_history_dict_si
 
 
 
-#%% Module - Experiment Handler
+#%% Module - Experiment Handlerk
 
 def PLACEHOLDER_objective_function(x1, x2, x3, x4, x5):
     #return (x[:, 0] - 2)**2 + (x[:, 1] - 3)**2
@@ -561,6 +577,11 @@ def experiment_manager(
         if not sum(df_designs_record.columns == return_keys_within_2_level_dict(design_space_dict) + return_cols_for_additional_reporting(default_input_dict) + global_designs_record_final_columns_list) == len(df_designs_record.columns):
             raise ValueError("previous designs table, doesn't match the format for this experiment")
 
+        # check if there are additional designs added to the DoE, if there are, add them to the design doc
+        if isinstance(initial_doe_size_or_DoE, list) == True:
+            design_history_dict = add_missing_designs_to_design_history_dict(design_history_dict, initial_doe_size_or_DoE)
+            df_designs_record   = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
+        
     #insert the completion of the DoE if not completed
     else:
         # create and save the design records table
@@ -640,6 +661,7 @@ def experiment_manager(
         
         if len(df_designs_record.index) >= overall_max_runs:
             continue_optimisation = False
+    print(datetime.now().strftime("%H:%M:%S") + "   normal termination")
         
 
         
@@ -721,15 +743,24 @@ init_doe =[[7, 0.3, 1, 25200, 2, 0.1],
 
 """ experiment checklist:
 1. ensure that the value for steps ahead is updated on the dictionary line below
-2. ensure the same is for the name of the run
-
-
+2. check the right lines are activated for the number of topics you wish to run
+3. ensure the same is for the name of the run
 """
 
+## SETTING THE RUN VARIABLES, READ ABOVE CHECK LIST
+
+
+#disabling topics, 2 lines
+for i in range(len(init_doe)): init_doe[i][0] = 1
+design_space_dict["senti_inputs_params_dict"]["topic_qty"] = [1]
+default_input_dict["senti_inputs_params_dict"]["topic_qty"] = 1
+
+# setting various optimisation variabls
 testing_measure = "mae"
 pred_steps = 3
 default_input_dict["outputs_params_dict"]["pred_steps_ahead"] = pred_steps
 
+# setting the optimisation objective functions
 confidence_scoring_measure_tuple_1 = ("additional_results_dict","results_x_mins_plus_minus_score_confidence_weighted",pred_steps,0.05)
 confidence_scoring_measure_tuple_2 = ("additional_results_dict","results_x_mins_plus_minus_PC_confindence",pred_steps,0.05)
 optim_scores_vec = ["testing_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2]
@@ -737,10 +768,18 @@ inverse_for_minimise_vec=[True, False, False]
 
 
 
+#what around to ensure that single topic sentimental data in more used in the model
+if default_senti_inputs_params_dict["topic_qty"] == 1:
+    default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 1
+elif default_senti_inputs_params_dict["topic_qty"] == 0:
+    default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
+
+
 experiment_manager(
-    "standard_run_3mins_re4",
+    "1topic_3steps_first_run2",
     design_space_dict,
     initial_doe_size_or_DoE=init_doe,
+#    max_iter=1,
     max_iter=20,
     model_start_time = model_start_time,
     force_restart_run = False,
