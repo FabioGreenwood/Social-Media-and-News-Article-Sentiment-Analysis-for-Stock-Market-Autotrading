@@ -215,7 +215,7 @@ def update_df_designs_record(df_designs_record, design_history_dict, design_spac
     return df_designs_record
 
 def return_name_of_additional_reporting_col(first_str, second_str_mins, third_str_confidence):
-    return str(first_str[8:]) + "_m" + str(second_str_mins) + "_c" + str(third_str_confidence)
+    return str(first_str[8:]) + "_s" + str(second_str_mins) + "_c" + str(third_str_confidence)
 
 def return_cols_for_additional_reporting(input_dict):
 
@@ -780,8 +780,8 @@ default_input_dict["outputs_params_dict"]["pred_steps_ahead"] = pred_steps
 default_input_dict["senti_inputs_params_dict"]["topic_training_tweet_ratio_removed"] = removal_ratio
 
 # setting the optimisation objective functions
-confidence_scoring_measure_tuple_1 = ("additional_results_dict","results_x_mins_plus_minus_score_confidence_weighted",pred_steps,0.05)
-confidence_scoring_measure_tuple_2 = ("additional_results_dict","results_x_mins_plus_minus_PC_confindence",pred_steps,0.05)
+confidence_scoring_measure_tuple_1 = ("additional_results_dict","results_x_mins_weighted",pred_steps,0.05)
+confidence_scoring_measure_tuple_2 = ("additional_results_dict","results_x_mins_PC",pred_steps,0.05)
 optim_scores_vec = ["testing_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2]
 inverse_for_minimise_vec=[True, False, False]    
 
@@ -795,7 +795,7 @@ scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_rati
 
 
 if __name__ == '__main__':
-    scenario_name_str = "reporting test 4"
+    #scenario_name_str = "reporting test 4"
     print("running scenario " + str(scenario_ID) + ": " + scenario_name_str)
 
     experiment_manager(
