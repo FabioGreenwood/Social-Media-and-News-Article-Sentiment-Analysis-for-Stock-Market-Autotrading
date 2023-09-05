@@ -26,7 +26,6 @@ import pickle
 import seaborn as sns 
 import seaborn as sns
 import copy
-from datetime import datetime
 from datetime import datetime, timedelta
 import os
 import warnings
@@ -192,17 +191,17 @@ def save_designs_record_csv_and_dict(records_path_list, df_designs_record=None, 
             with open(file_path + ".py_dict", "wb") as file:
                 pickle.dump(design_history_dict, file)
 
-def update_df_designs_record(df_designs_record, design_history_dict, design_space_dict):
+def update_df_designs_record(df_designs_record, design_history_dict, design_space_dict, skip_column_check=False):
     global global_designs_record_final_columns_list
     
-    if not all(df_designs_record.columns == return_keys_within_2_level_dict(design_space_dict) + return_cols_for_additional_reporting(default_input_dict) + global_designs_record_final_columns_list):
+    if skip_column_check == False and not all(df_designs_record.columns == return_keys_within_2_level_dict(design_space_dict) + return_cols_for_additional_reporting(default_input_dict) + global_designs_record_final_columns_list):
         raise ValueError("the schema for the design records table doesn't match, please review")
     
     input_param_cols = return_keys_within_2_level_dict(design_space_dict)
     
     for ID in range(find_largest_number(design_history_dict.keys())+1):
         df_designs_record.loc[ID, input_param_cols] = design_history_dict[ID]["X"]
-        # standard resutls
+        # standard results
         for subkey in design_history_dict[ID]:
             if not subkey in ["X", "predictor", "Y", "additional_results_dict"]:
                 df_designs_record.loc[ID, subkey] = design_history_dict[ID][subkey]
@@ -216,7 +215,7 @@ def update_df_designs_record(df_designs_record, design_history_dict, design_spac
     return df_designs_record
 
 def return_name_of_additional_reporting_col(first_str, second_str_mins, third_str_confidence):
-    return str(first_str[8:]) + "_" + str(second_str_mins) + "_" + str(third_str_confidence)
+    return str(first_str[8:]) + "_m" + str(second_str_mins) + "_c" + str(third_str_confidence)
 
 def return_cols_for_additional_reporting(input_dict):
 
@@ -251,7 +250,7 @@ def add_missing_designs_to_design_history_dict(design_history_dict, initial_doe_
                 design_history_dict[largest_existing_ID][k] = None
     return design_history_dict
 
-def return_scenario_name_str(topic_qty, pred_steps):
+def return_scenario_name_str(topic_qty, pred_steps, ratio_removed):
     if topic_qty == None:
         output = "topics_"
     elif topic_qty == 1:
@@ -262,7 +261,7 @@ def return_scenario_name_str(topic_qty, pred_steps):
         raise ValueError("topic_qty value of: " + str(topic_qty) + " not recognised")
     if not pred_steps in [1, 3, 5, 15]:
         raise ValueError("double check value " + str(pred_steps) + " desired for pred steps input")
-    return output + str(pred_steps)
+    return output + str(pred_steps) + "_" + str(ratio_removed)
         
 #%% Experiment Parameters
 
@@ -749,7 +748,8 @@ init_doe = 20
 # definition of different scenarios is set by this dict, to access a different scenario, please change the scenario variable
 
 # scenario parameters: topic_qty, pred_steps
-scenario_ID = 0
+scenario_ID = 8
+removal_ratio = int(1e5)
 scenario_dict = {
      0 : {"topics" : None, "pred_steps" : 1},
      1 : {"topics" : None, "pred_steps" : 3},
@@ -777,6 +777,7 @@ if isinstance(init_doe, list) and topic_qty != None:
 pred_steps = scenario_dict[scenario_ID]["pred_steps"]
 testing_measure = "mae"
 default_input_dict["outputs_params_dict"]["pred_steps_ahead"] = pred_steps
+default_input_dict["senti_inputs_params_dict"]["topic_training_tweet_ratio_removed"] = removal_ratio
 
 # setting the optimisation objective functions
 confidence_scoring_measure_tuple_1 = ("additional_results_dict","results_x_mins_plus_minus_score_confidence_weighted",pred_steps,0.05)
@@ -790,21 +791,24 @@ if default_senti_inputs_params_dict["topic_qty"] == 1:
 elif default_senti_inputs_params_dict["topic_qty"] == 0:
     default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
-scenario_name_str = return_scenario_name_str(topic_qty, pred_steps)
+scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
 
-print("running scenario " + str(scenario_ID) + ": " + scenario_name_str)
 
-experiment_manager(
-    scenario_name_str,
-    design_space_dict,
-    initial_doe_size_or_DoE=init_doe,
-    max_iter=0,
-    model_start_time = model_start_time,
-    force_restart_run = False,
-    inverse_for_minimise_vec = inverse_for_minimise_vec,
-    optim_scores_vec = optim_scores_vec,
-    testing_measure = testing_measure
-    )
+if __name__ == '__main__':
+    scenario_name_str = "reporting test 4"
+    print("running scenario " + str(scenario_ID) + ": " + scenario_name_str)
+
+    experiment_manager(
+        scenario_name_str,
+        design_space_dict,
+        initial_doe_size_or_DoE=init_doe,
+        max_iter=0,
+        model_start_time = model_start_time,
+        force_restart_run = False,
+        inverse_for_minimise_vec = inverse_for_minimise_vec,
+        optim_scores_vec = optim_scores_vec,
+        testing_measure = testing_measure
+        )
 
 
 

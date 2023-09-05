@@ -109,11 +109,12 @@ def return_results_X_min_plus_minus_accuracy(y_preds, X_test, pred_steps_list, p
         
         for time_step in range(max(pred_steps_list), len(X_test.index)):
             
-            count += 1
+            if not actual_difference * expected_difference == 0:
+                count += 1
             #basic values
             
             original_value      = x_values[time_step - steps_back]
-            expected_difference = y_values[time_step] - x_values[time_step - steps_back]
+            expected_difference = y_values[time_step] - x_values[time_step]
             actual_difference   = x_values[time_step] - x_values[time_step - steps_back]
             relative_confidence = expected_difference / original_value
             
@@ -136,10 +137,12 @@ def return_results_X_min_plus_minus_accuracy(y_preds, X_test, pred_steps_list, p
                     count_correct_bets_with_confidence_score[steps_back][confidence_threshold] -= abs(actual_difference)
                     count_correct_bets_with_confidence_score_weight[steps_back][confidence_threshold] -= abs(actual_difference) * (abs(relative_confidence) - confidence_threshold)
                     count_correct_bets_with_confidence_score_weight_total[steps_back][confidence_threshold] += (abs(relative_confidence) - confidence_threshold)
+                else:
+                    print("hello")
                     
 
         #Total scores for ticker steps_back conbination
-        results_x_min_plus_minus_PC = count_correct / count
+        results_x_min_plus_minus_PC[steps_back] = count_correct / count
         for confidence_threshold in confidences_before_betting_PC:
             results_bets_with_confidence_proportion           [steps_back][confidence_threshold] = count_bets_with_confidence[steps_back][confidence_threshold] / count
             if count_bets_with_confidence                           [steps_back][confidence_threshold] > 0:
