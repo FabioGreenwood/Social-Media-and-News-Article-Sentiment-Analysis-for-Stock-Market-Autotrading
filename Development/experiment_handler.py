@@ -252,16 +252,22 @@ def add_missing_designs_to_design_history_dict(design_history_dict, initial_doe_
 
 def return_scenario_name_str(topic_qty, pred_steps, ratio_removed):
     if topic_qty == None:
-        output = "topics_"
+        output = "multi_topic_steps_"
     elif topic_qty == 1:
-        output = "no_topics_"
+        output = "no_topics_steps_"
     elif topic_qty == 0:
-        output = "no_sentiment_"
+        output = "no_sentiment_steps_"
     else:
         raise ValueError("topic_qty value of: " + str(topic_qty) + " not recognised")
     if not pred_steps in [1, 3, 5, 15]:
         raise ValueError("double check value " + str(pred_steps) + " desired for pred steps input")
-    return output + str(pred_steps) + "_" + str(ratio_removed)
+    
+    valstr = "{0:e}".format(1e4)
+    epos = valstr.rfind('e')
+    exponent = valstr[epos+1:]
+    removal_str = "removal_1e" + str(exponent)
+    
+    return output + str(pred_steps) + "_" + removal_str
         
 #%% Experiment Parameters
 
@@ -735,7 +741,26 @@ design_space_dict = {
 
 global_run_count = 0
 
-init_doe = 20
+init_doe = [[5,	1,	0,	1800,	1,	0.1],
+[9,	1,	1,	7200,	1,	0.1],
+[5,	0.7,	1,	25200,	4,	0.01],
+[7,	0.7,	1,	25200,	0,	0.01],
+[9,	1,	0,	7200,	3,	0.02],
+[5,	0.3,	0,	25200,	4,	0.1],
+[7,	1,	1,	25200,	2,	0.01],
+[9,	0.3,	0,	1800,	3,	0.1],
+[9,	1,	0,	7200,	4,	0.02],
+[9,	1,	0,	1800,	0,	0.02],
+[9,	1,	1,	7200,	2,	0.05],
+[9,	1,	1,	1800,	0,	0.02],
+[5,	1,	0,	7200,	4,	0.05],
+[9,	0.3,	1,	25200,	3,	0.01],
+[5,	0.7,	1,	1800,	0,	0.01],
+[9,	0.7,	1,	25200,	0,	0.01],
+[9,	1,	1,	1800,	1,	0.01],
+[9,	1,	1,	7200,	0,	0.01],
+[7,	0.3,	1,	1800,	3,	0.05],
+[7,	1,	0,	7200,	2,	0.1]]
 
 """ experiment checklist:
 1. ensure that the value for steps ahead is updated on the dictionary line below
@@ -748,7 +773,7 @@ init_doe = 20
 # definition of different scenarios is set by this dict, to access a different scenario, please change the scenario variable
 
 # scenario parameters: topic_qty, pred_steps
-scenario_ID = 8
+scenario_ID = 0
 removal_ratio = int(1e5)
 scenario_dict = {
      0 : {"topics" : None, "pred_steps" : 1},
@@ -795,14 +820,14 @@ scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_rati
 
 
 if __name__ == '__main__':
-    #scenario_name_str = "reporting test 4"
+    #scenario_name_str = "DoE Generation"
     print("running scenario " + str(scenario_ID) + ": " + scenario_name_str)
 
     experiment_manager(
         scenario_name_str,
         design_space_dict,
         initial_doe_size_or_DoE=init_doe,
-        max_iter=0,
+        max_iter=15,
         model_start_time = model_start_time,
         force_restart_run = False,
         inverse_for_minimise_vec = inverse_for_minimise_vec,
