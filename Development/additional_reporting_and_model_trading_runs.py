@@ -46,7 +46,7 @@ def return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_
     
     return reaglined_plus_minus_dict
 
-def return_results_X_day_plus_minus_accuracy(y_preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting_PC=[0, 0.01], model_type_name="", save=True, model_start_time = "", output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2"):
+def return_results_X_min_plus_minus_accuracy(y_preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting_PC=[0, 0.01], model_type_name="", save=True, model_start_time = "", output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2"):
     output_col = "£_close"
     
     df_temp = pd.DataFrame()
@@ -60,10 +60,12 @@ def return_results_X_day_plus_minus_accuracy(y_preds, X_test, pred_steps_list, p
     time_series_index = X_test.index
     
     results_bets_with_confidence_proportion             = dict()
-    results_x_day_plus_minus_PC                         = dict()
-    results_x_day_plus_minus_PC_confindence             = dict()
-    results_x_day_plus_minus_score_confidence           = dict()
-    results_x_day_plus_minus_score_confidence_weighted  = dict()
+    results_x_min_plus_minus_PC                         = dict()
+    results_x_min_plus_minus_PC_confindence             = dict()
+    results_x_min_plus_minus_score_confidence           = dict()
+    results_x_min_plus_minus_score_confidence_weighted  = dict()
+    
+    
     
     count_bets_with_confidence               = dict()
     count_correct_bets_with_confidence       = dict()
@@ -85,11 +87,11 @@ def return_results_X_day_plus_minus_accuracy(y_preds, X_test, pred_steps_list, p
         count_correct_bets_with_confidence_score_weight[steps_back] = dict()
         count_correct_bets_with_confidence_score_weight_total[steps_back] = dict()
         
-        results_x_day_plus_minus_PC[steps_back]                      = dict()
+        results_x_min_plus_minus_PC[steps_back]                      = dict()
         results_bets_with_confidence_proportion[steps_back]          = dict()
-        results_x_day_plus_minus_PC_confindence[steps_back]          = dict()
-        results_x_day_plus_minus_score_confidence[steps_back]        = dict()
-        results_x_day_plus_minus_score_confidence_weighted[steps_back] = dict()
+        results_x_min_plus_minus_PC_confindence[steps_back]          = dict()
+        results_x_min_plus_minus_score_confidence[steps_back]        = dict()
+        results_x_min_plus_minus_score_confidence_weighted[steps_back] = dict()
         
         
         for confidence_threshold in confidences_before_betting_PC:
@@ -137,26 +139,26 @@ def return_results_X_day_plus_minus_accuracy(y_preds, X_test, pred_steps_list, p
                     
 
         #Total scores for ticker steps_back conbination
-        results_x_day_plus_minus_PC = count_correct / count
+        results_x_min_plus_minus_PC = count_correct / count
         for confidence_threshold in confidences_before_betting_PC:
             results_bets_with_confidence_proportion           [steps_back][confidence_threshold] = count_bets_with_confidence[steps_back][confidence_threshold] / count
             if count_bets_with_confidence                           [steps_back][confidence_threshold] > 0:
-                results_x_day_plus_minus_PC_confindence           [steps_back][confidence_threshold] = count_correct_bets_with_confidence             [steps_back][confidence_threshold] / count_bets_with_confidence                           [steps_back][confidence_threshold]
-                results_x_day_plus_minus_score_confidence         [steps_back][confidence_threshold] = count_correct_bets_with_confidence_score       [steps_back][confidence_threshold] / count_bets_with_confidence                           [steps_back][confidence_threshold]
-                results_x_day_plus_minus_score_confidence_weighted[steps_back][confidence_threshold] = count_correct_bets_with_confidence_score_weight[steps_back][confidence_threshold] / count_correct_bets_with_confidence_score_weight_total[steps_back][confidence_threshold]
+                results_x_min_plus_minus_PC_confindence           [steps_back][confidence_threshold] = count_correct_bets_with_confidence             [steps_back][confidence_threshold] / count_bets_with_confidence                           [steps_back][confidence_threshold]
+                results_x_min_plus_minus_score_confidence         [steps_back][confidence_threshold] = count_correct_bets_with_confidence_score       [steps_back][confidence_threshold] / count_bets_with_confidence                           [steps_back][confidence_threshold]
+                results_x_min_plus_minus_score_confidence_weighted[steps_back][confidence_threshold] = count_correct_bets_with_confidence_score_weight[steps_back][confidence_threshold] / count_correct_bets_with_confidence_score_weight_total[steps_back][confidence_threshold]
             else:
-                results_x_day_plus_minus_PC_confindence           [steps_back][confidence_threshold] = 0
-                results_x_day_plus_minus_score_confidence         [steps_back][confidence_threshold] = 0
-                results_x_day_plus_minus_score_confidence_weighted[steps_back][confidence_threshold] = 0
+                results_x_min_plus_minus_PC_confindence           [steps_back][confidence_threshold] = 0
+                results_x_min_plus_minus_score_confidence         [steps_back][confidence_threshold] = 0
+                results_x_min_plus_minus_score_confidence_weighted[steps_back][confidence_threshold] = 0
                 
                 
     
     #xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     results_dict = dict()
     results_dict["results_bets_with_confidence_proportion"]              = results_bets_with_confidence_proportion
-    results_dict["results_x_mins_plus_minus_PC_confindence"]             = results_x_day_plus_minus_PC_confindence
-    results_dict["results_x_mins_plus_minus_score_confidence"]           = results_x_day_plus_minus_score_confidence 
-    results_dict["results_x_mins_plus_minus_score_confidence_weighted"]  = results_x_day_plus_minus_score_confidence_weighted
+    results_dict["results_x_mins_plus_minus_PC_confindence"]             = results_x_min_plus_minus_PC_confindence
+    results_dict["results_x_mins_plus_minus_score_confidence"]           = results_x_min_plus_minus_score_confidence 
+    results_dict["results_x_mins_plus_minus_score_confidence_weighted"]  = results_x_min_plus_minus_score_confidence_weighted
     
     print("Hello")
     
@@ -165,8 +167,8 @@ def return_results_X_day_plus_minus_accuracy(y_preds, X_test, pred_steps_list, p
 def return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_list, results_tables_dict, DoE_name = "", model_type_name="", model_start_time = "", outputs_folder_path = ".//outputs//tables//", timestamp = False):
     
     outputs_folder_path = outputs_folder_path + "\\" + model_type_name + "\\"
-    single_levelled_tables = ["results_x_day_plus_minus_PC"]
-    double_levelled_tables = ["results_x_day_plus_minus_PC_confindence", "results_x_day_plus_minus_score_confidence", "results_x_day_plus_minus_score_confidence_weighted"]
+    single_levelled_tables = ["results_x_min_plus_minus_PC"]
+    double_levelled_tables = ["results_x_min_plus_minus_PC_confindence", "results_x_min_plus_minus_score_confidence", "results_x_min_plus_minus_score_confidence_weighted"]
     fig_i = 0
     
     for table_name in single_levelled_tables:
@@ -221,10 +223,10 @@ def return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_li
         fig_i += 1
         del fig, figure, new_table, target_dict, new_dict
         
-    results_x_day_plus_minus_PC                         = results_tables_dict["results_x_day_plus_minus_PC"]
-    results_x_day_plus_minus_PC_confindence             = results_tables_dict["results_x_day_plus_minus_PC_confindence"]
-    results_x_day_plus_minus_score_confidence           = results_tables_dict["results_x_day_plus_minus_score_confidence"]
-    results_x_day_plus_minus_score_confidence_weighted  = results_tables_dict["results_x_day_plus_minus_score_confidence_weighted"]
+    results_x_min_plus_minus_PC                         = results_tables_dict["results_x_min_plus_minus_PC"]
+    results_x_min_plus_minus_PC_confindence             = results_tables_dict["results_x_min_plus_minus_PC_confindence"]
+    results_x_min_plus_minus_score_confidence           = results_tables_dict["results_x_min_plus_minus_score_confidence"]
+    results_x_min_plus_minus_score_confidence_weighted  = results_tables_dict["results_x_min_plus_minus_score_confidence_weighted"]
 
     return plt, df_realigned_dict
 
@@ -244,7 +246,7 @@ def run_additional_reporting(preds=None,
                             ):
     pred_output_and_tickers_combos_list = [("£", "close")]
     #df_realigned_dict                   = return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
-    results_tables_dict                 = return_results_X_day_plus_minus_accuracy(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting_PC=confidences_before_betting_PC, model_type_name=model_type_name, model_start_time = model_start_time, output_name="Test2", outputs_folder_path = outputs_path, figure_name = "test_output2")
+    results_tables_dict                 = return_results_X_min_plus_minus_accuracy(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting_PC=confidences_before_betting_PC, model_type_name=model_type_name, model_start_time = model_start_time, output_name="Test2", outputs_folder_path = outputs_path, figure_name = "test_output2")
     #plt, df_realigned_dict              = return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_list, results_tables_dict, DoE_name = DoE_orders_dict["name"], model_type_name=model_type_name, model_start_time = model_start_time, outputs_folder_path = outputs_path, timestamp = False)
     
     return results_tables_dict#, plt, df_realigned_dict
