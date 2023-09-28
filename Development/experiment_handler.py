@@ -241,7 +241,7 @@ def add_missing_designs_to_design_history_dict(design_history_dict, initial_doe_
         design_found = False
         largest_existing_ID = find_largest_number(design_history_dict)
         for existing_design_ID in range(largest_existing_ID + 1):
-            if design_history_dict[existing_design_ID]["X"] == new_design:
+            if (design_history_dict[existing_design_ID]["X"] == new_design):
                 design_found = True
                 
         if design_found == False:
@@ -262,7 +262,7 @@ def return_scenario_name_str(topic_qty, pred_steps, ratio_removed):
     if not pred_steps in [1, 3, 5, 15]:
         raise ValueError("double check value " + str(pred_steps) + " desired for pred steps input")
     
-    valstr = "{0:e}".format(1e4)
+    valstr = "{0:e}".format(ratio_removed)
     epos = valstr.rfind('e')
     exponent = valstr[epos+1:]
     removal_str = "removal_1e" + str(exponent)
@@ -504,7 +504,7 @@ def print_desired_scores(design_history, df_designs_record, design_space_dict, o
             temp_col = df_designs_record[temp_str].fillna(np.inf)
             pareto_index = temp_col.idxmin()
         else:
-            temp_col = df_designs_record[temp_str].fillna(np.inf)
+            temp_col = df_designs_record[temp_str].fillna(-np.inf)
             pareto_index = temp_col.idxmax()
         
         output_string_4a = "pareto " + temp_str + ": " + "{:.5f}".format(df_designs_record[temp_str][pareto_index]) + ", ID: " + str(pareto_index)
@@ -649,6 +649,9 @@ def experiment_manager(
     else:
         overall_max_runs = initial_doe_size_or_DoE + max_iter
     
+    if len(df_designs_record.index) >= overall_max_runs:
+        continue_optimisation = False
+    
     while continue_optimisation == True:
         X, Y = return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, bo, inverse_for_minimise=inverse_for_minimise_vec, objective_function_name=optim_scores_vec)
         bo.X = np.array(X)
@@ -723,10 +726,11 @@ design_space_dict_original = {
 
 design_space_dict = {
     "senti_inputs_params_dict" : {
-        "topic_qty" : [5, 7, 9],
-        "topic_model_alpha" : [0.3, 0.7, 1],
+        "topic_qty" : [5, 9, 13, 17],
+        "topic_model_alpha" : [0.3, 0.7, 1, 2, 3],
         "weighted_topics" : [True, False],
-        "relative_halflife" : [0.5 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR]
+        "relative_halflife" : [0.5 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR], 
+        "apply_IDF" : [True, False]
     },
     "model_hyper_params" : {
         "estimator__hidden_layer_sizes" : {0 : (10, 10),
@@ -741,26 +745,7 @@ design_space_dict = {
 
 global_run_count = 0
 
-init_doe = [[5,	1,	0,	1800,	1,	0.1],
-[9,	1,	1,	7200,	1,	0.1],
-[5,	0.7,	1,	25200,	4,	0.01],
-[7,	0.7,	1,	25200,	0,	0.01],
-[9,	1,	0,	7200,	3,	0.02],
-[5,	0.3,	0,	25200,	4,	0.1],
-[7,	1,	1,	25200,	2,	0.01],
-[9,	0.3,	0,	1800,	3,	0.1],
-[9,	1,	0,	7200,	4,	0.02],
-[9,	1,	0,	1800,	0,	0.02],
-[9,	1,	1,	7200,	2,	0.05],
-[9,	1,	1,	1800,	0,	0.02],
-[5,	1,	0,	7200,	4,	0.05],
-[9,	0.3,	1,	25200,	3,	0.01],
-[5,	0.7,	1,	1800,	0,	0.01],
-[9,	0.7,	1,	25200,	0,	0.01],
-[9,	1,	1,	1800,	1,	0.01],
-[9,	1,	1,	7200,	0,	0.01],
-[7,	0.3,	1,	1800,	3,	0.05],
-[7,	1,	0,	7200,	2,	0.1]]
+init_doe = 20
 
 """ experiment checklist:
 1. ensure that the value for steps ahead is updated on the dictionary line below
@@ -820,9 +805,8 @@ scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_rati
 
 
 if __name__ == '__main__':
-    #scenario_name_str = "DoE Generation"
-    print("running scenario " + str(scenario_ID) + ": " + scenario_name_str)
-
+    #scenario_name_str = "test 19"
+    print("running scenario " + str(scenario_ID) + ": " + scenario_name_str + " - " + datetime.now().strftime("%H:%M:%S"))
     experiment_manager(
         scenario_name_str,
         design_space_dict,
@@ -834,6 +818,7 @@ if __name__ == '__main__':
         optim_scores_vec = optim_scores_vec,
         testing_measure = testing_measure
         )
+    print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
 
 

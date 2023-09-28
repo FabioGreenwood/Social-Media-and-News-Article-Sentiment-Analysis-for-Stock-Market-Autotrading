@@ -139,10 +139,8 @@ def return_results_X_min_plus_minus_accuracy(y_preds, X_test, pred_steps_list, p
                     count_correct_bets_with_confidence_score[steps_back][confidence_threshold] -= abs(actual_difference)
                     count_correct_bets_with_confidence_score_weight[steps_back][confidence_threshold] -= abs(actual_difference) * (abs(relative_confidence) - confidence_threshold)
                     count_correct_bets_with_confidence_score_weight_total[steps_back][confidence_threshold] += (abs(relative_confidence) - confidence_threshold)
-                elif int(actual_difference) == 0:
-                    nothing_value = None
-                else:
-                    print("hello")
+                
+                
                     
 
         #Total scores for ticker steps_back conbination
@@ -166,8 +164,6 @@ def return_results_X_min_plus_minus_accuracy(y_preds, X_test, pred_steps_list, p
     results_dict["results_x_mins_PC"]        = results_x_min_plus_minus_PC_confindence
     results_dict["results_x_mins_score"]     = results_x_min_plus_minus_score_confidence 
     results_dict["results_x_mins_weighted"]  = results_x_min_plus_minus_score_confidence_weighted
-    
-    print("Hello")
     
     return results_dict
 
