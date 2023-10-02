@@ -730,7 +730,10 @@ design_space_dict = {
         "topic_model_alpha" : [0.3, 0.7, 1, 2, 3, 5],
         "weighted_topics" : [True, False],
         "relative_halflife" : [0.5 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR], 
-        "apply_IDF" : [True, False]
+        "apply_IDF" : [True, False],
+        "enforced_topics_dict"  : {
+            0: None,
+            1 : [['investment', 'financing', 'losses'], ['risk', 'exposure', 'liability'], ["financial",  "forces" , "growth", "interest",  "rates"]]}
     },
     "model_hyper_params" : {
         "estimator__hidden_layer_sizes" : {0 : (10, 10),
