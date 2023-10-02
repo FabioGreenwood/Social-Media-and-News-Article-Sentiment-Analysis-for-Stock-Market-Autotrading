@@ -16,7 +16,7 @@ Dev notes:
 
 #%% Import Methods
 import random
-import data_prep_and_model_training as FG_model_training
+import Development.data_prep_and_model_training_old as FG_model_training
 import additional_reporting_and_model_trading_runs as FG_additional_reporting
 import GPyOpt
 import numpy as np
@@ -107,7 +107,7 @@ default_senti_inputs_params_dict    = {
     "enforced_topics_dict"  : [
     ['investment', 'financing', 'losses'],
     ['risk', 'exposure', 'liability'],
-    ["financial forces" , "growth", "interest rates"]],
+    ["financial",  "forces" , "growth", "interest",  "rates"]],
     "sentiment_method"      : SentimentIntensityAnalyzer(),
     "tweet_file_location"   : r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\twitter data\Tweets about the Top Companies from 2015 to 2020\Tweet.csv\Tweet.csv",
     "regenerate_cleaned_tweets_for_subject_discovery" : False
@@ -709,25 +709,25 @@ def experiment_manager(
 now = datetime.now()
 model_start_time = now.strftime(global_strptime_str_filename)
     
-design_space_dict_original = {
-    "senti_inputs_params_dict" : {
-        "topic_qty" : range(4,9,1),
-        "relative_halflife" : [SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR]
-    },
-    "model_hyper_params" : {
-        "estimator__hidden_layer_sizes" : {0 : (10, 10),
-                                           1 : (20, 10),
-                                           2 : (100, 10),
-                                           3 : (50, 20, 10),
-                                           4 : (20, 10)}
-    },
-    "string_key" : {}
-}
+#design_space_dict_original = {
+#    "senti_inputs_params_dict" : {
+#        "topic_qty" : range(4,9,1),
+#        "relative_halflife" : [SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR]
+#    },
+#    "model_hyper_params" : {
+#        "estimator__hidden_layer_sizes" : {0 : (10, 10),
+#                                           1 : (20, 10),
+#                                           2 : (100, 10),
+#                                           3 : (50, 20, 10),
+#                                           4 : (20, 10)}
+#    },
+#    "string_key" : {}
+#}
 
 design_space_dict = {
     "senti_inputs_params_dict" : {
         "topic_qty" : [5, 9, 13, 17],
-        "topic_model_alpha" : [0.3, 0.7, 1, 2, 3],
+        "topic_model_alpha" : [0.3, 0.7, 1, 2, 3, 5],
         "weighted_topics" : [True, False],
         "relative_halflife" : [0.5 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR], 
         "apply_IDF" : [True, False]
