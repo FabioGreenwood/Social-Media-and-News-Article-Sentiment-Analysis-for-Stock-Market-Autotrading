@@ -228,7 +228,7 @@ def return_topic_mode_seed_hash(enforced_topic_model_nested_list):
         for topic_id in range(min(3,len(enforced_topic_model_nested_list))):
             name2 += enforced_topic_model_nested_list[topic_id][0][0]
         # then a hash number
-            name2 += hash(enforced_topic_model_nested_list)[:4]
+            name2 += str(hash(str(enforced_topic_model_nested_list)))[:4]
     return name + name2
             
     
@@ -263,14 +263,16 @@ def return_ticker_code_1(filename):
 
 def fg_timer(curr_iter_num, total_iter_num, callback_counts, task_name="", start_time=None):
     if ((curr_iter_num) % int(total_iter_num / callback_counts) == 0 and curr_iter_num > 0) or curr_iter_num == total_iter_num - 1:
+        proportion_done = (curr_iter_num + 1) / total_iter_num
         output_string = ""
         if not task_name=="":
             output_string += task_name + " : "
+        output_string += str(proportion_done) + " : "
         output_string += str(curr_iter_num) + "/" + str(total_iter_num) + " "
         output_string += datetime.now().strftime("%H:%M:%S")
         if not start_time==None:
             time_past = datetime.now() - start_time
-            output_string += " : etc: " + (start_time + (time_past / (curr_iter_num / total_iter_num))).strftime("%H:%M:%S")
+            output_string += " : etc: " + (start_time + (((1 - proportion_done) / proportion_done) * time_past)).strftime("%H:%M:%S")
         print(output_string)
         
     return curr_iter_num + 1
@@ -571,7 +573,7 @@ def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dic
         tweet_cohort_end   += seconds_per_time_steps
         tweet_cohort, df_annotated_tweets = update_tweet_cohort(tweet_cohort, df_annotated_tweets, tweet_cohort_start, tweet_cohort_end)
         #timer
-        if repeat_timer==True:
+        if repeat_timer>0:
             count = fg_timer(count, counter_len, repeat_timer, task_name="sentimental_tweets", start_time=start_time)
             
     

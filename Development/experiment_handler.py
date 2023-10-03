@@ -16,7 +16,7 @@ Dev notes:
 
 #%% Import Methods
 import random
-import Development.data_prep_and_model_training_old as FG_model_training
+import data_prep_and_model_training as FG_model_training
 import additional_reporting_and_model_trading_runs as FG_additional_reporting
 import GPyOpt
 import numpy as np
@@ -237,17 +237,19 @@ def return_cols_for_additional_reporting(input_dict):
 
 def add_missing_designs_to_design_history_dict(design_history_dict, initial_doe_size_or_DoE):
     #check if any designs
-    for new_design in initial_doe_size_or_DoE:
+    global global_designs_record_final_columns_list
+    for new_design, id in zip(initial_doe_size_or_DoE, range(len(initial_doe_size_or_DoE))):
         design_found = False
         largest_existing_ID = find_largest_number(design_history_dict)
         for existing_design_ID in range(largest_existing_ID + 1):
-            if (design_history_dict[existing_design_ID]["X"] == new_design):
+            if all([design_history_dict[existing_design_ID]["X"] == new_design]):
                 design_found = True
                 
         if design_found == False:
-            design_history_dict[existing_design_ID]["X"] = new_design
+            design_history_dict[id] = dict()
+            design_history_dict[id]["X"] = new_design
             for k in global_designs_record_final_columns_list:
-                design_history_dict[largest_existing_ID][k] = None
+                design_history_dict[id][k] = None
     return design_history_dict
 
 def return_scenario_name_str(topic_qty, pred_steps, ratio_removed):
@@ -709,21 +711,6 @@ def experiment_manager(
 now = datetime.now()
 model_start_time = now.strftime(global_strptime_str_filename)
     
-#design_space_dict_original = {
-#    "senti_inputs_params_dict" : {
-#        "topic_qty" : range(4,9,1),
-#        "relative_halflife" : [SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR]
-#    },
-#    "model_hyper_params" : {
-#        "estimator__hidden_layer_sizes" : {0 : (10, 10),
-#                                           1 : (20, 10),
-#                                           2 : (100, 10),
-#                                           3 : (50, 20, 10),
-#                                           4 : (20, 10)}
-#    },
-#    "string_key" : {}
-#}
-
 design_space_dict = {
     "senti_inputs_params_dict" : {
         "topic_qty" : [5, 9, 13, 17],
@@ -741,14 +728,34 @@ design_space_dict = {
                                            2 : (100, 10),
                                            3 : (50, 20, 10),
                                            4 : (40,30,20,10)},
-        "estimator__alpha"                 : [0.01, 0.02, 0.05, 0.1]
+        "estimator__alpha"                 : [0.01, 0.02, 0.05, 0.1, 0.2]
     },
     "string_key" : {}
 }
 
 global_run_count = 0
 
-init_doe = 20
+#init_doe = 20
+init_doe = [[13,	1, 1, 7200, 1, 1, 4, 0.2], 
+    [17,	2, 1, 25200, 0, 1, 3, 0.1], 
+    [13,	0.3, 1, 1800, 0, 0, 1, 0.01], 
+    [9,	0.7, 0, 25200, 1, 0, 4, 0.01], 
+    [9,	0.7, 1, 25200, 1, 0, 4, 0.01], 
+    [5,	1, 1, 25200, 1, 0, 4, 0.02], 
+    [17,	0.7, 0, 7200, 1, 0, 4, 0.05], 
+    [17,	3, 1, 25200, 1, 1, 3, 0.1], 
+    [9,	2, 0, 1800, 0, 1, 1, 0.2], 
+    [9,	3, 1, 7200, 1, 0, 4, 0.01], 
+    [17,	2, 0, 25200, 0, 0, 0, 0.2], 
+    [17,	1, 0, 25200, 1, 1, 1, 0.01], 
+    [17,	0.3, 1, 25200, 1, 1, 3, 0.05], 
+    [5,	3, 1, 1800, 1, 0, 3, 0.05], 
+    [9,	5, 1, 1800, 1, 0, 4, 0.2], 
+    [9,	2, 1, 7200, 0, 1, 4, 0.1], 
+    [17,	1, 0, 25200, 0, 0, 2, 0.2], 
+    [17,	3, 0, 7200, 1, 1, 1, 0.01], 
+    [17,	0.7, 0, 25200, 0, 0, 0, 0.2], 
+    [9,	5, 0, 25200, 1, 0, 0, 0.02]]
 
 """ experiment checklist:
 1. ensure that the value for steps ahead is updated on the dictionary line below
@@ -761,8 +768,8 @@ init_doe = 20
 # definition of different scenarios is set by this dict, to access a different scenario, please change the scenario variable
 
 # scenario parameters: topic_qty, pred_steps
-scenario_ID = 0
-removal_ratio = int(1e5)
+scenario_ID = 1
+removal_ratio = int(1e1)
 scenario_dict = {
      0 : {"topics" : None, "pred_steps" : 1},
      1 : {"topics" : None, "pred_steps" : 3},
