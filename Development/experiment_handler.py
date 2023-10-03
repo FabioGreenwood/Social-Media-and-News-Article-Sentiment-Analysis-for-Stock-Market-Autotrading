@@ -152,6 +152,14 @@ default_input_dict = {
 
 #%% misc methods
 
+def filter_df_multi_col(df, list_of_cols, values_to_match):
+    #match only
+    mask = df[list_of_cols[0]] == values_to_match[0]
+    for val, col in zip(values_to_match, list_of_cols):
+        new_con = df[col] == val
+        mask = (mask) & (new_con)
+    return df[mask]
+
 def find_largest_number(mixed_list):
     numbers = [x for x in mixed_list if isinstance(x, (int, float))]
     
@@ -539,7 +547,51 @@ def check_if_experiment_already_ran_if_so_return_random_unique_design(x_next, de
     return x_next
         
 
+def update_global_record(pred_steps, df_designs_record, experi_params_list, run_name, global_record_path):
+    if global_record_path=="":
+        return
+    
+    global_ID_str = "global_ID"
+    local_ID_str = "local_ID"
+    run_name_col_str = "run_name"
+    pred_steps_str = "pred_steps"
+    
+    for i in range(len(experi_params_list)):
+        experi_params_list[i] = experi_params_list[i].replace("~", "_")
+    
+    col1 = [local_ID_str, run_name_col_str, pred_steps_str]
+    col2 = list(df_designs_record.columns)
+    run_specific_cols = [local_ID_str, run_name_col_str, pred_steps_str]
+    input_para_cols = run_specific_cols + experi_params_list
+    
+    if os.path.exists(global_record_path + "DONTTOUCH"):
+        df_global_record = pd.read_csv(global_record_path+ "DONTTOUCH")
+        df_global_record.set_index(df_global_record.columns[0], inplace=True)
+    else:
+        df_global_record = pd.DataFrame(columns=col1 + col2)
 
+    for local_ID in df_designs_record.index:
+        input_para = [local_ID, run_name, pred_steps] + list(df_designs_record.loc[local_ID, experi_params_list].values)
+        #matching_rows = df_global_record[df_global_record[input_para_cols] == input_para]
+        
+        matching_rows = filter_df_multi_col(df_global_record, input_para_cols, input_para)
+        
+        if len(matching_rows) == 0:
+            global_ID = max(list(df_global_record.index) + [-1]) + 1
+            #df_global_record.loc[global_ID, input_para_cols] = input_para
+        elif len(matching_rows) == 1:
+            global_ID = matching_rows.index[0]
+        elif len(matching_rows) > 1:
+            raise ValueError("mulitple value of input: " + df_designs_record.loc[local_ID, experi_params_list] + "found")
+        df_global_record.loc[global_ID,run_specific_cols] = [local_ID, run_name, pred_steps]
+        df_global_record.loc[global_ID, df_designs_record.columns] = df_designs_record.loc[local_ID, :]
+    #save resutls
+    try:
+        df_global_record.to_csv(global_record_path)
+        df_global_record.to_csv(global_record_path + "DONTTOUCH")
+    except:
+        df_global_record.to_csv(global_record_path + "DONTTOUCH")    
+    
 def experiment_manager(
     optim_run_name,
     design_space_dict,
@@ -554,7 +606,8 @@ def experiment_manager(
     force_restart_run = False,
     testing_measure = "mae",
     inverse_for_minimise_vec = None,
-    optim_scores_vec = None
+    optim_scores_vec = None,
+    global_record_path=""
     ):
     
     #parameters
@@ -633,6 +686,7 @@ def experiment_manager(
             df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
             save_designs_record_csv_and_dict(list_of_save_locations, df_designs_record=df_designs_record, design_history_dict=design_history_dict, optim_run_name=optim_run_name)
             print_desired_scores(design_history_dict, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_minimise_vec)
+        update_global_record(pred_steps, df_designs_record, experi_params_list, optim_run_name, global_record_path)
             
             
             
@@ -827,7 +881,8 @@ if __name__ == '__main__':
         force_restart_run = False,
         inverse_for_minimise_vec = inverse_for_minimise_vec,
         optim_scores_vec = optim_scores_vec,
-        testing_measure = testing_measure
+        testing_measure = testing_measure,
+        global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\non_seeded_global_results.csv"
         )
     print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 

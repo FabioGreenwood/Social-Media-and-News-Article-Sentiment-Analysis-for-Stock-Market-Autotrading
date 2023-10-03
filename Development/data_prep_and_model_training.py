@@ -272,7 +272,7 @@ def fg_timer(curr_iter_num, total_iter_num, callback_counts, task_name="", start
         output_string += datetime.now().strftime("%H:%M:%S")
         if not start_time==None:
             time_past = datetime.now() - start_time
-            output_string += " : etc: " + (start_time + (((1 - proportion_done) / proportion_done) * time_past)).strftime("%H:%M:%S")
+            output_string += " : etc: " + (dateime.now() + (((1 - proportion_done) / proportion_done) * time_past)).strftime("%H:%M:%S")
         print(output_string)
         
     return curr_iter_num + 1
@@ -500,7 +500,6 @@ def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dic
     relavance_halflife      = senti_inputs_params_dict["relative_halflife"]
     weighted_topics         = senti_inputs_params_dict["weighted_topics"]
     apply_IDF               = senti_inputs_params_dict["apply_IDF"]
-    start_time              = datetime.now()
     enforced_topic_model_nested_list = senti_inputs_params_dict["enforced_topics_dict"]
 
     if training_or_testing == "training" or training_or_testing == "train":
@@ -551,7 +550,7 @@ def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dic
     print(type(index_list))
     rep_num = int(len(index_list) / 10)
     
-    count = 0; counter_len = len(index) # FG_Counter
+    count = 0; counter_len = len(index); start_time = datetime.now() # FG_Counter
     for time_step in index:
         #if index_list.index(time_step) % rep_num == 0:
         #    print(str(index_list.index(time_step)/ (rep_num * 10)))
@@ -1340,7 +1339,6 @@ def generate_testing_scores(predictor, input_dict, return_time_series=False):
         return testing_scores, X_testing, y_testing, Y_preds_testing
 
 
-
 #%% main support methods
 
 def retrieve_model_and_training_scores(predictor_location_file, predictor_name_entry, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params):
@@ -1352,7 +1350,7 @@ def retrieve_model_and_training_scores(predictor_location_file, predictor_name_e
     if any(math.isnan(value) for value in list(training_score.values())):
     #if training_score is None:
         training_score = quick_training_score_rerun(predictor, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
-        edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="save", training_scores=training_score)
+        #edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="save", training_scores=training_score)
 
     return predictor, training_score
 
@@ -1467,7 +1465,6 @@ def retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inp
     predictor_name_entry = company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed
     predictor_name = return_predictor_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, time_step_seconds, rel_lifetime, rel_hlflfe, pred_steps_ahead, hidden_layers, estm_alpha, model_hyper_params)
     predictor_location_file = predictor_folder_location_string + predictor_name + ".pred"
-    #previous_score = edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="load")
     if os.path.exists(predictor_location_file):
         predictor, training_scores = retrieve_model_and_training_scores(predictor_location_file, predictor_name_entry, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
     else:
