@@ -103,11 +103,8 @@ default_senti_inputs_params_dict    = {
     "topic_model_alpha"     : 1,
     "weighted_topics"       : False,
     "apply_IDF"             : True,
-    "enforced_topics_dict_name" : "v1",
-    "enforced_topics_dict"  : [
-    ['investment', 'financing', 'losses'],
-    ['risk', 'exposure', 'liability'],
-    ["financial",  "forces" , "growth", "interest",  "rates"]],
+    "enforced_topics_dict_name" : "None",
+    "enforced_topics_dict"  : None,
     "sentiment_method"      : SentimentIntensityAnalyzer(),
     "tweet_file_location"   : r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\twitter data\Tweets about the Top Companies from 2015 to 2020\Tweet.csv\Tweet.csv",
     "regenerate_cleaned_tweets_for_subject_discovery" : False
@@ -557,7 +554,7 @@ def experiment_manager(
     force_restart_run = False,
     testing_measure = "mae",
     inverse_for_minimise_vec = None,
-    optim_scores_vec = None,
+    optim_scores_vec = None
     ):
     
     #parameters
@@ -717,10 +714,10 @@ design_space_dict = {
         "topic_model_alpha" : [0.3, 0.7, 1, 2, 3, 5],
         "weighted_topics" : [True, False],
         "relative_halflife" : [0.5 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR], 
-        "apply_IDF" : [True, False],
-        "enforced_topics_dict"  : {
-            0: None,
-            1 : [['investment', 'financing', 'losses'], ['risk', 'exposure', 'liability'], ["financial",  "forces" , "growth", "interest",  "rates"]]}
+        "apply_IDF" : [True, False]#,
+        #"enforced_topics_dict"  : {
+        #    0: None,
+        #    1 : [['investment', 'financing', 'losses'], ['risk', 'exposure', 'liability'], ["financial",  "forces" , "growth", "interest",  "rates"]]}
     },
     "model_hyper_params" : {
         "estimator__hidden_layer_sizes" : {0 : (10, 10),
@@ -736,26 +733,30 @@ design_space_dict = {
 global_run_count = 0
 
 #init_doe = 20
-init_doe = [[13,	1, 1, 7200, 1, 1, 4, 0.2], 
-    [17,	2, 1, 25200, 0, 1, 3, 0.1], 
-    [13,	0.3, 1, 1800, 0, 0, 1, 0.01], 
-    [9,	0.7, 0, 25200, 1, 0, 4, 0.01], 
-    [9,	0.7, 1, 25200, 1, 0, 4, 0.01], 
-    [5,	1, 1, 25200, 1, 0, 4, 0.02], 
-    [17,	0.7, 0, 7200, 1, 0, 4, 0.05], 
-    [17,	3, 1, 25200, 1, 1, 3, 0.1], 
-    [9,	2, 0, 1800, 0, 1, 1, 0.2], 
-    [9,	3, 1, 7200, 1, 0, 4, 0.01], 
-    [17,	2, 0, 25200, 0, 0, 0, 0.2], 
-    [17,	1, 0, 25200, 1, 1, 1, 0.01], 
-    [17,	0.3, 1, 25200, 1, 1, 3, 0.05], 
-    [5,	3, 1, 1800, 1, 0, 3, 0.05], 
-    [9,	5, 1, 1800, 1, 0, 4, 0.2], 
-    [9,	2, 1, 7200, 0, 1, 4, 0.1], 
-    [17,	1, 0, 25200, 0, 0, 2, 0.2], 
-    [17,	3, 0, 7200, 1, 1, 1, 0.01], 
-    [17,	0.7, 0, 25200, 0, 0, 0, 0.2], 
-    [9,	5, 0, 25200, 1, 0, 0, 0.02]]
+init_doe = [[17, 1,   1, 25200,  1,  2,  0.05],
+    [9,  2,   1, 1800,   1,  3,  0.02],
+    [13, 3,   0, 1800,   1,  3,  0.2],
+    [17, 5,   0, 1800,   1,  2,  0.2],
+    [5,  0.3, 1, 1800,   0,  2,  0.02],
+    [17, 2,   0, 25200,  0,  1,  0.01],
+    [17, 1,   0, 7200,   1,  4,  0.1],
+    [17, 0.7, 1, 1800,   0,  1,  0.02],
+    [13, 0.3, 1, 25200,  1,  2,  0.01],
+    [13, 1,   1, 1800,   0,  3,  0.02],
+    [13, 3,   1, 7200,   0,  4,  0.1],
+    [17, 5,   0, 1800,   0,  0,  0.01],
+    [5,  2,   0, 1800,   0,  4,  0.1],
+    [5,  0.7, 1, 25200,  0,  0,  0.01],
+    [13, 1,   0, 25200,  1,  1,  0.05],
+    [9,  0.7, 0, 1800,   1,  2,  0.1],
+    [17, 5,   1, 1800,   1,  2,  0.2],
+    [9,  2,   0, 1800,   0,  4,  0.2],
+    [9,  0.7, 0, 25200,  0,  3,  0.1],
+    [5,  3,   1, 25200,  0,  3,  0.01]]
+
+
+
+
 
 """ experiment checklist:
 1. ensure that the value for steps ahead is updated on the dictionary line below

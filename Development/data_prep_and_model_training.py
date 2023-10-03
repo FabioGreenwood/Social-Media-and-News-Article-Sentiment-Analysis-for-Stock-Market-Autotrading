@@ -228,7 +228,7 @@ def return_topic_mode_seed_hash(enforced_topic_model_nested_list):
         for topic_id in range(min(3,len(enforced_topic_model_nested_list))):
             name2 += enforced_topic_model_nested_list[topic_id][0][0]
         # then a hash number
-            name2 += str(hash(str(enforced_topic_model_nested_list)))[:4]
+        name2 += str(hash(str(enforced_topic_model_nested_list)))[:4]
     return name + name2
             
     
@@ -262,7 +262,7 @@ def return_ticker_code_1(filename):
     return filename[:filename.index(".")]
 
 def fg_timer(curr_iter_num, total_iter_num, callback_counts, task_name="", start_time=None):
-    if ((curr_iter_num) % int(total_iter_num / callback_counts) == 0 and curr_iter_num > 0) or curr_iter_num == total_iter_num - 1:
+    if ((curr_iter_num) % max(1,int(total_iter_num / callback_counts)) == 0 and curr_iter_num > 0) or curr_iter_num == total_iter_num - 1:
         proportion_done = (curr_iter_num + 1) / total_iter_num
         output_string = ""
         if not task_name=="":
