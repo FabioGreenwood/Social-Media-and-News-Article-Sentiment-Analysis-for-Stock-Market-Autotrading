@@ -272,7 +272,7 @@ def fg_timer(curr_iter_num, total_iter_num, callback_counts, task_name="", start
         output_string += datetime.now().strftime("%H:%M:%S")
         if not start_time==None:
             time_past = datetime.now() - start_time
-            output_string += " : etc: " + (dateime.now() + (((1 - proportion_done) / proportion_done) * time_past)).strftime("%H:%M:%S")
+            output_string += " : etc: " + (datetime.now() + (((1 - proportion_done) / proportion_done) * time_past)).strftime("%H:%M:%S")
         print(output_string)
         
     return curr_iter_num + 1
@@ -590,8 +590,7 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     apply_IDF           = senti_inputs_params_dict["apply_IDF"]
     sentiment_method    = senti_inputs_params_dict["sentiment_method"]
     enforced_topic_model_nested_list = senti_inputs_params_dict["enforced_topics_dict"]
-    start_time          = datetime.now()
-    
+        
     if training_or_testing == "training" or training_or_testing == "train":
         train_period_start  = temporal_params_dict["train_period_start"]
         train_period_end    = temporal_params_dict["train_period_end"]
@@ -629,6 +628,7 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     df_annotated_tweets[columns_to_add] = float("nan")
     count = 0; counter_len = len(df_annotated_tweets.index) # FG_Counter
     
+    start_time          = datetime.now()
     for tweet_id in df_annotated_tweets.index:
         
         text = df_annotated_tweets["body"][tweet_id]
