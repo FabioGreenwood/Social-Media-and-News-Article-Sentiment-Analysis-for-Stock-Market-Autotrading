@@ -582,10 +582,12 @@ def update_global_record(pred_steps, df_designs_record, experi_params_list, run_
         elif len(matching_rows) == 1:
             global_ID = matching_rows.index[0]
         elif len(matching_rows) > 1:
+            
             raise ValueError("mulitple value of input: " + df_designs_record.loc[local_ID, experi_params_list] + "found")
         df_global_record.loc[global_ID,run_specific_cols] = [local_ID, run_name, pred_steps]
         df_global_record.loc[global_ID, df_designs_record.columns] = df_designs_record.loc[local_ID, :]
     #save resutls
+    #print("printing results to " + str(global_record_path))
     try:
         df_global_record.to_csv(global_record_path)
         df_global_record.to_csv(global_record_path + "DONTTOUCH")
@@ -823,7 +825,7 @@ init_doe = [[17, 1,   1, 25200,  1,  2,  0.05],
 # definition of different scenarios is set by this dict, to access a different scenario, please change the scenario variable
 
 # scenario parameters: topic_qty, pred_steps
-scenario_ID = 1
+scenario_ID = 0
 removal_ratio = int(1e1)
 scenario_dict = {
      0 : {"topics" : None, "pred_steps" : 1},
