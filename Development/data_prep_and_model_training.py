@@ -36,11 +36,10 @@ from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from sklearn.preprocessing import StandardScaler
 import seaborn as sns
 import copy
-from datetime import datetime
 from sklearn.ensemble import BaggingRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import TimeSeriesSplit
-from datetime import datetime, timedelta
+from datetime import datetime, date, time
 import os
 import warnings
 import sys
@@ -77,6 +76,8 @@ from stock_indicators import indicators, Quote
 from stock_indicators.indicators.common.quote import Quote
 from stock_indicators.indicators.common.enums import Match
 from stock_indicators import PeriodSize, PivotPointType 
+from sklearn.model_selection import train_test_split
+
 
 #%% EXAMPLE INPUTS FOR MAIN METHOD
 
@@ -108,8 +109,8 @@ global_random_state = 1
 global_scores_database = r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\scores_database.csv"
 global_strptime_str = '%d/%m/%y %H:%M:%S'
 global_strptime_str_filename = '%d_%m_%y %H:%M:%S'
-
-
+combined_stop_words_list_file_path = r"C:\Users\Fabio\OneDrive\Documents\Studies\Mining Massive Datasets\MMD Project\data\support data\combined_stop_words.txt"
+custom_stop_words_list_file_path = r"C:\Users\Fabio\OneDrive\Documents\Studies\Mining Massive Datasets\MMD Project\data\support data\specific_stop_words.txt"
 
 temporal_params_dict    = {
     "train_period_start"    : datetime.strptime('04/06/18 00:00:00', global_strptime_str),
@@ -304,20 +305,22 @@ def import_financial_data(
     df_financial_data.set_index("date", inplace=True)
     df_financial_data.index.names = ['datetime']
     index = list(df_financial_data.index)
+    time_step = index[1] - index[0]
+    
     
     #check for faulty time windows
-    if temporal_params_dict["train_period_start"] < min(index) - timedelta(seconds=24*60*60):
+    if temporal_params_dict["train_period_start"] < min(index) - time_step: #timedelta(seconds=24*60*60):
         raise ValueError("the financial data provided doesn't cover the experiment time window")
-    if temporal_params_dict["test_period_start"] < min(index)  - timedelta(seconds=24*60*60):
+    if temporal_params_dict["test_period_start"] < min(index)  - time_step: #timedelta(seconds=24*60*60):
         raise ValueError("the financial data provided doesn't cover the experiment time window")
-    if temporal_params_dict["train_period_end"] > max(index)   + timedelta(seconds=24*60*60):
+    if temporal_params_dict["train_period_end"] > max(index)   + time_step and (training_or_testing=="test" or training_or_testing=="testing"): #timedelta(seconds=24*60*60):
         raise ValueError("the financial data provided doesn't cover the experiment time window")
-    if temporal_params_dict["test_period_end"] > max(index)    + timedelta(seconds=24*60*60):
+    if temporal_params_dict["test_period_end"] > max(index)    + time_step and (training_or_testing=="test" or training_or_testing=="testing"): #timedelta(seconds=24*60*60):
         raise ValueError("the financial data provided doesn't cover the experiment time window")
     
-    #check for the wrong timestep
-    if not index[1] - index[0] - timedelta(seconds=5*60) == timedelta(0):
-        raise ValueError("the financial data provided doesn't cover the experiment time window")
+    ##check for the wrong timestep
+    #if not index[1] - index[0] - timedelta(seconds=5*60) == timedelta(0):
+    #    raise ValueError("the financial data provided doesn't cover the experiment time window")
     
     #trim for time window
     mask_a = pd.to_datetime(index) > period_start
@@ -578,7 +581,9 @@ def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dic
     
     return df_sentiment_scores
 
-def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, repeat_timer=10, training_or_testing="training", hardcode_location_for_topic_model=""):
+def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, repeat_timer=10, training_or_testing="training", hardcode_location_for_topic_model="", k_fold_textual_sources=None):
+    
+    
     #general parameters
     global global_financial_history_folder_path, global_precalculated_assets_locations_dict
     company_symbol      = outputs_params_dict["output_symbol_indicators_tuple"][0]
@@ -620,14 +625,14 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     
     #generate annotated tweets
     print(datetime.now().strftime("%H:%M:%S") + " - generating annotated tweets")
-    df_annotated_tweets   = import_twitter_data_period(senti_inputs_params_dict["tweet_file_location"], train_period_start, train_period_end, relavance_lifetime, tweet_ratio_removed)
+    df_annotated_tweets   = import_twitter_data_period(senti_inputs_params_dict["tweet_file_location"], train_period_start, train_period_end, relavance_lifetime, tweet_ratio_removed, k_fold_textual_sources=k_fold_textual_sources)
     columns_to_add = ["~sent_overall"]
     for num in range(num_topics):
         columns_to_add = columns_to_add + ["~sent_topic_W" + str(num)]
     
     df_annotated_tweets[columns_to_add] = float("nan")
     count = 0; counter_len = len(df_annotated_tweets.index) # FG_Counter
-    
+    print("annotating {} tweets/news articles".format(len(df_annotated_tweets.index)))
     start_time          = datetime.now()
     for tweet_id in df_annotated_tweets.index:
         
@@ -698,9 +703,14 @@ def generate_and_save_topic_model(run_name, temporal_params_dict, fin_inputs_par
     print(datetime.now().strftime("%H:%M:%S"))
     return wordcloud, topic_model_dict, visualisation
 
-def import_twitter_data_period(target_file, period_start, period_end, relavance_lifetime, tweet_ratio_removed):
+def import_twitter_data_period(target_file, period_start, period_end, relavance_lifetime, tweet_ratio_removed, k_fold_textual_sources=None):
     #prep data
-    input_df = pd.read_csv(target_file)
+    
+    if target_file[-4:] == ".pkl": #news articles detacted, change function
+        input_df = import_and_prep_news_articles_as_tweets(target_file, tweet_ratio_removed, k_fold_textual_sources=k_fold_textual_sources)
+    else:
+        input_df = pd.read_csv(target_file)
+    
     epoch_time  = datetime(1970, 1, 1)
     period_start -= timedelta(seconds=relavance_lifetime)
     epoch_start = (period_start - epoch_time).total_seconds()
@@ -710,16 +720,37 @@ def import_twitter_data_period(target_file, period_start, period_end, relavance_
     input_df = input_df[input_df["post_date"]>epoch_start]
     input_df = input_df[input_df["post_date"]<epoch_end]
     
-    if tweet_ratio_removed > 1:
-        new_index = input_df.index[::tweet_ratio_removed]
+    if tweet_ratio_removed > 1 and not target_file[-4:] == ".pkl":
+        new_index = input_df.index
+        if k_fold_textual_sources != None:
+            new_index = new_index[k_fold_textual_sources:]
+        new_index = new_index[::tweet_ratio_removed]
         input_df = input_df.loc[new_index]
     
     return input_df
+
+def import_and_prep_news_articles_as_tweets(target_file, tweet_ratio_removed, k_fold_textual_sources=None):
+    with open(target_file, 'rb') as file:
+        news_rich_format = pickle.load(file)
+    data = []
+    
+    if tweet_ratio_removed > 1:
+        if k_fold_textual_sources != None:
+            news_rich_format = news_rich_format[k_fold_textual_sources:]
+        news_rich_format = news_rich_format[::tweet_ratio_removed]
+    for article in news_rich_format:
+        data = data + [[int(convert_datetime_to_epoch_time(article["publish_datetime"].replace(tzinfo=None))), 
+                       article["text"]]]
+    
+    return pd.DataFrame(data, columns=["post_date", "body"])    
 
 from datetime import datetime, timedelta
 def convert_epoch_time_to_datetime_string(post_date):
     period = datetime(1970, 1, 1) + timedelta(seconds=post_date)
     return period.strftime('%d/%m/%y %H:%M:%S')
+
+def convert_datetime_to_epoch_time(input_datetime):
+    return int((input_datetime - datetime(1970, 1, 1)).total_seconds())
 
 from datetime import datetime, timedelta
 def return_time(post_date):
@@ -727,22 +758,42 @@ def return_time(post_date):
     return period.strftime('%d/%m/%y %H:%M:%S')
 
 
-def prep_and_save_twitter_text_for_subject_discovery(input_list, df_stocks_list_file=None, df_prepped_tweets_company_agnostic_file_path=None):
-    global global_precalculated_assets_locations_dict
+def prep_and_save_twitter_text_for_subject_discovery(input_list, df_stocks_list_file=None, df_prepped_tweets_company_agnostic_file_path=None, make_company_agnostic=True, inc_new_combined_list=False):
+    global global_precalculated_assets_locations_dict, combined_stop_words_list_file_path, custom_stop_words_list_file_path
     #prep parameters
-    death_characters    = ["$", "amazon", "apple", "goog", "tesla", "http", "@", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", ".", "'s", "compile", "www"]
+    death_characters    = ["$", "amazon", "apple", "goog", "tesla", "http", "@", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "compile", "www","(", ")"]
     stocks_list         = list(df_stocks_list_file["Name"].map(lambda x: x.lower()).values)
     tickers_list        = list(df_stocks_list_file["Ticker"].map(lambda x: x.lower()).values)
     stopwords_english   = stopwords.words('english')
+    if inc_new_combined_list == True:
+        with open(combined_stop_words_list_file_path, 'r') as file:
+            file_content = file.read()
+            stopwords_english = stopwords_english + [s.strip(' "\'') for s in file_content.split(",")]
+        with open(custom_stop_words_list_file_path, 'r') as file2:
+            file_content2 = file2.read()
+            stopwords_english = stopwords_english + [s.strip(' "\'') for s in file_content2.split(",")]
+
+        
+        
+        print("english stopwords are now long: " + str(len(stopwords_english)))
+        
     #these are words are removed from company names to create additional shortened versions of those names. This is so these version can be eliminated from the tweets to make the subjects agnostic
     corp_stopwords      = [".com", "company", "corp", "froup", "fund", "gmbh", "global", "incorporated", "inc.", "inc", "tech", "technology", "technologies", "trust", "limited", "lmt", "ltd"]
     #these are words are directly removed from tweets
     misc_stopwords      = ["iphone", "airpods", "jeff", "bezos", "#microsoft", "#amzn", "volkswagen", "microsoft", "amazon's", "tsla", "androidwear", "ipad", "amzn", "iphone", "tesla", "TSLA", "elon", "musk", "baird", "robert", "pm", "androidwear", "android", "robert", "ab", "ae", "dlvrit", "https", "iphone", "inc", "new", "dlvrit", "py", "twitter", "cityfalconcom", "aapl", "ing", "ios", "samsung", "ipad", "phones", "cityfalconcom", "us", "bitly", "utmmpaign", "etexclusivecom", "cityfalcon", "owler", "com", "stock", "stocks", "buy", "bitly", "dlvrit", "alexa", "zprio", "billion", "seekalphacom", "et", "alphet", "seekalpha", "googl", "zprio", "trad", "jt", "windows", "adw", "ifttt", "ihadvfn", "nmona", "pphppid", "st", "bza", "twits", "biness", "tim", "ba", "se", "rat", "article"]
 
-
     #prep stocks_list_shortened
     stocks_list_shortened_dict  = update_shortened_company_file(global_df_stocks_list_file, corp_stopwords)
     stocks_list_shortened       = list(stocks_list_shortened_dict.values())
+    
+    if make_company_agnostic==False:
+        #death_characters        = 
+        stocks_list             = []
+        tickers_list            = []
+        #stopwords_english       = 
+        #corp_stopwords          = 
+        #misc_stopwords          = 
+        #stocks_list_shortened   = 
     
     #prep variables
     split_tweets = []
@@ -756,8 +807,12 @@ def prep_and_save_twitter_text_for_subject_discovery(input_list, df_stocks_list_
         split_tweets = split_tweets + [split_tweet]
 
     #removal of words
+    pos = 0
+    
     for tweet in split_tweets:
-        for word in reversed(tweet):
+        #for word in reversed(tweet):
+        copy_of_tweet = copy.deepcopy(tweet)
+        for word in copy_of_tweet:
             Removed = False
             # remove words containing "x"
             for char in death_characters:
@@ -772,6 +827,7 @@ def prep_and_save_twitter_text_for_subject_discovery(input_list, df_stocks_list_
                         S = False
                         break
             # remove words equalling stop words
+        pos += 1
         
         
     #finalise and remove stock names
@@ -831,18 +887,19 @@ def return_initial_eta(num_topics, initial_topics_dict, id2word):
 
 
 
-def return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty = 10, enforced_topics_dict=None, stock_names_list=None, words_to_remove = None, 
+def return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty=10, enforced_topics_dict=None, stock_names_list=None, words_to_remove=None, 
                         return_LDA_model=True, return_png_visualisation=False, return_html_visualisation=False, 
-                        topic_model_alpha=0.1, apply_IDF=True, cores=2, passes=20, iterations=400):
+                        topic_model_alpha=0.1, apply_IDF=True, cores=2, passes=20, iterations=400, return_perplexity=False):
     output = []
 
     data = df_prepped_tweets_company_agnostic
     data_words = list(sent_to_words(data))
+    
     if return_LDA_model < return_html_visualisation:
         raise ValueError("You must return the LDA visualisation if you return the LDA model")
 
-       
-    if return_png_visualisation==True:
+    if return_png_visualisation:
+        # Create a long string for word cloud visualization
         long_string = "start"
         for w in data_words:
             long_string = long_string + ',' + ','.join(w)
@@ -852,65 +909,92 @@ def return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty = 10, enfo
         output = output + [wordcloud]
     else:
         output = output + [None]
-    
-    if return_LDA_model==True:
+
+    if return_LDA_model:
+        if return_perplexity == True:
+            # Split the data into training and test sets
+            data_train, data_test = train_test_split(data_words, test_size=0.1, random_state=42)
+        else:
+            data_train = data_words
+
         # Create Dictionary
-        id2word = corpora.Dictionary(data_words)
+        id2word = corpora.Dictionary(data_train)
 
         # Create Corpus
-        texts = data_words
+        texts_train = data_train
+        texts_test = data_test
 
         # Term Document Frequency
-        corpus = [id2word.doc2bow(text) for text in texts]
+        corpus_train = [id2word.doc2bow(text) for text in texts_train]
+        if return_perplexity == True:
+            corpus_test = [id2word.doc2bow(text) for text in texts_test]
 
-        #translate the enforced_topics_dict input
-        if enforced_topics_dict != None:
+        # Translate the enforced_topics_dict input
+        if enforced_topics_dict is not None:
             if len(id2word.id2token) == 0:
-                #manual transfer to id2token, required.
+                # Manual transfer to id2token, required.
                 for key in id2word.token2id:
                     id2word.id2token[id2word.token2id[key]] = key
             eta = return_initial_eta(topic_qty, enforced_topics_dict, id2word)
         else:
-            eta='auto' # Let Gensim estimate eta (topic-word distribution)
-        #eta = np.zeros(len(id2word.id2token)) #FG_action: remove
-        #apply IDF
-        if apply_IDF == True:
-            # create tfidf model
-            tfidf = TfidfModel(corpus)
+            eta = 'auto'  # Let Gensim estimate eta (topic-word distribution)
 
-            # apply tfidf to corpus
-            corpus = tfidf[corpus]
-        
-        # Build LDA model
-        lda_model = gensim.models.LdaModel(corpus=corpus,
-        #lda_model = gensim.models.LdaMulticore(corpus=corpus,
+        # Apply IDF
+        if apply_IDF:
+            # Create tfidf model
+            tfidf = TfidfModel(corpus_train)
+
+            # Apply tfidf to both training and test corpora
+            corpus_train = tfidf[corpus_train]
+            if return_perplexity == True:
+                corpus_test = tfidf[corpus_test]
+
+        # Build LDA model on the training data
+        if passes == None:
+            print("LDA gate works")
+            lda_model = gensim.models.LdaModel(corpus=corpus_train,
                                                 id2word=id2word,
                                                 num_topics=topic_qty,
-                                                alpha = topic_model_alpha, # controls topic sparsity:- Set a low alpha to make topics more focused
-                                                eta=eta, # sets the initial topic-word distribution
-                                                passes=passes,  # Number of training iterations
-                                                iterations=iterations,  # Number of iterations per pass
+                                                alpha=topic_model_alpha,
+                                                eta=eta,
+                                                iterations=iterations,
+                                                random_state=42)
+        else:
+            lda_model = gensim.models.LdaModel(corpus=corpus_train,
+                                                id2word=id2word,
+                                                num_topics=topic_qty,
+                                                alpha=topic_model_alpha,
+                                                eta=eta,
+                                                passes=passes,
+                                                iterations=iterations,
                                                 random_state=42)
         
+        if return_perplexity == True:
+            # Calculate perplexity on the test data
+            perplexity = lda_model.log_perplexity(corpus_test)
+
         # Print the Keyword in the 10 topics
-        #pprint(lda_model.print_topics())
-        #eta = lda_model.expElogbeta
-        doc_lda = lda_model[corpus]
-        topic_model_dict = {"lda_model" : lda_model, "doc_lda" : doc_lda, "corpus" : corpus, "id2word" : id2word}
+        # pprint(lda_model.print_topics())
+        doc_lda = lda_model[corpus_train]
+        topic_model_dict = {"lda_model": lda_model, "doc_lda": doc_lda, "corpus": corpus_train, "id2word": id2word}
         output = output + [topic_model_dict]
+
+        if return_perplexity:
+            output = output + [perplexity]
+        
     else:
         output = output + [None]
-            
-    if return_html_visualisation==True:
+
+    if return_html_visualisation:
         pyLDAvis.enable_notebook
         if topic_qty > 1:
-            LDAvis_prepared = gensimvis.prepare(lda_model, corpus, id2word)
+            LDAvis_prepared = gensimvis.prepare(lda_model, corpus_train, id2word)
         else:
             LDAvis_prepared = None
         output = output + [LDAvis_prepared]
     else:
         output = output + [None]
-    
+    print("topic model complete with {} passes".format(str(lda_model.passes)))
     return tuple(output)
 
 def save_topic_clusters(wordcloud=None, topic_model_dict=None, visualisation=None, file_location_wordcloud=None, file_location_topic_model_dict=None, file_location_visualisation=None):
@@ -926,7 +1010,10 @@ def save_topic_clusters(wordcloud=None, topic_model_dict=None, visualisation=Non
             pickle.dump(topic_model_dict, file)
     
     if visualisation != None:
-        pyLDAvis.save_html(visualisation, file_location_visualisation)
+        try:
+            pyLDAvis.save_html(visualisation, file_location_visualisation)
+        except:
+            print("vis not made")
 
 def edit_scores_csv(predictor_name_entry, is_training_or_testing, score_types, mode="save", training_scores=None):
     global global_scores_database, global_strptime_str_filename
@@ -1014,7 +1101,7 @@ def sent_to_words(sentences):
 def update_tweet_cohort(tweet_cohort, df_annotated_tweets_temp, tweet_cohort_start, tweet_cohort_end):
     epoch_time          = datetime(1970, 1, 1)
     #delete old tweets
-    tweet_cohort                = tweet_cohort[tweet_cohort["post_date"] <= tweet_cohort_start]
+    tweet_cohort                = tweet_cohort[tweet_cohort["post_date"] >= tweet_cohort_start]
     
     #find new tweets
     new_tweets                  = df_annotated_tweets_temp[df_annotated_tweets_temp["post_date"] <= tweet_cohort_end]
