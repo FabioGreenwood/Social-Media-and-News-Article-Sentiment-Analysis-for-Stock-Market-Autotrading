@@ -889,7 +889,7 @@ def return_initial_eta(num_topics, initial_topics_dict, id2word):
 
 def return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty=10, enforced_topics_dict=None, stock_names_list=None, words_to_remove=None, 
                         return_LDA_model=True, return_png_visualisation=False, return_html_visualisation=False, 
-                        topic_model_alpha=0.1, apply_IDF=True, cores=2, passes=20, iterations=400, return_perplexity=False):
+                        topic_model_alpha=0.1, apply_IDF=True, cores=2, passes=60, iterations=800, return_perplexity=False):
     output = []
 
     data = df_prepped_tweets_company_agnostic
