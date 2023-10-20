@@ -107,7 +107,8 @@ default_senti_inputs_params_dict    = {
     "enforced_topics_dict"  : None,
     "sentiment_method"      : SentimentIntensityAnalyzer(),
     "tweet_file_location"   : r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\twitter data\Tweets about the Top Companies from 2015 to 2020\Tweet.csv\Tweet.csv",
-    "regenerate_cleaned_tweets_for_subject_discovery" : False
+    "regenerate_cleaned_tweets_for_subject_discovery" : False,
+    "inc_new_combined_stopwords_list" : False
 }
 default_outputs_params_dict         = {
     "output_symbol_indicators_tuple"    : ("aapl", "close"), # fg_action: do I use this?
@@ -247,7 +248,8 @@ def add_missing_designs_to_design_history_dict(design_history_dict, initial_doe_
         design_found = False
         largest_existing_ID = find_largest_number(design_history_dict)
         for existing_design_ID in range(largest_existing_ID + 1):
-            if all([design_history_dict[existing_design_ID]["X"] == new_design]):
+            check = np.all(design_history_dict[existing_design_ID]["X"] == new_design)
+            if check == True:
                 design_found = True
                 
         if design_found == False:
@@ -768,9 +770,11 @@ design_space_dict = {
     "senti_inputs_params_dict" : {
         "topic_qty" : [5, 9, 13, 17],
         "topic_model_alpha" : [0.3, 0.7, 1, 2, 3, 5],
-        "weighted_topics" : [True, False],
+        "weighted_topics" : [False, True],
         "relative_halflife" : [0.5 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR], 
-        "apply_IDF" : [True, False]#,
+        "apply_IDF" : [False, True],
+        "inc_new_combined_stopwords_list" : [False, True]
+        #,
         #"enforced_topics_dict"  : {
         #    0: None,
         #    1 : [['investment', 'financing', 'losses'], ['risk', 'exposure', 'liability'], ["financial",  "forces" , "growth", "interest",  "rates"]]}
@@ -789,28 +793,27 @@ design_space_dict = {
 global_run_count = 0
 
 #init_doe = 20
-init_doe = [[17, 1,   1, 25200,  1,  2,  0.05],
-    [9,  2,   1, 1800,   1,  3,  0.02],
-    [13, 3,   0, 1800,   1,  3,  0.2],
-    [17, 5,   0, 1800,   1,  2,  0.2],
-    [5,  0.3, 1, 1800,   0,  2,  0.02],
-    [17, 2,   0, 25200,  0,  1,  0.01],
-    [17, 1,   0, 7200,   1,  4,  0.1],
-    [17, 0.7, 1, 1800,   0,  1,  0.02],
-    [13, 0.3, 1, 25200,  1,  2,  0.01],
-    [13, 1,   1, 1800,   0,  3,  0.02],
-    [13, 3,   1, 7200,   0,  4,  0.1],
-    [17, 5,   0, 1800,   0,  0,  0.01],
-    [5,  2,   0, 1800,   0,  4,  0.1],
-    [5,  0.7, 1, 25200,  0,  0,  0.01],
-    [13, 1,   0, 25200,  1,  1,  0.05],
-    [9,  0.7, 0, 1800,   1,  2,  0.1],
-    [17, 5,   1, 1800,   1,  2,  0.2],
-    [9,  2,   0, 1800,   0,  4,  0.2],
-    [9,  0.7, 0, 25200,  0,  3,  0.1],
-    [5,  3,   1, 25200,  0,  3,  0.01]]
-
-
+init_doe = [
+[13, 2,	    1,	25200,	1,	0,	4,	0.05],
+[17, 1,	    0,	1800,	0,	1,	1,	0.05],
+[13, 0.7,	0,	25200,	1,	1,	4,	0.05],
+[9,  3,	    0,	7200,	1,	0,	0,	0.2],
+[17, 0.7,	1,	7200,	1,	1,	2,	0.02],
+[9,  2,	    0,	1800,	0,	1,	3,	0.2],
+[17, 5,	    1,	1800,	0,	0,	2,	0.05],
+[9,  5,	    1,	1800,	1,	1,	0,	0.1],
+[5,  1,	    1,	7200,	0,	0,	4,	0.05],
+[13, 0.3,	1,	25200,	1,	1,	2,	0.2],
+[9,  2,	    1,	25200,	1,	0,	2,	0.02],
+[13, 0.3,	0,	1800,	1,	0,	2,	0.05],
+[5,  1,	    1,	7200,	0,	1,	3,	0.01],
+[13, 3,	    1,	25200,	1,	1,	1,	0.01],
+[17, 5,	    1,	25200,	0,	1,	0,	0.05],
+[13, 5,	    0,	25200,	1,	0,	3,	0.02],
+[13, 5,	    0,	25200,	0,	0,	0,	0.01],
+[17, 3,	    1,	1800,	1,	0,	3,	0.1],
+[9,  0.7,	0,	7200,	1,	0,	4,	0.1],
+[5,  0.7,	1,	1800,	1,	1,	0,	0.1]]
 
 
 
@@ -884,7 +887,7 @@ if __name__ == '__main__':
         inverse_for_minimise_vec = inverse_for_minimise_vec,
         optim_scores_vec = optim_scores_vec,
         testing_measure = testing_measure,
-        global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\non_seeded_global_results.csv"
+        global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\non_seededv2_global_results.csv"
         )
     print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 

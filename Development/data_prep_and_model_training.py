@@ -109,8 +109,8 @@ global_random_state = 1
 global_scores_database = r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\scores_database.csv"
 global_strptime_str = '%d/%m/%y %H:%M:%S'
 global_strptime_str_filename = '%d_%m_%y %H:%M:%S'
-combined_stop_words_list_file_path = r"C:\Users\Fabio\OneDrive\Documents\Studies\Mining Massive Datasets\MMD Project\data\support data\combined_stop_words.txt"
-custom_stop_words_list_file_path = r"C:\Users\Fabio\OneDrive\Documents\Studies\Mining Massive Datasets\MMD Project\data\support data\specific_stop_words.txt"
+combined_stop_words_list_file_path = r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\support data\combined_stop_words.txt"
+custom_stop_words_list_file_path = r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\support data\specific_stop_words.txt"
 
 temporal_params_dict    = {
     "train_period_start"    : datetime.strptime('04/06/18 00:00:00', global_strptime_str),
@@ -147,7 +147,8 @@ senti_inputs_params_dict    = {
     ["financial forces" , "growth", "interest rates"]],
     "sentiment_method"      : SentimentIntensityAnalyzer(),
     "tweet_file_location"   : r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\twitter data\Tweets about the Top Companies from 2015 to 2020\Tweet.csv\Tweet.csv",
-    "regenerate_cleaned_tweets_for_subject_discovery" : False
+    "regenerate_cleaned_tweets_for_subject_discovery" : False,
+    "inc_new_combined_stopwords_list" : False
 }
 
 outputs_params_dict         = {
@@ -235,25 +236,25 @@ def return_topic_mode_seed_hash(enforced_topic_model_nested_list):
     
     
 
-def return_topic_model_name(topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list):
-    file_string = "tm_qty" + str(topic_model_qty) + "_tm_alpha" + str(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed) + return_topic_mode_seed_hash(enforced_topic_model_nested_list)
+def return_topic_model_name(topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc):
+    file_string = "tm_qty" + str(topic_model_qty) + "_tm_alpha" + str(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed) + return_topic_mode_seed_hash(enforced_topic_model_nested_list) + "_newStops" + str({True: 1, False: 2}[new_combined_stopwords_inc])
     return file_string
 
-def return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list):
+def return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc):
     global global_strptime_str, global_strptime_str_filename
     name = company_symbol + "_ps" + train_period_start.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_pe" + train_period_end.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_" + str(weighted_topics) + "_"
-    name = name + return_topic_model_name(topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list)
+    name = name + return_topic_model_name(topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc)
     return name
 
-def return_sentimental_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, time_step_seconds, rel_lifetime, rel_hlflfe):
+def return_sentimental_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, time_step_seconds, rel_lifetime, rel_hlflfe):
     global global_strptime_str, global_strptime_str_filename
-    name = return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list)
+    name = return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc)
     name = name + "_ts_sec" + str(time_step_seconds) + "_r_lt" + str(rel_lifetime) + "_r_hl" + str(rel_hlflfe)
     return name
 
-def return_predictor_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, time_step_seconds, rel_lifetime, rel_hlflfe, pred_steps_ahead, hidden_layers, estm_alpha, model_hyper_params):
+def return_predictor_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, time_step_seconds, rel_lifetime, rel_hlflfe, pred_steps_ahead, hidden_layers, estm_alpha, model_hyper_params):
     global global_strptime_str, global_strptime_str_filename
-    name = return_sentimental_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, time_step_seconds, rel_lifetime, rel_hlflfe)
+    name = return_sentimental_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, time_step_seconds, rel_lifetime, rel_hlflfe)
     name = name + "_steps" + str(pred_steps_ahead) + "_hiddenL" + str(hidden_layers) + "estm_A" + str(estm_alpha) + "estimHASH" + str(hash(str(model_hyper_params)))
     return name
     
@@ -457,6 +458,7 @@ def retrieve_or_generate_sentimental_data(index, temporal_params_dict, fin_input
     weighted_topics     = senti_inputs_params_dict["weighted_topics"]
     pred_steps          = outputs_params_dict["pred_steps_ahead"]
     enforced_topic_model_nested_list = senti_inputs_params_dict["enforced_topics_dict"]
+    new_combined_stopwords_inc = senti_inputs_params_dict["inc_new_combined_stopwords_list"]
     
     #set period start/ends
     if training_or_testing == "training" or training_or_testing == "train":
@@ -472,7 +474,7 @@ def retrieve_or_generate_sentimental_data(index, temporal_params_dict, fin_input
     #search for predictor
     sentimental_data_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["sentimental_data"]
     #FG_action: check that the train_period_start is only used and not the test version, that is an error
-    sentimental_data_name = return_sentimental_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, time_step_seconds, rel_lifetime, rel_hlflfe)
+    sentimental_data_name = return_sentimental_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, time_step_seconds, rel_lifetime, rel_hlflfe)
     sentimental_data_location_file = sentimental_data_folder_location_string + sentimental_data_name + ".csv"
     if os.path.exists(sentimental_data_location_file):
         df_sentimental_data = pd.read_csv(sentimental_data_location_file)
@@ -503,7 +505,8 @@ def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dic
     relavance_halflife      = senti_inputs_params_dict["relative_halflife"]
     weighted_topics         = senti_inputs_params_dict["weighted_topics"]
     apply_IDF               = senti_inputs_params_dict["apply_IDF"]
-    enforced_topic_model_nested_list = senti_inputs_params_dict["enforced_topics_dict"]
+    new_combined_stopwords_inc          = senti_inputs_params_dict["inc_new_combined_stopwords_list"]
+    enforced_topic_model_nested_list    = senti_inputs_params_dict["enforced_topics_dict"]
 
     if training_or_testing == "training" or training_or_testing == "train":
         train_period_start  = temporal_params_dict["train_period_start"]
@@ -517,7 +520,7 @@ def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dic
     
     #search for annotated tweets
     annotated_tweets_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["annotated_tweets"]
-    annotated_tweets_name = return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, weighted_topics, num_topics, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list)
+    annotated_tweets_name = return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, weighted_topics, num_topics, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc)
     annotated_tweets_location_file = annotated_tweets_folder_location_string + annotated_tweets_name + ".csv"
     print("approaching gate")
     if isinstance(hardcode_df_annotated_tweets, pd.DataFrame):
@@ -595,6 +598,7 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     apply_IDF           = senti_inputs_params_dict["apply_IDF"]
     sentiment_method    = senti_inputs_params_dict["sentiment_method"]
     enforced_topic_model_nested_list = senti_inputs_params_dict["enforced_topics_dict"]
+    inc_new_combined_stopwords_list = senti_inputs_params_dict["inc_new_combined_stopwords_list"]
         
     if training_or_testing == "training" or training_or_testing == "train":
         train_period_start  = temporal_params_dict["train_period_start"]
@@ -611,7 +615,7 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     #search for topic_model
     topic_model_folder_folder = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["topic_models"]
     
-    topic_model_name = return_topic_model_name(num_topics, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list)
+    topic_model_name = return_topic_model_name(num_topics, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, inc_new_combined_stopwords_list)
     topic_model_location_file = topic_model_folder_folder + topic_model_name
     if not hardcode_location_for_topic_model=="":
         with open(hardcode_location_for_topic_model, 'rb') as file:
@@ -620,7 +624,7 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
         with open(topic_model_location_file + "topic_model_dict_" + topic_model_name + ".pkl", "rb") as file:
             topic_model_dict = pickle.load(file)
     else:
-        wordcloud, topic_model_dict, visualisation = generate_and_save_topic_model(topic_model_name, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+        wordcloud, topic_model_dict, visualisation = generate_and_save_topic_model(topic_model_name, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, inc_new_combined_stopwords_list=inc_new_combined_stopwords_list)
   
     
     #generate annotated tweets
@@ -663,7 +667,7 @@ def return_topic_weight(text_body, topic_model_dict, num_topics):
         doc_topics = [(0,1)]
     return doc_topics
 
-def generate_and_save_topic_model(run_name, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params):
+def generate_and_save_topic_model(run_name, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, inc_new_combined_stopwords_list=False):
     folder_path = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["topic_models"]
     file_location_wordcloud         = folder_path + "wordcloud_" + run_name + ".png"
     file_location_topic_model_dict  = folder_path + "topic_model_dict_" + run_name + ".pkl"
@@ -689,7 +693,7 @@ def generate_and_save_topic_model(run_name, temporal_params_dict, fin_inputs_par
     global global_df_stocks_list_file
     df_prepped_tweets_company_agnostic_file_path = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["clean_tweets"]
     if reclean_tweets == True:
-        df_prepped_tweets_company_agnostic          = prep_and_save_twitter_text_for_subject_discovery(df_prepped_tweets["body"], df_stocks_list_file=global_df_stocks_list_file, df_prepped_tweets_company_agnostic_file_path=df_prepped_tweets_company_agnostic_file_path)
+        df_prepped_tweets_company_agnostic          = prep_and_save_twitter_text_for_subject_discovery(df_prepped_tweets["body"], df_stocks_list_file=global_df_stocks_list_file, df_prepped_tweets_company_agnostic_file_path=df_prepped_tweets_company_agnostic_file_path, inc_new_combined_stopwords_list=inc_new_combined_stopwords_list)
     else:
         with open(df_prepped_tweets_company_agnostic_file_path, 'rb') as file:
             df_prepped_tweets_company_agnostic = pickle.load(file)
@@ -758,14 +762,14 @@ def return_time(post_date):
     return period.strftime('%d/%m/%y %H:%M:%S')
 
 
-def prep_and_save_twitter_text_for_subject_discovery(input_list, df_stocks_list_file=None, df_prepped_tweets_company_agnostic_file_path=None, make_company_agnostic=True, inc_new_combined_list=False):
+def prep_and_save_twitter_text_for_subject_discovery(input_list, df_stocks_list_file=None, df_prepped_tweets_company_agnostic_file_path=None, make_company_agnostic=True, inc_new_combined_stopwords_list=False):
     global global_precalculated_assets_locations_dict, combined_stop_words_list_file_path, custom_stop_words_list_file_path
     #prep parameters
     death_characters    = ["$", "amazon", "apple", "goog", "tesla", "http", "@", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "compile", "www","(", ")"]
     stocks_list         = list(df_stocks_list_file["Name"].map(lambda x: x.lower()).values)
     tickers_list        = list(df_stocks_list_file["Ticker"].map(lambda x: x.lower()).values)
     stopwords_english   = stopwords.words('english')
-    if inc_new_combined_list == True:
+    if inc_new_combined_stopwords_list == True:
         with open(combined_stop_words_list_file_path, 'r') as file:
             file_content = file.read()
             stopwords_english = stopwords_english + [s.strip(' "\'') for s in file_content.split(",")]
@@ -914,6 +918,7 @@ def return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty=10, enforc
         if return_perplexity == True:
             # Split the data into training and test sets
             data_train, data_test = train_test_split(data_words, test_size=0.1, random_state=42)
+            texts_test = data_test
         else:
             data_train = data_words
 
@@ -922,7 +927,7 @@ def return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty=10, enforc
 
         # Create Corpus
         texts_train = data_train
-        texts_test = data_test
+        
 
         # Term Document Frequency
         corpus_train = [id2word.doc2bow(text) for text in texts_train]
@@ -1546,11 +1551,12 @@ def retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inp
     estm_alpha          = model_hyper_params["estimator__alpha"]
     pred_steps_ahead    = outputs_params_dict["pred_steps_ahead"]
     enforced_topic_model_nested_list = senti_inputs_params_dict["enforced_topics_dict"]
+    new_combined_stopwords_inc       = senti_inputs_params_dict["inc_new_combined_stopwords_list"]
             
     #search for predictor
     predictor_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["predictive_model"]
     predictor_name_entry = company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed
-    predictor_name = return_predictor_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, time_step_seconds, rel_lifetime, rel_hlflfe, pred_steps_ahead, hidden_layers, estm_alpha, model_hyper_params)
+    predictor_name = return_predictor_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, time_step_seconds, rel_lifetime, rel_hlflfe, pred_steps_ahead, hidden_layers, estm_alpha, model_hyper_params)
     predictor_location_file = predictor_folder_location_string + predictor_name + ".pred"
     if os.path.exists(predictor_location_file):
         predictor, training_scores = retrieve_model_and_training_scores(predictor_location_file, predictor_name_entry, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
