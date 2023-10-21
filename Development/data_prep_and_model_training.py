@@ -630,6 +630,11 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     #generate annotated tweets
     print(datetime.now().strftime("%H:%M:%S") + " - generating annotated tweets")
     df_annotated_tweets   = import_twitter_data_period(senti_inputs_params_dict["tweet_file_location"], train_period_start, train_period_end, relavance_lifetime, tweet_ratio_removed, k_fold_textual_sources=k_fold_textual_sources)
+    
+    sentiment_col_strs = []
+    for num in range(num_topics):
+        sentiment_col_strs = sentiment_col_strs + ["~sent_topic_W" + str(num)]
+    
     columns_to_add = ["~sent_overall"]
     for num in range(num_topics):
         columns_to_add = columns_to_add + ["~sent_topic_W" + str(num)]
@@ -638,7 +643,7 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     count = 0; counter_len = len(df_annotated_tweets.index) # FG_Counter
     print("annotating {} tweets/news articles".format(len(df_annotated_tweets.index)))
     start_time          = datetime.now()
-    for tweet_id in df_annotated_tweets.index:
+    """for tweet_id in df_annotated_tweets.index:
         
         text = df_annotated_tweets["body"][tweet_id]
         sentiment_value = sentiment_method.polarity_scores(text)["compound"] #FG_Action: this needs to be checked 
@@ -653,7 +658,26 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
         df_annotated_tweets.loc[tweet_id, columns_to_add] = sentiment_analysis
         #timer
         if repeat_timer>0:
-            count = fg_timer(count, counter_len, repeat_timer, task_name="annotated_data", start_time=start_time)
+            count = fg_timer(count, counter_len, repeat_timer, task_name="annotated_data", start_time=start_time)"""
+    
+    # Calculate sentiment scores for all tweets
+    sentiment_scores = df_annotated_tweets['body'].apply(lambda text: sentiment_method.polarity_scores(text)['compound'])
+    sentiment_scores.name = "~sent_overall"
+
+    # Calculate topic weights for all tweets
+    topic_weights = df_annotated_tweets['body'].apply(lambda text: return_topic_weight(text, topic_model_dict, num_topics))
+    topic_weights = topic_weights.apply(lambda topic_tuples: [t[1] for t in topic_tuples] if len(topic_tuples) == num_topics else list(np.zeros(num_topics)))
+    
+    # Combine sentiment and topic weights
+    temp_list = []
+    for indy in topic_weights.index: temp_list = temp_list + [topic_weights[indy]]
+    topic_weights_prepped = pd.DataFrame(temp_list, index=sentiment_scores.index, columns=sentiment_col_strs)
+    sentiment_analysis = pd.concat([sentiment_scores, topic_weights_prepped], axis=1, ignore_index=False)
+    
+
+    # Add the sentiment and topic weight columns to the DataFrame
+    df_annotated_tweets[sentiment_analysis.columns] = sentiment_analysis
+    
     
     return df_annotated_tweets
 
