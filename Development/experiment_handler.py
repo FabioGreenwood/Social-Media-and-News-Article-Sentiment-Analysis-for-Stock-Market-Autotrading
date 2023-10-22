@@ -654,7 +654,7 @@ def experiment_manager(
             design_history_dict = add_missing_designs_to_design_history_dict(design_history_dict, initial_doe_size_or_DoE)
             df_designs_record   = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
         
-    #insert the completion of the DoE if not completed
+    
     else:
         # create and save the design records table
         designs_record_cols = ["ID"] + return_keys_within_2_level_dict(design_space_dict) + return_cols_for_additional_reporting(default_input_dict) + global_designs_record_final_columns_list
@@ -677,7 +677,7 @@ def experiment_manager(
         df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
         save_designs_record_csv_and_dict(list_of_save_locations, df_designs_record=df_designs_record, design_history_dict=design_history_dict, optim_run_name=optim_run_name)
         
-    # complete all incomplete experiment runs (DoE or otherwise)
+    # complete all incomplete experiment runs !!of the same pred step and appropriate topic quant!! (DoE or otherwise)
     df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
     for ID in range(find_largest_number(design_history_dict.keys()) + 1):
         design_history_dict[ID]["X"] = convert_floats_to_int_if_whole(design_history_dict[ID]["X"])#[:len(design_history_dict[ID-1]["X"])]
@@ -691,10 +691,6 @@ def experiment_manager(
             save_designs_record_csv_and_dict(list_of_save_locations, df_designs_record=df_designs_record, design_history_dict=design_history_dict, optim_run_name=optim_run_name)
             print_desired_scores(design_history_dict, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_minimise_vec)
         update_global_record(pred_steps, df_designs_record, experi_params_list, optim_run_name, global_record_path)
-            
-            
-            
-            
             
             
     
@@ -741,23 +737,7 @@ def experiment_manager(
         
 
         
-#%% save dict for export testing
 
-
-
-        
-    
-    
-    
-    
-    
-    
-    
-
-#preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, DoE_orders_dict, model_type_name, outputs_path, model_start_time
-    
-    
-    
     
     
 
@@ -793,8 +773,7 @@ design_space_dict = {
 global_run_count = 0
 
 #init_doe = 20
-init_doe = [
-[13, 2,	    1,	25200,	1,	0,	4,	0.05],
+init_doe = [[13, 2,	    1,	25200,	1,	0,	4,	0.05],
 [17, 1,	    0,	1800,	0,	1,	1,	0.05],
 [13, 0.7,	0,	25200,	1,	1,	4,	0.05],
 [9,  3,	    0,	7200,	1,	0,	0,	0.2],

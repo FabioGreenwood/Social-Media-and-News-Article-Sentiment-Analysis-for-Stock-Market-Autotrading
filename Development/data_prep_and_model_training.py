@@ -327,7 +327,7 @@ def import_financial_data(
     mask_a = pd.to_datetime(index) > period_start
     mask_b = pd.to_datetime(index) < period_end
     mask = mask_a & mask_b
-    df_financial_data[mask]
+    df_financial_data = df_financial_data[mask]
     index = list(df_financial_data.index)
     
     #remove or annotate columns
@@ -491,6 +491,13 @@ def retrieve_sentimental_data():
     raise ValueError('needs writing') 
     return None
 
+
+
+
+
+
+
+
 def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, repeat_timer=10, training_or_testing="training", hardcode_df_annotated_tweets=None):
     
     #general parameters
@@ -546,40 +553,45 @@ def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dic
     
     #create the initial cohort of tweets to be looked at in a time window
     epoch_time          = datetime(1970, 1, 1)
-    tweet_cohort_start  = (train_period_start - epoch_time) - timedelta(seconds=relavance_lifetime)
-    tweet_cohort_end    = (train_period_start - epoch_time)
-    tweet_cohort_start  = tweet_cohort_start.total_seconds()
-    tweet_cohort_end    = tweet_cohort_end.total_seconds()
-    tweet_cohort        = pd.DataFrame(columns=df_annotated_tweets.columns)
-    tweet_cohort, df_annotated_tweets  = update_tweet_cohort(tweet_cohort, df_annotated_tweets, tweet_cohort_start, tweet_cohort_end)
-    index_list = list(index)
-    print(type(index_list))
-    rep_num = int(len(index_list) / 10)
+    #tweet_cohort_start  = (train_period_start - epoch_time) - timedelta(seconds=relavance_lifetime)
+    #tweet_cohort_end    = (train_period_start - epoch_time)
+    #tweet_cohort_start  = tweet_cohort_start.total_seconds()
+    #tweet_cohort_end    = tweet_cohort_end.total_seconds()
+    #tweet_cohort        = return_tweet_cohort_from_scratch(df_annotated_tweets, df_annotated_tweets, tweet_cohort_start, tweet_cohort_end)
     
-    count = 0; counter_len = len(index); start_time = datetime.now() # FG_Counter
-    for time_step in index:
-        #if index_list.index(time_step) % rep_num == 0:
-        #    print(str(index_list.index(time_step)/ (rep_num * 10)))
-        #    print(datetime.now().strftime("%H:%M:%S"))
-            
-        senti_scores = list(np.zeros(num_topics))
-        tweet_cohort["post_date"] = tweet_cohort["post_date"].astype(float)
-        tweet_cohort["~sent_overall"] = tweet_cohort["~sent_overall"].astype(float)
-        pre_calc_time_overall = np.exp((- 3 / relavance_lifetime) * (tweet_cohort.loc[:, "post_date"] - tweet_cohort_start)) * tweet_cohort.loc[:, "~sent_overall"]
+    #index_list = list(index)
+    #print(type(index_list))
+    #rep_num = int(len(index_list) / 10)
+    
+    tweet_cohort_t1 = pd.DataFrame(index=index, columns=["tweet_cohort_start_post", "tweet_cohort_end_post", "tweet_cohort_t1", "tweet_cohort"])
+    tweet_cohort_t1["tweet_cohort_start_post"]  = tweet_cohort_t1.index
+    tweet_cohort_t1["tweet_cohort_end_post"]    = tweet_cohort_t1["tweet_cohort_start_post"].apply(lambda datetime: ((datetime - epoch_time)).total_seconds())
+    tweet_cohort_t1["tweet_cohort_start_post"]  = tweet_cohort_t1["tweet_cohort_start_post"].apply(lambda datetime: ((datetime - epoch_time) - timedelta(seconds=relavance_lifetime)).total_seconds())
+    
+    def process_row_2(row, df_annotated_tweets=df_annotated_tweets, topic_num=num_topics, relavance_lifetime=relavance_lifetime):
+        tweet_cohort_start_post = row["tweet_cohort_start_post"]
+        tweet_cohort_end_post = row["tweet_cohort_end_post"]
+        tweet_cohort = return_tweet_cohort_from_scratch(df_annotated_tweets, tweet_cohort_start_post, tweet_cohort_end_post)
+
+        pre_calc_time_overall = np.exp((-3 / relavance_lifetime) * (tweet_cohort["post_date"] - tweet_cohort_start_post)) * tweet_cohort["~sent_overall"]
+
+        senti_scores = []
         for topic_num in range(num_topics):
-            score_numer = sum(pre_calc_time_overall * tweet_cohort.loc[:, "~sent_topic_W" + str(topic_num)])
-            score_denom = sum(np.exp((- 3 / relavance_lifetime) * (tweet_cohort.loc[:, "post_date"] - tweet_cohort_start)) * tweet_cohort.loc[:, "~sent_topic_W" + str(topic_num)])
-            if score_numer > 0 and score_denom > 0:
-                senti_scores[topic_num] = score_numer / score_denom
-        #update table
-        df_sentiment_scores.loc[time_step, :] = senti_scores
-        #update tweet cohort
-        tweet_cohort_start += seconds_per_time_steps
-        tweet_cohort_end   += seconds_per_time_steps
-        tweet_cohort, df_annotated_tweets = update_tweet_cohort(tweet_cohort, df_annotated_tweets, tweet_cohort_start, tweet_cohort_end)
-        #timer
-        if repeat_timer>0:
-            count = fg_timer(count, counter_len, repeat_timer, task_name="sentimental_tweets", start_time=start_time)
+            score_numer = np.sum(pre_calc_time_overall * tweet_cohort[f"~sent_topic_W{topic_num}"])
+            score_denom = np.sum(np.exp((-3 / relavance_lifetime) * (tweet_cohort["post_date"] -  tweet_cohort_start_post)) * tweet_cohort[f"~sent_topic_W{topic_num}"])
+            if score_denom > 0:
+                senti_scores = senti_scores + [score_numer / score_denom]
+            elif score_denom == 0:
+                senti_scores = senti_scores + [0]
+            else:
+                senti_scores = senti_scores + [2]
+                
+        return senti_scores
+        
+    data = tweet_cohort_t1.apply(process_row_2, axis=1)
+    for indy in tweet_cohort_t1.index:
+        df_sentiment_scores.loc[indy, :] = data[indy]
+
             
     
     return df_sentiment_scores
@@ -1127,7 +1139,19 @@ def sent_to_words(sentences):
     for sentence in sentences:
         yield(gensim.utils.simple_preprocess(str(sentence), deacc=True))
 
-def update_tweet_cohort(tweet_cohort, df_annotated_tweets_temp, tweet_cohort_start, tweet_cohort_end):
+def return_tweet_cohort_from_scratch(df_annotated_tweets_temp, tweet_cohort_start, tweet_cohort_end):
+    maskA           = df_annotated_tweets_temp["post_date"] >= tweet_cohort_start
+    maskB           = df_annotated_tweets_temp["post_date"] <= tweet_cohort_end
+    mask            = maskA & maskB
+    tweet_cohort    = df_annotated_tweets_temp[mask]
+    return tweet_cohort
+
+#def return_single_topic_sentiment_vector_overtime(df_annotated_tweets_temp):
+#    seconds_per_time_steps
+#    relavance_lifetime
+
+
+def update_tweet_cohort(df_annotated_tweets_temp, tweet_cohort_start, tweet_cohort_end):
     epoch_time          = datetime(1970, 1, 1)
     #delete old tweets
     tweet_cohort                = tweet_cohort[tweet_cohort["post_date"] >= tweet_cohort_start]
