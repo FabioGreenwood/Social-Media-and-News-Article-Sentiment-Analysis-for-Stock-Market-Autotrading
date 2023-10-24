@@ -67,8 +67,10 @@ global_precalculated_assets_locations_dict = {
 global_outputs_folder = "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\outputs\\"
 global_designs_record_final_columns_list = ["experiment_timestamp", "training_r2", "training_mse", "training_mae", "testing_r2", "testing_mse", "testing_mae", "profitability", "predictor_names"]
 
+
 SECS_IN_A_DAY = 60*60*24
 SECS_IN_AN_HOUR = 60*60
+FIVE_MIN_TIME_STEPS_IN_A_DAY = SECS_IN_A_DAY / (5*60)
 
 
 #%% Default Input Parameters
@@ -84,8 +86,8 @@ default_fin_inputs_params_dict      = {
     "index_cols"        : "date",    
     "cols_list"         : ["open", "high", "low", "close", "volume"],
     "fin_indi"          : {#additional financial indicators to generate
-        "sma" : [5, 15, 20, int(0.5*SECS_IN_A_DAY), int(SECS_IN_A_DAY)],
-        "ema" : [5, 15, 20, int(0.5*SECS_IN_A_DAY), int(SECS_IN_A_DAY)],
+        "sma" : [5, 15, 20, int(0.5*FIVE_MIN_TIME_STEPS_IN_A_DAY), int(FIVE_MIN_TIME_STEPS_IN_A_DAY), 5 * FIVE_MIN_TIME_STEPS_IN_A_DAY],
+        "ema" : [5, 15, 20, int(0.5*FIVE_MIN_TIME_STEPS_IN_A_DAY), int(FIVE_MIN_TIME_STEPS_IN_A_DAY), 5 * FIVE_MIN_TIME_STEPS_IN_A_DAY],
         "macd" : [[12, 26, 9]],
         "BollingerBands" : [[20, 2]],
         "PivotPoints" : [0]
@@ -108,7 +110,8 @@ default_senti_inputs_params_dict    = {
     "sentiment_method"      : SentimentIntensityAnalyzer(),
     "tweet_file_location"   : r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\twitter data\Tweets about the Top Companies from 2015 to 2020\Tweet.csv\Tweet.csv",
     "regenerate_cleaned_tweets_for_subject_discovery" : False,
-    "inc_new_combined_stopwords_list" : False
+    "inc_new_combined_stopwords_list" : False,
+    "topic_weight_square_factor" : 1
 }
 default_outputs_params_dict         = {
     "output_symbol_indicators_tuple"    : ("aapl", "close"), # fg_action: do I use this?
@@ -753,7 +756,8 @@ design_space_dict = {
         "weighted_topics" : [False, True],
         "relative_halflife" : [0.5 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR], 
         "apply_IDF" : [False, True],
-        "inc_new_combined_stopwords_list" : [False, True]
+        "inc_new_combined_stopwords_list" : [False, True],
+        "topic_weight_square_factor" : [1, 2, 4]
         #,
         #"enforced_topics_dict"  : {
         #    0: None,
