@@ -466,8 +466,8 @@ def retrieve_or_generate_sentimental_data(index, temporal_params_dict, fin_input
         train_period_start  = temporal_params_dict["train_period_start"]
         train_period_end    = temporal_params_dict["train_period_end"]
     elif training_or_testing == "testing" or training_or_testing == "test":
-        train_period_start  = temporal_params_dict["train_period_start"]
-        train_period_end    = temporal_params_dict["train_period_end"]
+        train_period_start  = temporal_params_dict["test_period_start"]
+        train_period_end    = temporal_params_dict["test_period_end"]
     else:
         raise ValueError("the input " + str(training_or_testing) + " is wrong for the input training_or_testing")
        
@@ -541,8 +541,8 @@ def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dic
         df_annotated_tweets.set_index(df_annotated_tweets.columns[0], inplace=True)
         df_annotated_tweets.index.name = "datetime"
     else:
-        df_annotated_tweets.to_csv(annotated_tweets_location_file)
         df_annotated_tweets = generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+        df_annotated_tweets.to_csv(annotated_tweets_location_file)
         print(datetime.now().strftime("%H:%M:%S") + " - generating sentimental data")
     
     #generate sentimental data from topic model and annotate tweets
@@ -613,7 +613,7 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     sentiment_method    = senti_inputs_params_dict["sentiment_method"]
     enforced_topic_model_nested_list = senti_inputs_params_dict["enforced_topics_dict"]
     inc_new_combined_stopwords_list = senti_inputs_params_dict["inc_new_combined_stopwords_list"]
-    topic_weight_adjustment_factor = senti_inputs_params_dict["topic_weight_adjustment_factor"]
+    topic_weight_square_factor = senti_inputs_params_dict["topic_weight_square_factor"]
         
     if training_or_testing == "training" or training_or_testing == "train":
         train_period_start  = temporal_params_dict["train_period_start"]
@@ -666,8 +666,8 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     # Calculate topic weights for all tweets
     topic_weights = df_annotated_tweets['body'].apply(lambda text: return_topic_weight(text, topic_model_dict, num_topics))
     topic_weights = topic_weights.apply(lambda topic_tuples: [t[1] for t in topic_tuples] if len(topic_tuples) == num_topics else list(np.zeros(num_topics)))
-    if topic_weight_adjustment_factor != 1:
-        topic_weights = topic_weights.apply(lambda x: adjust_topic_weights(x, topic_weight_adjustment_factor))
+    if topic_weight_square_factor != 1:
+        topic_weights = topic_weights.apply(lambda x: adjust_topic_weights(x, topic_weight_square_factor))
 
     
     # Combine sentiment and topic weights
