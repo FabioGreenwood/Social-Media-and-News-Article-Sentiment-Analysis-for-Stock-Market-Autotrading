@@ -687,7 +687,7 @@ def experiment_manager(
         # only run value if testing measure missing
         if design_history_dict[ID]["testing_" + testing_measure] == None:
             print(return_keys_within_2_level_dict(design_space_dict))
-            print(design_history_dict[ID]["X"])
+            print(str(design_history_dict[ID]["X"]) + " running ID:" + str(ID))
             design_history_dict[ID], results_tables_dict = run_experiment_and_return_updated_design_history_dict(design_history_dict[ID], experiment_requester, model_testing_method, testing_measure="mae", confidences_before_betting_PC=default_input_dict["reporting_dict"]["confidence_thresholds"])
             # save
             df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
@@ -727,6 +727,7 @@ def experiment_manager(
         ID = find_largest_number(design_history_dict.keys()) + 1
         design_history_dict[ID] = dict()
         design_history_dict[ID]["X"] = convert_floats_to_int_if_whole(list(x_next))#[:len(design_history_dict[ID-1]["X"])]
+        print(str(design_history_dict[ID]["X"]) + " running ID:" + str(ID))
         design_history_dict[ID], results_tables_dict = run_experiment_and_return_updated_design_history_dict(design_history_dict[ID], experiment_requester, model_testing_method, testing_measure="mae", confidences_before_betting_PC=default_input_dict["reporting_dict"]["confidence_thresholds"])
         # save
         df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
@@ -827,7 +828,7 @@ checklist for restarting the experiment
 # definition of different scenarios is set by this dict, to access a different scenario, please change the scenario variable
 
 # scenario parameters: topic_qty, pred_steps
-scenario_ID = 0
+scenario_ID = 5
 removal_ratio = int(1e1)
 scenario_dict = {
      0 : {"topics" : None, "pred_steps" : 1},

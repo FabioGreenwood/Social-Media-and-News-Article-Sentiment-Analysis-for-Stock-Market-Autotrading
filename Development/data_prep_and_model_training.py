@@ -685,7 +685,7 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
 
 def adjust_topic_weights(lst, factor):
     a = [x ** factor for x in lst]
-    return [x / sum(a) for x in lst]
+    return [x / sum(lst) for x in lst]
 
 def return_topic_weight(text_body, topic_model_dict, num_topics):
     if num_topics > 1:
