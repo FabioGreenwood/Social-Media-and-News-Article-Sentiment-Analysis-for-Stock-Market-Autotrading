@@ -777,7 +777,7 @@ design_space_dict = {
 
 global_run_count = 0
 
-#init_doe = 30
+#init_doe = 20
 init_doe = [[5,	5,	 1, 25200, 1, 0, 1, 0, 0.02],
     [5,  5,	  1, 7200,  1, 1, 4, 1, 0.05],
     [13, 5,	  0, 25200, 1, 1, 1, 2, 0.05],
@@ -807,9 +807,27 @@ init_doe = [[5,	5,	 1, 25200, 1, 0, 1, 0, 0.02],
     [13, 0.7, 0, 7200,  0, 1, 2, 0, 0.1],
     [5,  0.7, 0, 7200,  0, 1, 2, 4, 0.2],
     [13, 5,	  1, 25200, 0, 1, 1, 0, 0.01],
-    [5,  0.7, 0, 7200,  0, 1, 2, 3, 0.1]]
-
-
+    [5,  0.7, 0, 7200,  0, 1, 2, 3, 0.1],
+    [5,  5,   1, 25200, 1, 0, 4, 3, 0.2],
+    [17, 1,   1, 1800,  0, 0, 2, 1, 0.2],
+    [9,  0.3, 0, 7200,  0, 1, 1, 0, 0.05],
+    [17, 0.7, 1, 7200,  1, 1, 1, 0, 0.05],
+    [17, 0.3, 0, 7200,  1, 0, 2, 2, 0.02],
+    [13, 0.3, 1, 7200,  0, 1, 1, 3, 0.01],
+    [17, 2,   1, 25200, 1, 1, 4, 1, 0.1],
+    [13, 1,   0, 7200,  0, 0, 1, 4, 0.1],
+    [13, 1,   1, 1800,  1, 1, 4, 2, 0.01],
+    [5,  3,   1, 7200,  1, 1, 1, 3, 0.2],
+    [9,  3,   1, 7200,  0, 1, 1, 1, 0.1],
+    [17, 0.3, 1, 7200,  0, 1, 4, 1, 0.02],
+    [5,  2,   1, 7200,  0, 0, 1, 2, 0.02],
+    [13, 5,   0, 7200,  1, 1, 1, 3, 0.05],
+    [9,  1,   1, 25200, 0, 0, 4, 2, 0.2],
+    [13, 0.3, 0, 7200,  0, 0, 1, 3, 0.2],
+    [17, 0.7, 1, 7200,  0, 1, 4, 4, 0.02],
+    [17, 5,   0, 1800,  1, 1, 4, 1, 0.2],
+    [17, 2,   0, 25200, 1, 0, 2, 0, 0.2],
+    [13, 0.7, 1, 7200,  1, 1, 2, 1, 0.02]]
 
 
 
@@ -828,68 +846,71 @@ checklist for restarting the experiment
 # definition of different scenarios is set by this dict, to access a different scenario, please change the scenario variable
 
 # scenario parameters: topic_qty, pred_steps
-scenario_ID = 5
+
+scenario_ID = 0
+
 removal_ratio = int(1e1)
 scenario_dict = {
-     0 : {"topics" : None, "pred_steps" : 1},
-     1 : {"topics" : None, "pred_steps" : 3},
-     2 : {"topics" : None, "pred_steps" : 5},
-     3 : {"topics" : None, "pred_steps" : 15},
-     4 : {"topics" : 1, "pred_steps" : 1},
-     5 : {"topics" : 1, "pred_steps" : 3},
-     6 : {"topics" : 1, "pred_steps" : 5},
-     7 : {"topics" : 1, "pred_steps" : 15},
-     8 : {"topics" : 0, "pred_steps" : 1},
-     9 : {"topics" : 0, "pred_steps" : 3},
-     10: {"topics" : 0, "pred_steps" : 5},
-     11: {"topics" : 0, "pred_steps" : 15}
-}
+        0 : {"topics" : None, "pred_steps" : 1},
+        1 : {"topics" : None, "pred_steps" : 3},
+        2 : {"topics" : None, "pred_steps" : 5},
+        3 : {"topics" : None, "pred_steps" : 15},
+        4 : {"topics" : 1, "pred_steps" : 1},
+        5 : {"topics" : 1, "pred_steps" : 3},
+        6 : {"topics" : 1, "pred_steps" : 5},
+        7 : {"topics" : 1, "pred_steps" : 15},
+        8 : {"topics" : 0, "pred_steps" : 1},
+        9 : {"topics" : 0, "pred_steps" : 3},
+        10: {"topics" : 0, "pred_steps" : 5},
+        11: {"topics" : 0, "pred_steps" : 15}
+    }
+
+for scenario_ID in scenario_dict.keys():
+
+    #editing topic quantity values for scenario, 2 lines
+    topic_qty = scenario_dict[scenario_ID]["topics"]
+    if isinstance(init_doe, list) and topic_qty != None:
+            for i in range(len(init_doe)): init_doe[i][0] = 1
+            design_space_dict["senti_inputs_params_dict"]["topic_qty"] = [1]
+            default_input_dict["senti_inputs_params_dict"]["topic_qty"] = 1
+
+    # setting various optimisation variabls
+    pred_steps = scenario_dict[scenario_ID]["pred_steps"]
+    testing_measure = "mae"
+    default_input_dict["outputs_params_dict"]["pred_steps_ahead"] = pred_steps
+    default_input_dict["senti_inputs_params_dict"]["topic_training_tweet_ratio_removed"] = removal_ratio
+
+    # setting the optimisation objective functions
+    confidence_scoring_measure_tuple_1 = ("additional_results_dict","results_x_mins_weighted",pred_steps,0.05)
+    confidence_scoring_measure_tuple_2 = ("additional_results_dict","results_x_mins_PC",pred_steps,0.05)
+    optim_scores_vec = ["testing_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2]
+    inverse_for_minimise_vec=[True, False, False]    
+
+    #what around to ensure that single topic sentimental data in more used in the model
+    if default_senti_inputs_params_dict["topic_qty"] == 1:
+            default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 1
+    elif default_senti_inputs_params_dict["topic_qty"] == 0:
+            default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
+
+    scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
 
 
-#editing topic quantity values for scenario, 2 lines
-topic_qty = scenario_dict[scenario_ID]["topics"]
-if isinstance(init_doe, list) and topic_qty != None:
-    for i in range(len(init_doe)): init_doe[i][0] = 1
-    design_space_dict["senti_inputs_params_dict"]["topic_qty"] = [1]
-    default_input_dict["senti_inputs_params_dict"]["topic_qty"] = 1
-
-# setting various optimisation variabls
-pred_steps = scenario_dict[scenario_ID]["pred_steps"]
-testing_measure = "mae"
-default_input_dict["outputs_params_dict"]["pred_steps_ahead"] = pred_steps
-default_input_dict["senti_inputs_params_dict"]["topic_training_tweet_ratio_removed"] = removal_ratio
-
-# setting the optimisation objective functions
-confidence_scoring_measure_tuple_1 = ("additional_results_dict","results_x_mins_weighted",pred_steps,0.05)
-confidence_scoring_measure_tuple_2 = ("additional_results_dict","results_x_mins_PC",pred_steps,0.05)
-optim_scores_vec = ["testing_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2]
-inverse_for_minimise_vec=[True, False, False]    
-
-#what around to ensure that single topic sentimental data in more used in the model
-if default_senti_inputs_params_dict["topic_qty"] == 1:
-    default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 1
-elif default_senti_inputs_params_dict["topic_qty"] == 0:
-    default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
-
-scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-
-
-if __name__ == '__main__':
-    #scenario_name_str = "test 19"
-    print("running scenario " + str(scenario_ID) + ": " + scenario_name_str + " - " + datetime.now().strftime("%H:%M:%S"))
-    experiment_manager(
-        scenario_name_str,
-        design_space_dict,
-        initial_doe_size_or_DoE=init_doe,
-        max_iter=20,
-        model_start_time = model_start_time,
-        force_restart_run = False,
-        inverse_for_minimise_vec = inverse_for_minimise_vec,
-        optim_scores_vec = optim_scores_vec,
-        testing_measure = testing_measure,
-        global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\non_seededv2_global_results.csv"
-        )
-    print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
+    if __name__ == '__main__':
+        #scenario_name_str = "test 19"
+        print("running scenario " + str(scenario_ID) + ": " + scenario_name_str + " - " + datetime.now().strftime("%H:%M:%S"))
+        experiment_manager(
+            scenario_name_str,
+            design_space_dict,
+            initial_doe_size_or_DoE=init_doe,
+            max_iter=40,
+            model_start_time = model_start_time,
+            force_restart_run = False,
+            inverse_for_minimise_vec = inverse_for_minimise_vec,
+            optim_scores_vec = optim_scores_vec,
+            testing_measure = testing_measure,
+            global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\non_seededv2_global_results.csv"
+            )
+        print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
 
 

@@ -237,11 +237,19 @@ def return_topic_mode_seed_hash(enforced_topic_model_nested_list):
     
 
 def return_topic_model_name(topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc):
+    if topic_model_qty > 1:
+        file_string = "tm_qty" + str(topic_model_qty) + "_tm_alpha" + str(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed) + return_topic_mode_seed_hash(enforced_topic_model_nested_list) + "_newStops" + str({True: 1, False: 0}[new_combined_stopwords_inc])
+    elif topic_model_qty == 1:
+        file_string = "single_topic"
+    elif topic_model_qty == 0:
+        file_string = "no_topics"
     file_string = "tm_qty" + str(topic_model_qty) + "_tm_alpha" + str(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed) + return_topic_mode_seed_hash(enforced_topic_model_nested_list) + "_newStops" + str({True: 1, False: 0}[new_combined_stopwords_inc])
     return file_string
 
 def return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor):
     global global_strptime_str, global_strptime_str_filename
+    if topic_model_qty == 1 or topic_model_qty == 0:
+        weighted_topics, topic_weight_square_factor, topic_model_alpha = "NA", "NA", "NA"
     name = company_symbol + "_ps" + train_period_start.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_pe" + train_period_end.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_" + str(weighted_topics) + "_twsf" + str(topic_weight_square_factor) + "_"
     name = name + return_topic_model_name(topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc)
     return name
@@ -685,7 +693,7 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
 
 def adjust_topic_weights(lst, factor):
     a = [x ** factor for x in lst]
-    return [x / sum(lst) for x in lst]
+    return [x / sum(a) for x in a]
 
 def return_topic_weight(text_body, topic_model_dict, num_topics):
     if num_topics > 1:
