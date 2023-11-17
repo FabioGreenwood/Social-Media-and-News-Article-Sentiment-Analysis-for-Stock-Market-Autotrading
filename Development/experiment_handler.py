@@ -256,10 +256,10 @@ def add_missing_designs_to_design_history_dict(design_history_dict, initial_doe_
                 design_found = True
                 
         if design_found == False:
-            design_history_dict[id] = dict()
-            design_history_dict[id]["X"] = new_design
+            design_history_dict[largest_existing_ID + 1] = dict()
+            design_history_dict[largest_existing_ID + 1]["X"] = new_design
             for k in global_designs_record_final_columns_list:
-                design_history_dict[id][k] = None
+                design_history_dict[largest_existing_ID + 1][k] = None
     return design_history_dict
 
 def return_scenario_name_str(topic_qty, pred_steps, ratio_removed):
@@ -866,7 +866,7 @@ scenario_dict = {
     }
 
 for scenario_ID in scenario_dict.keys():
-
+    
     #editing topic quantity values for scenario, 2 lines
     topic_qty = scenario_dict[scenario_ID]["topics"]
     if isinstance(init_doe, list) and topic_qty != None:
@@ -884,7 +884,12 @@ for scenario_ID in scenario_dict.keys():
     confidence_scoring_measure_tuple_1 = ("additional_results_dict","results_x_mins_weighted",pred_steps,0.05)
     confidence_scoring_measure_tuple_2 = ("additional_results_dict","results_x_mins_PC",pred_steps,0.05)
     optim_scores_vec = ["testing_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2]
+    
     inverse_for_minimise_vec=[True, False, False]    
+    
+    inverse_for_minimise_vec=[False]    
+    optim_scores_vec = [("additional_results_dict","results_x_mins_score",pred_steps,0.05)]
+    
 
     #what around to ensure that single topic sentimental data in more used in the model
     if default_senti_inputs_params_dict["topic_qty"] == 1:
@@ -902,7 +907,7 @@ for scenario_ID in scenario_dict.keys():
             scenario_name_str,
             design_space_dict,
             initial_doe_size_or_DoE=init_doe,
-            max_iter=40,
+            max_iter=50,
             model_start_time = model_start_time,
             force_restart_run = False,
             inverse_for_minimise_vec = inverse_for_minimise_vec,
