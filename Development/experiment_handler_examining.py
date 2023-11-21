@@ -99,7 +99,7 @@ default_fin_inputs_params_dict      = {
 }
 default_senti_inputs_params_dict    = {
     "topic_qty"             : 7,
-    "topic_training_tweet_ratio_removed" : int(1e5),
+    "topic_training_tweet_ratio_removed" : int(1e8),
     "relative_lifetime"     : 60*60*24*7, # units are seconds
     "relative_halflife"     : 60*60*0.5, # units are seconds
     "topic_model_alpha"     : 1,
@@ -341,6 +341,7 @@ def template_experiment_requester(GPyOpt_input, design_space_dict, default_input
     prepped_senti_inputs_params_dict  = prepped_input_dict["senti_inputs_params_dict"]
     prepped_outputs_params_dict       = prepped_input_dict["outputs_params_dict"]
     prepped_model_hyper_params        = prepped_input_dict["model_hyper_params"]
+    reporting_dict                    = prepped_input_dict["reporting_dict"]
     
     if type(prepped_input_dict["model_hyper_params"]["estimator__hidden_layer_sizes"]) == str or type(prepped_input_dict["model_hyper_params"]["estimator__hidden_layer_sizes"]) == np.str_:
         original_value = prepped_input_dict["model_hyper_params"]["estimator__hidden_layer_sizes"]
@@ -355,7 +356,7 @@ def template_experiment_requester(GPyOpt_input, design_space_dict, default_input
     print(GPyOpt_input)
     global_run_count += 1
     
-    predictor, training_scores = experiment_method(prepped_temporal_params_dict, prepped_fin_inputs_params_dict, prepped_senti_inputs_params_dict, prepped_outputs_params_dict, prepped_model_hyper_params)
+    predictor, training_scores = experiment_method(prepped_temporal_params_dict, prepped_fin_inputs_params_dict, prepped_senti_inputs_params_dict, prepped_outputs_params_dict, prepped_model_hyper_params, reporting_dict)
     return predictor, training_scores
     
 def return_experiment_requester(design_space_dict, default_input_dict=default_input_dict, experiment_method=FG_model_training.retrieve_or_generate_model_and_training_scores):
@@ -431,6 +432,7 @@ def run_experiment_and_return_updated_design_history_dict(design_history_dict_si
         results_tables_dict = FG_additional_reporting.run_additional_reporting(preds=Y_preds,
                 X_test = X_testing, 
                 pred_steps_list = default_input_dict["outputs_params_dict"]["pred_steps_ahead"],
+                pred_output_and_tickers_combos_list = [("£", "<CLOSE>")], 
                 DoE_orders_dict = None, 
                 model_type_name = "xxxxMODEL NAMExxxx", 
                 outputs_path = global_outputs_folder, 
@@ -848,7 +850,7 @@ checklist for restarting the experiment
 
 scenario_ID = 0
 
-removal_ratio = int(1e1)
+removal_ratio = int(1e8)
 scenario_dict = {
         0 : {"topics" : None, "pred_steps" : 1},
         1 : {"topics" : None, "pred_steps" : 3},
@@ -883,20 +885,14 @@ for scenario_ID in scenario_dict.keys():
     confidence_scoring_measure_tuple_1 = ("additional_results_dict","results_x_mins_weighted",pred_steps,0.05)
     confidence_scoring_measure_tuple_2 = ("additional_results_dict","results_x_mins_PC",pred_steps,0.05)
     confidence_scoring_measure_tuple_3 = ("additional_results_dict","results_x_mins_score",pred_steps,0.05)
-    
     optim_scores_vec = ["testing_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2, confidence_scoring_measure_tuple_3, confidence_scoring_measure_tuple_1]
-    inverse_for_minimise_vec=[True, False, False, False, False]    
+    
+    inverse_for_minimise_vec=[True, False, False]    
+    
+    inverse_for_minimise_vec=[False]    
     
     
-    # second gen objective functions
-    confidence_scoring_measure_tuple_4 = ("additional_results_dict","results_x_mins_weighted",pred_steps,0.02)
-    confidence_scoring_measure_tuple_5 = ("additional_results_dict","results_x_mins_score",pred_steps,0.02)
-    
-    optim_scores_vec = [confidence_scoring_measure_tuple_4, confidence_scoring_measure_tuple_5]
-    inverse_for_minimise_vec=[False, False]
-    
-    
-    
+
     #what around to ensure that single topic sentimental data in more used in the model
     if default_senti_inputs_params_dict["topic_qty"] == 1:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 1
@@ -912,14 +908,14 @@ for scenario_ID in scenario_dict.keys():
         experiment_manager(
             scenario_name_str,
             design_space_dict,
-            initial_doe_size_or_DoE = init_doe,
-            max_iter=50,
+            initial_doe_size_or_DoE=init_doe,
+            max_iter=30,
             model_start_time = model_start_time,
             force_restart_run = False,
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\non_seededv2_global_results.csv"
+            global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\examine.csv"
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 

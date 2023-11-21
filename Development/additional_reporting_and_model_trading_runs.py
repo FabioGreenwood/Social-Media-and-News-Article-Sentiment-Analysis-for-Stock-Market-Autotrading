@@ -24,14 +24,14 @@ import matplotlib.pyplot as plt
 
 #%% methods
 
-def return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True):
+def return_realign_plus_minus_table(preds, Y_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True):
     input_col_str = "{}_{}"
     output_col_str = "{}_{}_{}"
     reaglined_plus_minus_dict = dict()
     for ticker, output in pred_output_and_tickers_combos_list:
         #initial output
         input_col_str_curr = input_col_str.format(ticker, output)
-        df_temp = pd.DataFrame(X_test[input_col_str_curr])
+        df_temp = pd.DataFrame(Y_test[input_col_str_curr])
         #pop the preditions
         output_col_str_2 = output_col_str.format(ticker, output, {})
     
@@ -46,8 +46,10 @@ def return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_
     
     return reaglined_plus_minus_dict
 
-def return_results_X_min_plus_minus_accuracy(y_preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting_PC=[0, 0.01], model_type_name="", save=True, model_start_time = "", output_name="Test2", outputs_folder_path = ".//outputs//", figure_name = "test_output2"):
-    output_col = "£_close"
+def return_results_X_min_plus_minus_accuracy(y_preds, Y_test, pred_steps_list, confidences_before_betting_PC=[0, 0.01]):
+        
+    if len(Y_test.columns) > 1:
+        raise ValueError("Y_test should only be one columns wide")
     
     df_temp = pd.DataFrame()
     pred_str = dict()
@@ -57,7 +59,7 @@ def return_results_X_min_plus_minus_accuracy(y_preds, X_test, pred_steps_list, p
     if type(pred_steps_list) == int:
         pred_steps_list = [pred_steps_list]
     
-    time_series_index = X_test.index
+    time_series_index = Y_test.index
     
     results_bets_with_confidence_proportion             = dict()
     results_x_min_plus_minus_PC                         = dict()
@@ -73,7 +75,7 @@ def return_results_X_min_plus_minus_accuracy(y_preds, X_test, pred_steps_list, p
     count_correct_bets_with_confidence_score_weight = dict()
     count_correct_bets_with_confidence_score_weight_total = dict()
     
-    time_series_index = X_test.index
+    time_series_index = Y_test.index
     
     for steps_back in pred_steps_list:
         #initialise variables
@@ -105,10 +107,13 @@ def return_results_X_min_plus_minus_accuracy(y_preds, X_test, pred_steps_list, p
         
         # values
         max_pred_value = max(pred_steps_list)
-        x_values = list(X_test[output_col].values)
-        y_values = list(y_preds.values.reshape((1,-1))[0])
+        x_values = list(Y_test.iloc[:,0].values)
+        if isinstance(y_preds, np.ndarray):
+            y_values = list(y_preds.reshape((1,-1))[0])
+        else:
+            y_values = list(y_preds.values.reshape((1,-1))[0])
         
-        for time_step in range(max(pred_steps_list), len(X_test.index)):
+        for time_step in range(max(pred_steps_list), len(Y_test.index)):
             
             #basic values
             
@@ -238,18 +243,17 @@ def return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_li
 
 
 def run_additional_reporting(preds=None,
-                            X_test = None, 
+                            Y_test = None, 
                             pred_steps_list = None, 
-                            pred_output_and_tickers_combos_list = None, 
                             DoE_orders_dict = None, 
                             model_type_name = None, 
                             outputs_path = None, 
                             model_start_time = None,
                             confidences_before_betting_PC=None
                             ):
-    pred_output_and_tickers_combos_list = [("£", "close")]
-    #df_realigned_dict                   = return_realign_plus_minus_table(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
-    results_tables_dict                 = return_results_X_min_plus_minus_accuracy(preds, X_test, pred_steps_list, pred_output_and_tickers_combos_list, confidences_before_betting_PC=confidences_before_betting_PC, model_type_name=model_type_name, model_start_time = model_start_time, output_name="Test2", outputs_folder_path = outputs_path, figure_name = "test_output2")
+    
+    #df_realigned_dict                   = return_realign_plus_minus_table(preds, Y_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
+    results_tables_dict                 = return_results_X_min_plus_minus_accuracy(preds, Y_test, pred_steps_list, confidences_before_betting_PC=confidences_before_betting_PC)
     #plt, df_realigned_dict              = return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_list, results_tables_dict, DoE_name = DoE_orders_dict["name"], model_type_name=model_type_name, model_start_time = model_start_time, outputs_folder_path = outputs_path, timestamp = False)
     
     return results_tables_dict#, plt, df_realigned_dict
