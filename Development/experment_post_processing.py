@@ -153,6 +153,3 @@ for table_name, target_output_name, replace_BOOL, previous_BOOL, id_BOOL in outp
     #save_table(df, generate_image_name(target_output_name), folder, colour_bool)
     
     final_output_tables_list[target_output_name] = df
-        
-        
-print("hello")

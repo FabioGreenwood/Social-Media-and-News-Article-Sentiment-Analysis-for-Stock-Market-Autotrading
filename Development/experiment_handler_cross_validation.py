@@ -76,11 +76,12 @@ FIVE_MIN_TIME_STEPS_IN_A_DAY = SECS_IN_A_DAY / (5*60)
 #%% Default Input Parameters
 
 default_temporal_params_dict    = {
-    "train_period_start"    : datetime.strptime('04/06/18 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/09/20 00:00:00', global_strptime_str),
+    "train_period_start"    : datetime.strptime('04/09/18 00:00:00', global_strptime_str),
+    "train_period_end"      : datetime.strptime('07/01/20 00:00:00', global_strptime_str),
+    
     "time_step_seconds"     : 5*60, #5 mins,
-    "test_period_start"     : datetime.strptime('01/09/20 00:00:00', global_strptime_str),
-    "test_period_end"       : datetime.strptime('01/01/21 00:00:00', global_strptime_str),
+    "test_period_start"     : datetime.strptime('04/06/18 00:00:00', global_strptime_str),
+    "test_period_end"       : datetime.strptime('04/09/18 00:00:00', global_strptime_str)
 }
 default_fin_inputs_params_dict      = {
     "index_cols"        : "date",    
@@ -778,56 +779,14 @@ design_space_dict = {
 global_run_count = 0
 
 #init_doe = 20
-init_doe = [[5,	5,	 1, 25200, 1, 0, 1, 0, 0.02],
-    [5,  5,	  1, 7200,  1, 1, 4, 1, 0.05],
-    [13, 5,	  0, 25200, 1, 1, 1, 2, 0.05],
-    [5,  1,	  0, 25200, 1, 0, 1, 4, 0.2],
-    [5,  0.3, 1, 25200, 0, 1, 4, 0, 0.2],
-    [17, 5,	  1, 1800,  0, 0, 1, 0, 0.1],
-    [13, 5,	  1, 25200, 1, 1, 1, 2, 0.02],
-    [13, 2,	  0, 25200, 0, 0, 1, 2, 0.05],
-    [5,  1,	  1, 1800,  1, 1, 2, 1, 0.1],
-    [5,  0.3, 0, 25200, 1, 0, 4, 4, 0.2],
-    [17, 1,	  0, 1800,  1, 1, 1, 4, 0.2],
-    [13, 5,	  1, 25200, 0, 0, 2, 0, 0.2],
-    [5,  3,	  1, 1800,  0, 0, 1, 1, 0.01],
-    [5,  2,	  1, 1800,  1, 0, 4, 0, 0.05],
-    [17, 3,	  1, 7200,  0, 0, 4, 0, 0.05],
-    [9,  0.7, 0, 1800,  0, 1, 4, 2, 0.02],
-    [17, 0.3, 1, 7200,  0, 1, 1, 3, 0.01],
-    [17, 2,	  1, 1800,  0, 0, 2, 3, 0.05],
-    [9,  3,	  1, 7200,  1, 0, 4, 3, 0.01],
-    [17, 0.3, 1, 1800,  0, 0, 2, 2, 0.05],
-    [9,  0.3, 0, 1800,  0, 0, 2, 4, 0.05],
-    [17,  3,  1, 1800,  0, 1, 1, 4, 0.02],
-    [5,  5,	  1, 25200, 1, 1, 4, 1, 0.02],
-    [9,  3,	  0, 25200, 1, 0, 2, 0, 0.05],
-    [9,  0.3, 0, 25200, 0, 0, 1, 0, 0.01],
-    [9,  3,	  1, 7200,  0, 0, 2, 2, 0.05],
-    [13, 0.7, 0, 7200,  0, 1, 2, 0, 0.1],
-    [5,  0.7, 0, 7200,  0, 1, 2, 4, 0.2],
-    [13, 5,	  1, 25200, 0, 1, 1, 0, 0.01],
-    [5,  0.7, 0, 7200,  0, 1, 2, 3, 0.1],
-    [5,  5,   1, 25200, 1, 0, 4, 3, 0.2],
-    [17, 1,   1, 1800,  0, 0, 2, 1, 0.2],
-    [9,  0.3, 0, 7200,  0, 1, 1, 0, 0.05],
-    [17, 0.7, 1, 7200,  1, 1, 1, 0, 0.05],
-    [17, 0.3, 0, 7200,  1, 0, 2, 2, 0.02],
-    [13, 0.3, 1, 7200,  0, 1, 1, 3, 0.01],
-    [17, 2,   1, 25200, 1, 1, 4, 1, 0.1],
-    [13, 1,   0, 7200,  0, 0, 1, 4, 0.1],
-    [13, 1,   1, 1800,  1, 1, 4, 2, 0.01],
-    [5,  3,   1, 7200,  1, 1, 1, 3, 0.2],
-    [9,  3,   1, 7200,  0, 1, 1, 1, 0.1],
-    [17, 0.3, 1, 7200,  0, 1, 4, 1, 0.02],
-    [5,  2,   1, 7200,  0, 0, 1, 2, 0.02],
-    [13, 5,   0, 7200,  1, 1, 1, 3, 0.05],
-    [9,  1,   1, 25200, 0, 0, 4, 2, 0.2],
-    [13, 0.3, 0, 7200,  0, 0, 1, 3, 0.2],
-    [17, 0.7, 1, 7200,  0, 1, 4, 4, 0.02],
-    [17, 5,   0, 1800,  1, 1, 4, 1, 0.2],
-    [17, 2,   0, 25200, 1, 0, 2, 0, 0.2],
-    [13, 0.7, 1, 7200,  1, 1, 2, 1, 0.02]]
+init_doe = [
+    [5, 0.7, 0, 7200, 1, 1, 2, 2, 0.02],
+    [17, 2, 0, 1800, 1, 0, 1, 3, 0.05],
+    [5, 1, 0, 25200, 1, 0, 1, 3, 0.05],
+    [9, 3, 1, 7200, 1, 0, 4, 3, 0.01]
+    ]
+
+
 
 
 
@@ -865,7 +824,7 @@ scenario_dict = {
         11: {"topics" : 0, "pred_steps" : 15}
     }
 
-for scenario_ID in scenario_dict.keys():
+for scenario_ID in [2]:
     
     #editing topic quantity values for scenario, 2 lines
     topic_qty = scenario_dict[scenario_ID]["topics"]
@@ -883,14 +842,11 @@ for scenario_ID in scenario_dict.keys():
     # setting the optimisation objective functions
     confidence_scoring_measure_tuple_1 = ("additional_results_dict","results_x_mins_weighted",pred_steps,0.05)
     confidence_scoring_measure_tuple_2 = ("additional_results_dict","results_x_mins_PC",pred_steps,0.05)
-    optim_scores_vec = ["testing_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2]
+    confidence_scoring_measure_tuple_3 = ("additional_results_dict","results_x_mins_score",pred_steps,0.05)
+    optim_scores_vec = ["testing_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2, confidence_scoring_measure_tuple_3, confidence_scoring_measure_tuple_1]
     
-    inverse_for_minimise_vec=[True, False, False]    
+    inverse_for_minimise_vec=[True, False, False, False, False]    
     
-    inverse_for_minimise_vec=[False]    
-    optim_scores_vec = [("additional_results_dict","results_x_mins_score",pred_steps,0.05)]
-    
-
     #what around to ensure that single topic sentimental data in more used in the model
     if default_senti_inputs_params_dict["topic_qty"] == 1:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 1
@@ -898,6 +854,7 @@ for scenario_ID in scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
+    scenario_name_str = "cross_validation"
 
 
     if __name__ == '__main__':
@@ -906,14 +863,15 @@ for scenario_ID in scenario_dict.keys():
         experiment_manager(
             scenario_name_str,
             design_space_dict,
-            initial_doe_size_or_DoE=init_doe,
-            max_iter=50,
+            initial_doe_size_or_DoE = init_doe,
+            max_iter=0,
             model_start_time = model_start_time,
             force_restart_run = False,
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\non_seededv2_global_results.csv"
+            global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\cross_validation.csv"
+            #global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\non_seededv2_global_results.csv"
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 

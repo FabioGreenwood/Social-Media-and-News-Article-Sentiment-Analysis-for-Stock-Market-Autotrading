@@ -289,7 +289,7 @@ def fg_timer(curr_iter_num, total_iter_num, callback_counts, task_name="", start
 
 
 
-#%%SubModule – Stock Market Data Prep 
+#%% SubModule – Stock Market Data Prep 
 
 def import_financial_data(
         target_file_path=None, 
@@ -1194,7 +1194,8 @@ class BlockingTimeSeriesSplit():
         for i in range(self.n_splits):
             start = i * k_fold_size
             stop = start + k_fold_size
-            mid = int(0.5 * (stop - start)) + start
+            #mid = int(0.5 * (stop - start)) + start
+            mid = int(1.0 * (stop - start)) + start
             yield indices[start: mid], indices[mid + margin: stop]
 
 def create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list, pred_steps_ahead):
@@ -1359,7 +1360,6 @@ class DRSLinReg():
                 X_sel = X.loc[X.index[train_index].values].copy()
                 X_sel.loc[:, dropout_cols] = 0
                 y_sel= y.loc[y.index[train_index].values].copy()
-                #add max depth if it is a decision tree
                 estimator.random_state = global_random_state
                 global_random_state += 1
                 estimator.dropout_cols_ = dropout_cols

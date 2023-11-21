@@ -77,10 +77,10 @@ FIVE_MIN_TIME_STEPS_IN_A_DAY = SECS_IN_A_DAY / (5*60)
 
 default_temporal_params_dict    = {
     "train_period_start"    : datetime.strptime('04/06/18 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/09/20 00:00:00', global_strptime_str),
+    "train_period_end"      : datetime.strptime('01/09/19 00:00:00', global_strptime_str),
     "time_step_seconds"     : 5*60, #5 mins,
-    "test_period_start"     : datetime.strptime('01/09/20 00:00:00', global_strptime_str),
-    "test_period_end"       : datetime.strptime('01/01/21 00:00:00', global_strptime_str),
+    "test_period_start"     : datetime.strptime('01/09/19 00:00:00', global_strptime_str),
+    "test_period_end"       : datetime.strptime('07/01/20 00:00:00', global_strptime_str),
 }
 default_fin_inputs_params_dict      = {
     "index_cols"        : "date",    
@@ -883,14 +883,21 @@ for scenario_ID in scenario_dict.keys():
     # setting the optimisation objective functions
     confidence_scoring_measure_tuple_1 = ("additional_results_dict","results_x_mins_weighted",pred_steps,0.05)
     confidence_scoring_measure_tuple_2 = ("additional_results_dict","results_x_mins_PC",pred_steps,0.05)
-    optim_scores_vec = ["testing_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2]
+    confidence_scoring_measure_tuple_3 = ("additional_results_dict","results_x_mins_score",pred_steps,0.05)
     
-    inverse_for_minimise_vec=[True, False, False]    
+    optim_scores_vec = ["testing_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2, confidence_scoring_measure_tuple_3, confidence_scoring_measure_tuple_1]
+    inverse_for_minimise_vec=[True, False, False, False, False]    
     
-    inverse_for_minimise_vec=[False]    
-    optim_scores_vec = [("additional_results_dict","results_x_mins_score",pred_steps,0.05)]
     
-
+    # second gen objective functions
+    confidence_scoring_measure_tuple_4 = ("additional_results_dict","results_x_mins_weighted",pred_steps,0.02)
+    confidence_scoring_measure_tuple_5 = ("additional_results_dict","results_x_mins_score",pred_steps,0.02)
+    
+    optim_scores_vec = [confidence_scoring_measure_tuple_4, confidence_scoring_measure_tuple_5]
+    inverse_for_minimise_vec=[False, False]
+    
+    
+    
     #what around to ensure that single topic sentimental data in more used in the model
     if default_senti_inputs_params_dict["topic_qty"] == 1:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 1
@@ -906,7 +913,7 @@ for scenario_ID in scenario_dict.keys():
         experiment_manager(
             scenario_name_str,
             design_space_dict,
-            initial_doe_size_or_DoE=init_doe,
+            initial_doe_size_or_DoE = init_doe,
             max_iter=50,
             model_start_time = model_start_time,
             force_restart_run = False,
