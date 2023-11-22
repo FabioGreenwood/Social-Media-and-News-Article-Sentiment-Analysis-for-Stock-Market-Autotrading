@@ -90,8 +90,7 @@ default_fin_inputs_params_dict      = {
         "ema" : [5, 15, 20, int(0.5*FIVE_MIN_TIME_STEPS_IN_A_DAY), int(FIVE_MIN_TIME_STEPS_IN_A_DAY), 5 * FIVE_MIN_TIME_STEPS_IN_A_DAY],
         "macd" : [[12, 26, 9]],
         "BollingerBands" : [[20, 2]],
-        "PivotPoints" : [0]
-        }, 
+        "PivotPoints" : [0]}, 
     "fin_match"         :{
         "Doji" : True},
     "index_col_str"     : "datetime",
@@ -99,7 +98,7 @@ default_fin_inputs_params_dict      = {
 }
 default_senti_inputs_params_dict    = {
     "topic_qty"             : 7,
-    "topic_training_tweet_ratio_removed" : int(1e8),
+    "topic_training_tweet_ratio_removed" : int(1e5),
     "relative_lifetime"     : 60*60*24*7, # units are seconds
     "relative_halflife"     : 60*60*0.5, # units are seconds
     "topic_model_alpha"     : 1,
@@ -114,8 +113,8 @@ default_senti_inputs_params_dict    = {
     "topic_weight_square_factor" : 1
 }
 default_outputs_params_dict         = {
-    "output_symbol_indicators_tuple"    : ("aapl", "close"), # fg_action: do I use this?
-    "pred_steps_ahead"                  : 1,
+    "output_symbol_indicators_tuple"    : ("aapl", "close"), 
+    "pred_steps_ahead"                  : 1
 }
 default_cohort_retention_rate_dict = {
             "£_close" : 1, #output value
@@ -697,7 +696,7 @@ def experiment_manager(
     for ID in range(find_largest_number(design_history_dict.keys()) + 1):
         design_history_dict[ID]["X"] = convert_floats_to_int_if_whole(design_history_dict[ID]["X"])#[:len(design_history_dict[ID-1]["X"])]
         # only run value if testing measure missing
-        if design_history_dict[ID]["testing_" + testing_measure] == None or 1 == 1: #FG_Action: remove workaround
+        if design_history_dict[ID]["testing_" + testing_measure] == None:
             print(return_keys_within_2_level_dict(design_space_dict))
             print(str(design_history_dict[ID]["X"]) + " running ID:" + str(ID))
             design_history_dict[ID] = run_experiment_and_return_updated_design_history_dict(design_history_dict[ID], experiment_requester, model_testing_method, testing_measure="mae", confidences_before_betting_PC=default_input_dict["reporting_dict"]["confidence_thresholds"])
@@ -790,8 +789,56 @@ design_space_dict = {
 global_run_count = 0
 
 #init_doe = 20
-init_doe = [[5,	5,	 1, 25200, 1, 0, 1, 0, 0.02]]
-
+init_doe = [[5,	5,	 1, 25200, 1, 0, 1, 0, 0.02],
+    [5,  5,	  1, 7200,  1, 1, 4, 1, 0.05],
+    [13, 5,	  0, 25200, 1, 1, 1, 2, 0.05],
+    [5,  1,	  0, 25200, 1, 0, 1, 4, 0.2],
+    [5,  0.3, 1, 25200, 0, 1, 4, 0, 0.2],
+    [17, 5,	  1, 1800,  0, 0, 1, 0, 0.1],
+    [13, 5,	  1, 25200, 1, 1, 1, 2, 0.02],
+    [13, 2,	  0, 25200, 0, 0, 1, 2, 0.05],
+    [5,  1,	  1, 1800,  1, 1, 2, 1, 0.1],
+    [5,  0.3, 0, 25200, 1, 0, 4, 4, 0.2],
+    [17, 1,	  0, 1800,  1, 1, 1, 4, 0.2],
+    [13, 5,	  1, 25200, 0, 0, 2, 0, 0.2],
+    [5,  3,	  1, 1800,  0, 0, 1, 1, 0.01],
+    [5,  2,	  1, 1800,  1, 0, 4, 0, 0.05],
+    [17, 3,	  1, 7200,  0, 0, 4, 0, 0.05],
+    [9,  0.7, 0, 1800,  0, 1, 4, 2, 0.02],
+    [17, 0.3, 1, 7200,  0, 1, 1, 3, 0.01],
+    [17, 2,	  1, 1800,  0, 0, 2, 3, 0.05],
+    [9,  3,	  1, 7200,  1, 0, 4, 3, 0.01],
+    [17, 0.3, 1, 1800,  0, 0, 2, 2, 0.05],
+    [9,  0.3, 0, 1800,  0, 0, 2, 4, 0.05],
+    [17,  3,  1, 1800,  0, 1, 1, 4, 0.02],
+    [5,  5,	  1, 25200, 1, 1, 4, 1, 0.02],
+    [9,  3,	  0, 25200, 1, 0, 2, 0, 0.05],
+    [9,  0.3, 0, 25200, 0, 0, 1, 0, 0.01],
+    [9,  3,	  1, 7200,  0, 0, 2, 2, 0.05],
+    [13, 0.7, 0, 7200,  0, 1, 2, 0, 0.1],
+    [5,  0.7, 0, 7200,  0, 1, 2, 4, 0.2],
+    [13, 5,	  1, 25200, 0, 1, 1, 0, 0.01],
+    [5,  0.7, 0, 7200,  0, 1, 2, 3, 0.1],
+    [5,  5,   1, 25200, 1, 0, 4, 3, 0.2],
+    [17, 1,   1, 1800,  0, 0, 2, 1, 0.2],
+    [9,  0.3, 0, 7200,  0, 1, 1, 0, 0.05],
+    [17, 0.7, 1, 7200,  1, 1, 1, 0, 0.05],
+    [17, 0.3, 0, 7200,  1, 0, 2, 2, 0.02],
+    [13, 0.3, 1, 7200,  0, 1, 1, 3, 0.01],
+    [17, 2,   1, 25200, 1, 1, 4, 1, 0.1],
+    [13, 1,   0, 7200,  0, 0, 1, 4, 0.1],
+    [13, 1,   1, 1800,  1, 1, 4, 2, 0.01],
+    [5,  3,   1, 7200,  1, 1, 1, 3, 0.2],
+    [9,  3,   1, 7200,  0, 1, 1, 1, 0.1],
+    [17, 0.3, 1, 7200,  0, 1, 4, 1, 0.02],
+    [5,  2,   1, 7200,  0, 0, 1, 2, 0.02],
+    [13, 5,   0, 7200,  1, 1, 1, 3, 0.05],
+    [9,  1,   1, 25200, 0, 0, 4, 2, 0.2],
+    [13, 0.3, 0, 7200,  0, 0, 1, 3, 0.2],
+    [17, 0.7, 1, 7200,  0, 1, 4, 4, 0.02],
+    [17, 5,   0, 1800,  1, 1, 4, 1, 0.2],
+    [17, 2,   0, 25200, 1, 0, 2, 0, 0.2],
+    [13, 0.7, 1, 7200,  1, 1, 2, 1, 0.02]]
 
 
 """ experiment checklist:
@@ -812,7 +859,7 @@ checklist for restarting the experiment
 
 scenario_ID = 0
 
-removal_ratio = int(1e8)
+removal_ratio = int(1e5)
 scenario_dict = {
         0 : {"topics" : None, "pred_steps" : 1},
         1 : {"topics" : None, "pred_steps" : 3},
@@ -875,7 +922,7 @@ for scenario_ID in scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\examine4.csv"
+            global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\kfold_v3_global_results.csv"
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 

@@ -518,7 +518,6 @@ def retrieve_or_generate_sentimental_data(index, temporal_params_dict, fin_input
     #method
     #search for predictor
     sentimental_data_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["sentimental_data"]
-    #FG_action: check that the train_period_start is only used and not the test version, that is an error
     sentimental_data_name = return_sentimental_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe)
     sentimental_data_location_file = sentimental_data_folder_location_string + sentimental_data_name + ".csv"
     if os.path.exists(sentimental_data_location_file):
@@ -1667,7 +1666,6 @@ def retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inp
     else:
         print(datetime.now().strftime("%H:%M:%S") + " - generating model and testing scores")
         predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = generate_model_and_validation_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict)
-        predictor_location_file = predictor_location_file + "w" #FG_action: remove
         with open(predictor_location_file, "wb") as file:
             pickle.dump(predictor, file)
         #edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="save", training_scores=validation_dict)
