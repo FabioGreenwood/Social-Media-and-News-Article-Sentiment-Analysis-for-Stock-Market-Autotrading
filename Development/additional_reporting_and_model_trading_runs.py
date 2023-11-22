@@ -243,17 +243,13 @@ def return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_li
 
 
 def run_additional_reporting(preds=None,
-                            Y_test = None, 
-                            pred_steps_list = None, 
-                            DoE_orders_dict = None, 
-                            model_type_name = None, 
-                            outputs_path = None, 
-                            model_start_time = None,
+                            y_testing = None, 
+                            pred_steps_list = None,
                             confidences_before_betting_PC=None
                             ):
     
     #df_realigned_dict                   = return_realign_plus_minus_table(preds, Y_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
-    results_tables_dict                 = return_results_X_min_plus_minus_accuracy(preds, Y_test, pred_steps_list, confidences_before_betting_PC=confidences_before_betting_PC)
+    results_tables_dict                 = return_results_X_min_plus_minus_accuracy(preds, y_testing, pred_steps_list, confidences_before_betting_PC=confidences_before_betting_PC)
     #plt, df_realigned_dict              = return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_list, results_tables_dict, DoE_name = DoE_orders_dict["name"], model_type_name=model_type_name, model_start_time = model_start_time, outputs_folder_path = outputs_path, timestamp = False)
     
     return results_tables_dict#, plt, df_realigned_dict

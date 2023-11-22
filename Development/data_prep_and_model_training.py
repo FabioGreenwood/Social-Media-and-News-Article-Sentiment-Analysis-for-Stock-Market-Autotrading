@@ -1373,7 +1373,9 @@ class DRSLinReg():
         tscv = BlockingTimeSeriesSplit(n_splits=self.training_time_splits)
         count = 0
         global global_random_state
-        validations_dict_list = []
+        training_scores_dict_list  = []
+        validation_scores_dict_list  = []
+        additional_validation_dict_list = []
         kf = KFold(n_splits=5, shuffle=False)
         estimator = BaggingRegressor(base_estimator=self.base_estimator,
                                           #the assignment of "one" estimator is overwritten by the rest of the method
@@ -1396,22 +1398,28 @@ class DRSLinReg():
                 # randomly select features to drop out
                 n_features = X.shape[1]
                 dropout_cols = return_columns_to_remove(columns_list=X.columns, self=self)
-                X_sel = X.loc[X.index[train_index].values].copy()
-                X_sel.loc[:, dropout_cols] = 0
-                y_sel= y.loc[y.index[train_index].values].copy()
+                X_train = X.loc[X.index[train_index].values].copy()
+                X_train.loc[:, dropout_cols] = 0
+                y_train = y.loc[y.index[train_index].values].copy()
+                y_test  = y.loc[y.index[test_index].values].copy()
                 estimator.random_state = global_random_state
                 global_random_state += 1
                 estimator.dropout_cols_ = dropout_cols
-                estimator.fit(X_sel, y_sel)
+                estimator.fit(X_train, y_train)
                 # validate model
-                y_val = estimator.predict(X.iloc[test_index].values)
-                validations_dict_list += [FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_val, y.iloc[test_index], pred_steps_list, confidences_before_betting_PC=confidences_before_betting_PC)]
+                y_pred_train = estimator.predict(X.iloc[train_index].values)
+                y_pred_test = estimator.predict(X.iloc[test_index].values)
+                #collect training, validation and validation additional analysis scores
+                training_scores_dict_list   += [{"r2" : r2_score(y_train, y_pred_train), "mse" : mean_squared_error(y_train, y_pred_train), "mae" : mean_absolute_error(y_train, y_pred_train)}]
+                validation_scores_dict_list += [{"r2" : r2_score(y_test, y_pred_test),   "mse" : mean_squared_error(y_test, y_pred_test),   "mae" : mean_absolute_error(y_test, y_pred_test)}]
+                additional_validation_dict_list += [FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred_test, y.iloc[test_index], pred_steps_list, confidences_before_betting_PC=confidences_before_betting_PC)]
                 self.estimators_ = self.estimators_ + [estimator]
-            
-            #self.estimators_.append(estimator)
-        validations_dict_list = average_list_of_identical_dicts(validations_dict_list)
         
-        return self, validations_dict_list
+        training_scores_dict       = average_list_of_identical_dicts(training_scores_dict_list)
+        validation_scores_dict     = average_list_of_identical_dicts(validation_scores_dict_list)
+        additional_validation_dict = average_list_of_identical_dicts(additional_validation_dict_list)
+        
+        return self, training_scores_dict, validation_scores_dict, additional_validation_dict
 
 
 
@@ -1580,9 +1588,7 @@ def generate_model_and_validation_scores(temporal_params_dict,
     #model training - create regressors
     X_train, y_train   = create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
     model              = initiate_model(outputs_params_dict, model_hyper_params)
-    model, validation_dict = model.fit(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"])
-    #training_scores = model.evaluate(X_test=X_train , y_test=y_train, method=model_hyper_params["testing_scoring"])
-      
+    model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.fit(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"])
     
     #report timings
     print(datetime.now().strftime("%H:%M:%S") + " - complete generating model")
@@ -1593,7 +1599,7 @@ def generate_model_and_validation_scores(temporal_params_dict,
     total_run_seconds   = total_run_secs % 60
     report = f"{int(total_run_hours)} hours, {int(total_run_minutes)} minutes, {int(total_run_seconds)} seconds"
     print(report)
-    return model, validation_dict
+    return model, training_scores_dict, validation_scores_dict, additional_validation_dict
 
 
 def quick_training_score_rerun(model, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params):
@@ -1660,13 +1666,14 @@ def retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inp
         predictor, training_scores = retrieve_model_and_training_scores(predictor_location_file, predictor_name_entry, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
     else:
         print(datetime.now().strftime("%H:%M:%S") + " - generating model and testing scores")
-        predictor, validation_dict = generate_model_and_validation_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict)
+        predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = generate_model_and_validation_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict)
+        predictor_location_file = predictor_location_file + "w" #FG_action: remove
         with open(predictor_location_file, "wb") as file:
             pickle.dump(predictor, file)
         #edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="save", training_scores=validation_dict)
 
-    return predictor, validation_dict
+    return predictor, training_scores_dict, validation_scores_dict, additional_validation_dict
 
 if __name__ == '__main__':
-    predictor, training_scores      = retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict)
-    testing_scores, Y_preds_testing = generate_testing_scores(predictor, input_dict)
+    predictor, traditional_training_scores, validation_dict = retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict)
+    testing_scores, Y_preds_testing                         = generate_testing_scores(predictor, input_dict)

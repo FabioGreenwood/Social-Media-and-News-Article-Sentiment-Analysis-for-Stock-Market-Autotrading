@@ -65,7 +65,7 @@ global_precalculated_assets_locations_dict = {
     "clean_tweets"              : "cleaned_tweets_ready_for_subject_discovery\\"
     }
 global_outputs_folder = "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\outputs\\"
-global_designs_record_final_columns_list = ["experiment_timestamp", "training_r2", "training_mse", "training_mae", "testing_r2", "testing_mse", "testing_mae", "profitability", "predictor_names"]
+global_designs_record_final_columns_list = ["experiment_timestamp", "training_r2", "training_mse", "training_mae", "validation_r2", "validation_mse", "validation_mae", "testing_r2", "testing_mse", "testing_mae", "profitability", "predictor_names"]
 
 
 SECS_IN_A_DAY = 60*60*24
@@ -212,19 +212,21 @@ def update_df_designs_record(df_designs_record, design_history_dict, design_spac
         df_designs_record.loc[ID, input_param_cols] = design_history_dict[ID]["X"]
         # standard results
         for subkey in design_history_dict[ID]:
-            if not subkey in ["X", "predictor", "Y", "additional_results_dict"]:
+            if not subkey in ["X", "predictor", "Y", "validation_results_dict", "testing_results_dict"]:
                 df_designs_record.loc[ID, subkey] = design_history_dict[ID][subkey]
         # additional results dict
-        if "additional_results_dict" in design_history_dict[ID].keys():
-            for result_type in design_history_dict[ID]["additional_results_dict"].keys():
-                for steps_back in design_history_dict[ID]["additional_results_dict"][result_type].keys():
-                    for confidence in design_history_dict[ID]["additional_results_dict"][result_type][steps_back]:
-                        df_designs_record.loc[ID, return_name_of_additional_reporting_col(result_type, steps_back, confidence)] = design_history_dict[ID]["additional_results_dict"][result_type][steps_back][confidence]
+        for prefix, additional_results_dict in zip(["validation", "testing"], ["validation_results_dict", "testing_results_dict"]):
+            if additional_results_dict in design_history_dict[ID].keys():
+                for result_type in design_history_dict[ID][additional_results_dict].keys():
+                    for steps_back in design_history_dict[ID][additional_results_dict][result_type].keys():
+                        for confidence in design_history_dict[ID][additional_results_dict][result_type][steps_back]:
+                            df_designs_record.loc[ID, return_name_of_additional_reporting_col(prefix, result_type, confidence)] = design_history_dict[ID][additional_results_dict][result_type][steps_back][confidence]
                 
     return df_designs_record
 
-def return_name_of_additional_reporting_col(first_str, second_str_mins, third_str_confidence):
-    return str(first_str[8:]) + "_s" + str(second_str_mins) + "_c" + str(third_str_confidence)
+def return_name_of_additional_reporting_col(validation_or_testing_prefix, first_str, third_str_confidence):
+    return validation_or_testing_prefix + "_" + str(first_str[8:]) + "_s" + "X" + "_c" + str(third_str_confidence)
+    #return str(first_str[8:]) + "_s" + str(second_str_mins) + "_c" + str(third_str_confidence)
 
 def return_cols_for_additional_reporting(input_dict):
 
@@ -232,15 +234,16 @@ def return_cols_for_additional_reporting(input_dict):
     confidences = input_dict["reporting_dict"]["confidence_thresholds"]
     pred_steps_ahead_list = input_dict["outputs_params_dict"]["pred_steps_ahead"]
     
-    template = FG_additional_reporting.run_additional_reporting(Y_test=pd.DataFrame(), pred_steps_list=[])
+    template = FG_additional_reporting.run_additional_reporting(y_testing=pd.DataFrame(), pred_steps_list=[])
     
     if type(pred_steps_ahead_list) == int:
         pred_steps_ahead_list = [pred_steps_ahead_list]
     
-    for result_type in list(template.keys()):
-        for pred_steps in pred_steps_ahead_list:
-            for confidence in confidences:
-                output_cols = output_cols + [return_name_of_additional_reporting_col(result_type, pred_steps, confidence)]
+    for pre_fix_str in ["validation", "testing"]:
+        for result_type in list(template.keys()):
+            for pred_steps in pred_steps_ahead_list:
+                for confidence in confidences:
+                    output_cols = output_cols + [return_name_of_additional_reporting_col(pre_fix_str, result_type, confidence)]
     
     return output_cols
 
@@ -280,6 +283,21 @@ def return_scenario_name_str(topic_qty, pred_steps, ratio_removed):
     removal_str = "removal_1e" + str(exponent)
     
     return output + str(pred_steps) + "_" + removal_str
+
+def update_design_hist_dict_post_training(design_history_dict_single, predictor, training_scores_dict, validation_scores_dict, additional_validation_dict):
+    design_history_dict_single["predictor"] = predictor
+    design_history_dict_single["training_r2"], design_history_dict_single["training_mse"], design_history_dict_single["training_mae"] = training_scores_dict["r2"], training_scores_dict["mse"], training_scores_dict["mae"]
+    design_history_dict_single["validation_r2"], design_history_dict_single["validation_mse"], design_history_dict_single["validation_mae"] = validation_scores_dict["r2"], validation_scores_dict["mse"], validation_scores_dict["mae"]
+    design_history_dict_single["validation_results_dict"] = additional_validation_dict
+    design_history_dict_single["experiment_timestamp"] = datetime.now().strftime(global_strptime_str)
+    return design_history_dict_single
+
+def update_design_hist_dict_post_testing(design_history_dict_single, testing_scores, testing_results_dict):
+    design_history_dict_single["testing_r2"], design_history_dict_single["testing_mse"], design_history_dict_single["testing_mae"] = testing_scores["r2"], testing_scores["mse"], testing_scores["mae"]
+    design_history_dict_single["Y"] = testing_scores[testing_measure]
+    design_history_dict_single["testing_results_dict"] = testing_results_dict
+    return design_history_dict_single
+
         
 #%% Experiment Parameters
 
@@ -356,8 +374,8 @@ def template_experiment_requester(GPyOpt_input, design_space_dict, default_input
     print(GPyOpt_input)
     global_run_count += 1
     
-    predictor, training_scores = experiment_method(prepped_temporal_params_dict, prepped_fin_inputs_params_dict, prepped_senti_inputs_params_dict, prepped_outputs_params_dict, prepped_model_hyper_params, reporting_dict)
-    return predictor, training_scores
+    predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = experiment_method(prepped_temporal_params_dict, prepped_fin_inputs_params_dict, prepped_senti_inputs_params_dict, prepped_outputs_params_dict, prepped_model_hyper_params, reporting_dict)
+    return predictor, training_scores_dict, validation_scores_dict, additional_validation_dict
     
 def return_experiment_requester(design_space_dict, default_input_dict=default_input_dict, experiment_method=FG_model_training.retrieve_or_generate_model_and_training_scores):
     output_method = lambda GPyOpt_input: template_experiment_requester(GPyOpt_input, design_space_dict, default_input_dict=default_input_dict, experiment_method=experiment_method)
@@ -405,6 +423,8 @@ def return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, opt_obj, inverse
         else:
             target = design_history_dict[ID]
             for val in objective_function_name:
+                if val == "validation":
+                    val = val + "_results_dict"
                 target = target[val]
             output_Y = output_Y + [target * coff]
     return output_X, output_Y
@@ -412,38 +432,29 @@ def return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, opt_obj, inverse
 def run_experiment_and_return_updated_design_history_dict(design_history_dict_single, experiment_requester, model_testing_method, testing_measure="mae", confidences_before_betting_PC=[0.00, 0.01, 0.02]):
     
     global global_strptime_str, global_outputs_folder
-    col_training_str = "training_" + testing_measure
-    col_testing_str = "testing_" + testing_measure
+    col_training_str    = "training_" + testing_measure
+    col_testing_str     = "testing_" + testing_measure
     
     for col_str in [col_training_str, col_testing_str]:
        if not col_str in design_history_dict_single.keys():
            design_history_dict_single[col_str] = None
-    
+   
     if design_history_dict_single[col_training_str] == None:
-        predictor, training_scores = experiment_requester(design_history_dict_single["X"])
-        design_history_dict_single["predictor"] = predictor
-        design_history_dict_single["training_r2"], design_history_dict_single["training_mse"], design_history_dict_single["training_mae"] = training_scores["r2"], training_scores["mse"], training_scores["mae"]
+        predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = experiment_requester(design_history_dict_single["X"])
+        design_history_dict_single = update_design_hist_dict_post_training(design_history_dict_single, predictor, training_scores_dict, validation_scores_dict, additional_validation_dict)
+    
     if design_history_dict_single[col_testing_str] == None:
         temp_input_dict = return_edited_input_dict(design_history_dict_single["X"], design_space_dict, default_input_dict)
         testing_scores, X_testing, y_testing, Y_preds = model_testing_method(design_history_dict_single["predictor"], temp_input_dict)
         del temp_input_dict
-        design_history_dict_single["testing_r2"], design_history_dict_single["testing_mse"], design_history_dict_single["testing_mae"] = testing_scores["r2"], testing_scores["mse"], testing_scores["mae"]
-        design_history_dict_single["Y"] = testing_scores[testing_measure]
-        results_tables_dict = FG_additional_reporting.run_additional_reporting(preds=Y_preds,
-                X_test = X_testing, 
+        testing_results_dict = FG_additional_reporting.run_additional_reporting(preds=Y_preds,
+                y_testing = y_testing, 
                 pred_steps_list = default_input_dict["outputs_params_dict"]["pred_steps_ahead"],
-                pred_output_and_tickers_combos_list = [("£", "<CLOSE>")], 
-                DoE_orders_dict = None, 
-                model_type_name = "xxxxMODEL NAMExxxx", 
-                outputs_path = global_outputs_folder, 
-                model_start_time = datetime.now(),
                 confidences_before_betting_PC = confidences_before_betting_PC
                 )
+        design_history_dict_single = update_design_hist_dict_post_testing(design_history_dict_single, testing_scores, testing_results_dict)
         
-        
-    design_history_dict_single["experiment_timestamp"] = datetime.now().strftime(global_strptime_str)
-    design_history_dict_single["additional_results_dict"] = results_tables_dict
-    return design_history_dict_single, results_tables_dict
+    return design_history_dict_single
 
 
 
@@ -502,7 +513,7 @@ def print_desired_scores(design_history, df_designs_record, design_space_dict, o
         if type(score_name) == str:
             temp_str = score_name
         else:
-            temp_str = return_name_of_additional_reporting_col(score_name[1], score_name[2], score_name[3])
+            temp_str = return_name_of_additional_reporting_col(score_name[0], score_name[1], score_name[3])
         output_string_3 = output_string_3 + str(temp_str) + ": " + "{:.5f}".format(df_designs_record[temp_str][last_ID]) + ", "
             #output_string_3 = output_string_3 + str(temp_str) + ": " + str(df_designs_record[temp_str][last_ID]) + ", "
     print(output_string_3[:-2])
@@ -512,7 +523,7 @@ def print_desired_scores(design_history, df_designs_record, design_space_dict, o
         if type(objective) == str:
             temp_str = objective
         else:
-            temp_str = return_name_of_additional_reporting_col(objective[1], objective[2], objective[3])
+            temp_str = return_name_of_additional_reporting_col(objective[0], objective[1], objective[3])
         if polarity == True:
             temp_col = df_designs_record[temp_str].fillna(np.inf)
             pareto_index = temp_col.idxmin()
@@ -686,10 +697,10 @@ def experiment_manager(
     for ID in range(find_largest_number(design_history_dict.keys()) + 1):
         design_history_dict[ID]["X"] = convert_floats_to_int_if_whole(design_history_dict[ID]["X"])#[:len(design_history_dict[ID-1]["X"])]
         # only run value if testing measure missing
-        if design_history_dict[ID]["testing_" + testing_measure] == None:
+        if design_history_dict[ID]["testing_" + testing_measure] == None or 1 == 1: #FG_Action: remove workaround
             print(return_keys_within_2_level_dict(design_space_dict))
             print(str(design_history_dict[ID]["X"]) + " running ID:" + str(ID))
-            design_history_dict[ID], results_tables_dict = run_experiment_and_return_updated_design_history_dict(design_history_dict[ID], experiment_requester, model_testing_method, testing_measure="mae", confidences_before_betting_PC=default_input_dict["reporting_dict"]["confidence_thresholds"])
+            design_history_dict[ID] = run_experiment_and_return_updated_design_history_dict(design_history_dict[ID], experiment_requester, model_testing_method, testing_measure="mae", confidences_before_betting_PC=default_input_dict["reporting_dict"]["confidence_thresholds"])
             # save
             df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
             save_designs_record_csv_and_dict(list_of_save_locations, df_designs_record=df_designs_record, design_history_dict=design_history_dict, optim_run_name=optim_run_name)
@@ -729,7 +740,7 @@ def experiment_manager(
         design_history_dict[ID] = dict()
         design_history_dict[ID]["X"] = convert_floats_to_int_if_whole(list(x_next))#[:len(design_history_dict[ID-1]["X"])]
         print(str(design_history_dict[ID]["X"]) + " running ID:" + str(ID))
-        design_history_dict[ID], results_tables_dict = run_experiment_and_return_updated_design_history_dict(design_history_dict[ID], experiment_requester, model_testing_method, testing_measure="mae", confidences_before_betting_PC=default_input_dict["reporting_dict"]["confidence_thresholds"])
+        design_history_dict[ID] = run_experiment_and_return_updated_design_history_dict(design_history_dict[ID], experiment_requester, model_testing_method, testing_measure="mae", confidences_before_betting_PC=default_input_dict["reporting_dict"]["confidence_thresholds"])
         # save
         df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
         save_designs_record_csv_and_dict(list_of_save_locations, df_designs_record=df_designs_record, design_history_dict=design_history_dict, optim_run_name=optim_run_name)
@@ -779,56 +790,7 @@ design_space_dict = {
 global_run_count = 0
 
 #init_doe = 20
-init_doe = [[5,	5,	 1, 25200, 1, 0, 1, 0, 0.02],
-    [5,  5,	  1, 7200,  1, 1, 4, 1, 0.05],
-    [13, 5,	  0, 25200, 1, 1, 1, 2, 0.05],
-    [5,  1,	  0, 25200, 1, 0, 1, 4, 0.2],
-    [5,  0.3, 1, 25200, 0, 1, 4, 0, 0.2],
-    [17, 5,	  1, 1800,  0, 0, 1, 0, 0.1],
-    [13, 5,	  1, 25200, 1, 1, 1, 2, 0.02],
-    [13, 2,	  0, 25200, 0, 0, 1, 2, 0.05],
-    [5,  1,	  1, 1800,  1, 1, 2, 1, 0.1],
-    [5,  0.3, 0, 25200, 1, 0, 4, 4, 0.2],
-    [17, 1,	  0, 1800,  1, 1, 1, 4, 0.2],
-    [13, 5,	  1, 25200, 0, 0, 2, 0, 0.2],
-    [5,  3,	  1, 1800,  0, 0, 1, 1, 0.01],
-    [5,  2,	  1, 1800,  1, 0, 4, 0, 0.05],
-    [17, 3,	  1, 7200,  0, 0, 4, 0, 0.05],
-    [9,  0.7, 0, 1800,  0, 1, 4, 2, 0.02],
-    [17, 0.3, 1, 7200,  0, 1, 1, 3, 0.01],
-    [17, 2,	  1, 1800,  0, 0, 2, 3, 0.05],
-    [9,  3,	  1, 7200,  1, 0, 4, 3, 0.01],
-    [17, 0.3, 1, 1800,  0, 0, 2, 2, 0.05],
-    [9,  0.3, 0, 1800,  0, 0, 2, 4, 0.05],
-    [17,  3,  1, 1800,  0, 1, 1, 4, 0.02],
-    [5,  5,	  1, 25200, 1, 1, 4, 1, 0.02],
-    [9,  3,	  0, 25200, 1, 0, 2, 0, 0.05],
-    [9,  0.3, 0, 25200, 0, 0, 1, 0, 0.01],
-    [9,  3,	  1, 7200,  0, 0, 2, 2, 0.05],
-    [13, 0.7, 0, 7200,  0, 1, 2, 0, 0.1],
-    [5,  0.7, 0, 7200,  0, 1, 2, 4, 0.2],
-    [13, 5,	  1, 25200, 0, 1, 1, 0, 0.01],
-    [5,  0.7, 0, 7200,  0, 1, 2, 3, 0.1],
-    [5,  5,   1, 25200, 1, 0, 4, 3, 0.2],
-    [17, 1,   1, 1800,  0, 0, 2, 1, 0.2],
-    [9,  0.3, 0, 7200,  0, 1, 1, 0, 0.05],
-    [17, 0.7, 1, 7200,  1, 1, 1, 0, 0.05],
-    [17, 0.3, 0, 7200,  1, 0, 2, 2, 0.02],
-    [13, 0.3, 1, 7200,  0, 1, 1, 3, 0.01],
-    [17, 2,   1, 25200, 1, 1, 4, 1, 0.1],
-    [13, 1,   0, 7200,  0, 0, 1, 4, 0.1],
-    [13, 1,   1, 1800,  1, 1, 4, 2, 0.01],
-    [5,  3,   1, 7200,  1, 1, 1, 3, 0.2],
-    [9,  3,   1, 7200,  0, 1, 1, 1, 0.1],
-    [17, 0.3, 1, 7200,  0, 1, 4, 1, 0.02],
-    [5,  2,   1, 7200,  0, 0, 1, 2, 0.02],
-    [13, 5,   0, 7200,  1, 1, 1, 3, 0.05],
-    [9,  1,   1, 25200, 0, 0, 4, 2, 0.2],
-    [13, 0.3, 0, 7200,  0, 0, 1, 3, 0.2],
-    [17, 0.7, 1, 7200,  0, 1, 4, 4, 0.02],
-    [17, 5,   0, 1800,  1, 1, 4, 1, 0.2],
-    [17, 2,   0, 25200, 1, 0, 2, 0, 0.2],
-    [13, 0.7, 1, 7200,  1, 1, 2, 1, 0.02]]
+init_doe = [[5,	5,	 1, 25200, 1, 0, 1, 0, 0.02]]
 
 
 
@@ -882,16 +844,14 @@ for scenario_ID in scenario_dict.keys():
     default_input_dict["senti_inputs_params_dict"]["topic_training_tweet_ratio_removed"] = removal_ratio
 
     # setting the optimisation objective functions
-    confidence_scoring_measure_tuple_1 = ("additional_results_dict","results_x_mins_weighted",pred_steps,0.05)
-    confidence_scoring_measure_tuple_2 = ("additional_results_dict","results_x_mins_PC",pred_steps,0.05)
-    confidence_scoring_measure_tuple_3 = ("additional_results_dict","results_x_mins_score",pred_steps,0.05)
-    optim_scores_vec = ["testing_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2, confidence_scoring_measure_tuple_3, confidence_scoring_measure_tuple_1]
+    confidence_scoring_measure_tuple_1 = ("validation","results_x_mins_weighted",pred_steps,0.02)
+    confidence_scoring_measure_tuple_2 = ("validation","results_x_mins_PC",pred_steps,0.02)
+    confidence_scoring_measure_tuple_3 = ("validation","results_x_mins_score",pred_steps,0.02)
     
-    inverse_for_minimise_vec=[True, False, False]    
+    optim_scores_vec = ["validation_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2, confidence_scoring_measure_tuple_3]
     
-    inverse_for_minimise_vec=[False]    
-    
-    
+    inverse_for_minimise_vec = [True, False, False, False]
+       
 
     #what around to ensure that single topic sentimental data in more used in the model
     if default_senti_inputs_params_dict["topic_qty"] == 1:
@@ -906,7 +866,7 @@ for scenario_ID in scenario_dict.keys():
         #scenario_name_str = "test 19"
         print("running scenario " + str(scenario_ID) + ": " + scenario_name_str + " - " + datetime.now().strftime("%H:%M:%S"))
         experiment_manager(
-            scenario_name_str,
+            "experimenting 4",
             design_space_dict,
             initial_doe_size_or_DoE=init_doe,
             max_iter=30,
@@ -915,7 +875,7 @@ for scenario_ID in scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\examine.csv"
+            global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\examine4.csv"
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
