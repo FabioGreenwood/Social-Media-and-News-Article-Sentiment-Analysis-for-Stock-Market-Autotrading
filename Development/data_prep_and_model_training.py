@@ -561,18 +561,18 @@ def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dic
     topic_weight_square_factor          = senti_inputs_params_dict["topic_weight_square_factor"]
 
     if training_or_testing == "training" or training_or_testing == "train":
-        train_period_start  = temporal_params_dict["train_period_start"]
-        train_period_end    = temporal_params_dict["train_period_end"]
+        period_start  = temporal_params_dict["train_period_start"]
+        period_end    = temporal_params_dict["train_period_end"]
     elif training_or_testing == "testing" or training_or_testing == "test":
-        train_period_start  = temporal_params_dict["train_period_start"]
-        train_period_end    = temporal_params_dict["train_period_end"]
+        period_start  = temporal_params_dict["test_period_start"]
+        period_end    = temporal_params_dict["test_period_end"]
     else:
         global global_error_str_1
         raise ValueError(global_error_str_1.format(str(training_or_testing)))
     
     #search for annotated tweets
     annotated_tweets_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["annotated_tweets"]
-    annotated_tweets_name = return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, weighted_topics, num_topics, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor)
+    annotated_tweets_name = return_annotated_tweets_name(company_symbol, period_start, period_end, weighted_topics, num_topics, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor)
     annotated_tweets_location_file = annotated_tweets_folder_location_string + annotated_tweets_name + ".csv"
     print("approaching gate")
     if isinstance(hardcode_df_annotated_tweets, pd.DataFrame):
@@ -584,7 +584,7 @@ def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dic
         df_annotated_tweets.set_index(df_annotated_tweets.columns[0], inplace=True)
         df_annotated_tweets.index.name = "datetime"
     else:
-        df_annotated_tweets = generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+        df_annotated_tweets = generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing=training_or_testing)
         df_annotated_tweets.to_csv(annotated_tweets_location_file)
         print(datetime.now().strftime("%H:%M:%S") + " - generating sentimental data")
     
@@ -659,11 +659,11 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     topic_weight_square_factor = senti_inputs_params_dict["topic_weight_square_factor"]
         
     if training_or_testing == "training" or training_or_testing == "train":
-        train_period_start  = temporal_params_dict["train_period_start"]
-        train_period_end    = temporal_params_dict["train_period_end"]
+        period_start  = temporal_params_dict["train_period_start"]
+        period_end    = temporal_params_dict["train_period_end"]
     elif training_or_testing == "testing" or training_or_testing == "test":
-        train_period_start  = temporal_params_dict["train_period_start"]
-        train_period_end    = temporal_params_dict["train_period_end"]
+        period_start  = temporal_params_dict["test_period_start"]
+        period_end    = temporal_params_dict["test_period_end"]
     else:
         global global_error_str_1
         raise ValueError(global_error_str_1.format(str(training_or_testing)))
@@ -674,12 +674,11 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     topic_model_folder_folder = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["topic_models"]
     
     topic_model_name = return_topic_model_name(num_topics, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, inc_new_combined_stopwords_list)
-    topic_model_location_file = topic_model_folder_folder + topic_model_name
     if not hardcode_location_for_topic_model=="":
         with open(hardcode_location_for_topic_model, 'rb') as file:
             topic_model_dict = pickle.load(file)
-    elif os.path.exists(topic_model_location_file + "topic_model_dict_" + topic_model_name + ".pkl"):
-        with open(topic_model_location_file + "topic_model_dict_" + topic_model_name + ".pkl", "rb") as file:
+    elif os.path.exists(topic_model_folder_folder + "topic_model_dict_" + topic_model_name + ".pkl"):
+        with open(topic_model_folder_folder + "topic_model_dict_" + topic_model_name + ".pkl", "rb") as file:
             topic_model_dict = pickle.load(file)
     else:
         wordcloud, topic_model_dict, visualisation = generate_and_save_topic_model(topic_model_name, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, inc_new_combined_stopwords_list=inc_new_combined_stopwords_list)
@@ -687,7 +686,7 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     
     #generate annotated tweets
     print(datetime.now().strftime("%H:%M:%S") + " - generating annotated tweets")
-    df_annotated_tweets   = import_twitter_data_period(senti_inputs_params_dict["tweet_file_location"], train_period_start, train_period_end, relavance_lifetime, tweet_ratio_removed, k_fold_textual_sources=k_fold_textual_sources)
+    df_annotated_tweets   = import_twitter_data_period(senti_inputs_params_dict["tweet_file_location"], period_start, period_end, relavance_lifetime, tweet_ratio_removed, k_fold_textual_sources=k_fold_textual_sources)
     
     sentiment_col_strs = []
     for num in range(num_topics):
@@ -1541,7 +1540,7 @@ def retrieve_model_and_training_scores(predictor_location_file, predictor_name_e
     with open(predictor_location_file, 'rb') as file:
         predictor = pickle.load(file)
     #training_score = edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="load")
-    
+    1.
     if any(math.isnan(value) for value in list(training_score.values())):
     #if training_score is None:
         training_score = quick_training_score_rerun(predictor, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)

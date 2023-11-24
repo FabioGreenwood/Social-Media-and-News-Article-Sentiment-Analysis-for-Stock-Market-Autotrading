@@ -80,7 +80,7 @@ default_temporal_params_dict    = {
     "train_period_end"      : datetime.strptime('01/09/19 00:00:00', global_strptime_str),
     "time_step_seconds"     : 5*60, #5 mins,
     "test_period_start"     : datetime.strptime('01/09/19 00:00:00', global_strptime_str),
-    "test_period_end"       : datetime.strptime('07/01/20 00:00:00', global_strptime_str),
+    "test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str),
 }
 default_fin_inputs_params_dict      = {
     "index_cols"        : "date",    
@@ -137,7 +137,7 @@ default_model_hyper_params          = {
     "estimator__activation"            : 'relu',
     "cohort_retention_rate_dict"       : default_cohort_retention_rate_dict}
 default_reporting_dict              = {
-    "confidence_thresholds" : [0, 0.01, 0.02, 0.05, 0.1],
+    "confidence_thresholds" : [0, 0.01, 0.02, 0.035, 0.05, 0.1],
     "confidence_thresholds_inserted_to_df" : {
         "PC_confindence" : [0.02],
         "score_confidence" : [0.02],
@@ -437,7 +437,7 @@ def run_experiment_and_return_updated_design_history_dict(design_history_dict_si
     for col_str in [col_training_str, col_testing_str]:
        if not col_str in design_history_dict_single.keys():
            design_history_dict_single[col_str] = None
-   
+    
     if design_history_dict_single[col_training_str] == None:
         predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = experiment_requester(design_history_dict_single["X"])
         design_history_dict_single = update_design_hist_dict_post_training(design_history_dict_single, predictor, training_scores_dict, validation_scores_dict, additional_validation_dict)
@@ -727,7 +727,7 @@ def experiment_manager(
         # find next design
         dice_roll = random.random()
         print("dice_roll: " + str(dice_roll))
-        if  dice_roll < 0.25:
+        if  dice_roll < 0.0:#25:
             x_next = define_DoE(bounds, 1)
             x_next = x_next[0]
         else:
@@ -858,8 +858,7 @@ checklist for restarting the experiment
 # scenario parameters: topic_qty, pred_steps
 
 scenario_ID = 0
-
-removal_ratio = int(1e5)
+removal_ratio = int(1e1)
 scenario_dict = {
         0 : {"topics" : None, "pred_steps" : 1},
         1 : {"topics" : None, "pred_steps" : 3},
@@ -895,6 +894,7 @@ for scenario_ID in scenario_dict.keys():
     confidence_scoring_measure_tuple_2 = ("validation","results_x_mins_PC",pred_steps,0.02)
     confidence_scoring_measure_tuple_3 = ("validation","results_x_mins_score",pred_steps,0.02)
     
+    
     optim_scores_vec = ["validation_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2, confidence_scoring_measure_tuple_3]
     
     inverse_for_minimise_vec = [True, False, False, False]
@@ -913,7 +913,7 @@ for scenario_ID in scenario_dict.keys():
         #scenario_name_str = "test 19"
         print("running scenario " + str(scenario_ID) + ": " + scenario_name_str + " - " + datetime.now().strftime("%H:%M:%S"))
         experiment_manager(
-            "experimenting 4",
+            scenario_name_str,
             design_space_dict,
             initial_doe_size_or_DoE=init_doe,
             max_iter=30,
