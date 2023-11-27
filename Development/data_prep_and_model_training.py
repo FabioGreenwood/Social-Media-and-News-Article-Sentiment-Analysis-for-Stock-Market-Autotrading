@@ -1540,12 +1540,9 @@ def retrieve_model_and_training_scores(predictor_location_file, predictor_name_e
     with open(predictor_location_file, 'rb') as file:
         predictor = pickle.load(file)
     #training_score = edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="load")
-    1.
-    if any(math.isnan(value) for value in list(training_score.values())):
-    #if training_score is None:
-        training_score = quick_training_score_rerun(predictor, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
-        #edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="save", training_scores=training_score)
-
+    
+    training_score = quick_training_score_rerun(predictor, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+    
     return predictor, training_score
 
 def generate_model_and_validation_scores(temporal_params_dict,
