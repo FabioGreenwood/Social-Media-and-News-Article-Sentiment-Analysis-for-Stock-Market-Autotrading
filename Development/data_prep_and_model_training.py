@@ -245,13 +245,12 @@ def return_topic_mode_seed_hash(enforced_topic_model_nested_list):
     return name + name2
     
 def return_topic_model_name(topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc):
-    if topic_model_qty > 1:
+    if int(topic_model_qty) > 1:
         file_string = "tm_qty" + str(topic_model_qty) + "_tm_alpha" + str(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed) + return_topic_mode_seed_hash(enforced_topic_model_nested_list) + "_newStops" + str({True: 1, False: 0}[new_combined_stopwords_inc])
-    elif topic_model_qty == 1:
+    elif int(topic_model_qty) == 1:
         file_string = "single_topic"
-    elif topic_model_qty == 0:
+    elif int(topic_model_qty) == 0:
         file_string = "no_topics"
-    file_string = "tm_qty" + str(topic_model_qty) + "_tm_alpha" + str(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed) + return_topic_mode_seed_hash(enforced_topic_model_nested_list) + "_newStops" + str({True: 1, False: 0}[new_combined_stopwords_inc])
     return file_string
 
 def return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor):
@@ -1538,12 +1537,19 @@ def generate_testing_scores(predictor, input_dict, return_time_series=False):
 def retrieve_model_and_training_scores(predictor_location_file, predictor_name_entry, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params):
     #predictor_location_file = "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\precalculated_assets\\predictive_model\\aapl_ps04_06_18_000000_pe01_09_20_000000_ts_sec300_tm_qty7_r_lt3600_r_hl3600_tm_alpha1_IDF-True_t_ratio_r100000.pred"
     with open(predictor_location_file, 'rb') as file:
-        predictor = pickle.load(file)
+        model = pickle.load(file)
+    df_financial_data = import_financial_data(
+        target_file_path          = fin_inputs_params_dict["historical_file"], 
+        input_cols_to_include_list  = fin_inputs_params_dict["cols_list"],
+        temporal_params_dict = temporal_params_dict, training_or_testing="training")
     #training_score = edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="load")
+    df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"], fin_inputs_params_dict["historical_file"])
+    df_sentimental_data = retrieve_or_generate_sentimental_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training")
     
-    training_score = quick_training_score_rerun(predictor, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+    X_train, y_train   = create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
+    model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.fit(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"])
     
-    return predictor, training_score
+    return model, training_scores_dict, validation_scores_dict, additional_validation_dict
 
 def generate_model_and_validation_scores(temporal_params_dict,
     fin_inputs_params_dict,
@@ -1658,7 +1664,7 @@ def retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inp
     predictor_name = return_predictor_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe, pred_steps_ahead, hidden_layers, estm_alpha, model_hyper_params)
     predictor_location_file = predictor_folder_location_string + predictor_name + ".pred"
     if os.path.exists(predictor_location_file):
-        predictor, training_scores = retrieve_model_and_training_scores(predictor_location_file, predictor_name_entry, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
+        predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = retrieve_model_and_training_scores(predictor_location_file, predictor_name_entry, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params)
     else:
         print(datetime.now().strftime("%H:%M:%S") + " - generating model and testing scores")
         predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = generate_model_and_validation_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict)

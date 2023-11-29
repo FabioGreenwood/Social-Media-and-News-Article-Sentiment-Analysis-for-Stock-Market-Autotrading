@@ -489,7 +489,7 @@ def trim_string_from_substring(string, substring="_params_"):
     x = string.find(substring) + len(substring)
     return string[x:]
 
-def print_desired_scores(design_history, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_minimise_vec):
+def print_desired_scores(design_history, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_minimise_vec, optim_run_name):
     # this method produces the desired output at the end of a run, informing the user of:
     # number of design runs, last score, best scores of each high-lighted score and best run with each score in question
     # last score info
@@ -501,6 +501,7 @@ def print_desired_scores(design_history, df_designs_record, design_space_dict, o
         ID: X scores:
     """
     last_ID = max(df_designs_record[df_designs_record["testing_mse"] > 0].index)
+    print(optim_run_name)
     print("ID: ", str(last_ID))
     output_string_2 = "inputs - "
     for name_1, val_1 in zip(return_keys_within_2_level_dict(design_space_dict), design_history[last_ID]["X"]):
@@ -703,7 +704,7 @@ def experiment_manager(
             # save
             df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
             save_designs_record_csv_and_dict(list_of_save_locations, df_designs_record=df_designs_record, design_history_dict=design_history_dict, optim_run_name=optim_run_name)
-            print_desired_scores(design_history_dict, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_minimise_vec)
+            print_desired_scores(design_history_dict, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_minimise_vec, optim_run_name)
         update_global_record(pred_steps, df_designs_record, experi_params_list, optim_run_name, global_record_path)
             
             
@@ -743,7 +744,7 @@ def experiment_manager(
         # save
         df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
         save_designs_record_csv_and_dict(list_of_save_locations, df_designs_record=df_designs_record, design_history_dict=design_history_dict, optim_run_name=optim_run_name)
-        print_desired_scores(design_history_dict, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_minimise_vec)
+        print_desired_scores(design_history_dict, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_minimise_vec, optim_run_name)
         # check loop
         
         if len(df_designs_record.index) >= overall_max_runs:
@@ -788,7 +789,7 @@ design_space_dict = {
 
 global_run_count = 0
 
-#init_doe = 20
+#init_doe = 5
 init_doe = [[5,	5,	 1, 25200, 1, 0, 1, 0, 1e-5],
             [5,  5,	  1, 7200,  1, 1, 4, 1, 1e-4],
             [13, 5,	  0, 25200, 1, 1, 1, 2, 1e-3],
