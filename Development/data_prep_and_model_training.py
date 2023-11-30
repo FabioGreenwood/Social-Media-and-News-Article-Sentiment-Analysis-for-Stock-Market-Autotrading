@@ -627,7 +627,7 @@ def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dic
                 senti_scores = senti_scores + [0]
             else:
                 senti_scores = senti_scores + [2]
-                
+        
         return senti_scores
         
     data = tweet_cohort_t1.apply(process_row_2, axis=1)
@@ -965,7 +965,8 @@ def return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty=10, enforc
                         topic_model_alpha=0.1, apply_IDF=True, cores=2, passes=60, iterations=800, return_perplexity=False):
     output = []
 
-    data = df_prepped_tweets_company_agnostic
+    data = df_prepped_tweets_company_agnostic[::40]
+    print("topic model trained from {} tweets".format(len(data)))
     data_words = list(sent_to_words(data))
     
     if return_LDA_model < return_html_visualisation:
@@ -1209,49 +1210,19 @@ def current_infer_values_method(df):
 
 def initiate_model(outputs_params_dict, model_hyper_params):
     if model_hyper_params["name"] == "RandomSubspace_MLPRegressor":
-            estimator = DRSLinReg(base_estimator=MLPRegressor(
-                hidden_layer_sizes  = model_hyper_params["estimator__hidden_layer_sizes"],
-                activation          = model_hyper_params["estimator__activation"],
-                alpha               = model_hyper_params["estimator__alpha"]
-                ),
-                model_hyper_params=model_hyper_params, 
-                ticker_name=outputs_params_dict["output_symbol_indicators_tuple"][0])
-    #elif model_hyper_params["name"] == "SimpleRNN":
-    #    estimator = Sequential()
-    #    estimator.add(SimpleRNN(units=32, activation='relu', input_shape=(sequence_length, input_dim)))
-    #    estimator.add(Dense(output_dim))
+        estimator = DRSLinReg(base_estimator=MLPRegressor(
+            hidden_layer_sizes  = model_hyper_params["estimator__hidden_layer_sizes"],
+            activation          = model_hyper_params["estimator__activation"],
+            alpha               = model_hyper_params["estimator__alpha"]
+            ),
+            model_hyper_params=model_hyper_params, 
+            ticker_name=outputs_params_dict["output_symbol_indicators_tuple"][0])
+    elif model_hyper_params["name"] == "RandomSubspace_RNN_Regressor":
+        estimator = DRSLinRegRNN(base_estimator=Sequential(),
+            model_hyper_params=model_hyper_params, 
+            ticker_name=outputs_params_dict["output_symbol_indicators_tuple"][0])
+        
     
-    elif model_hyper_params["name"] == "ElasticNet": 
-            raise ValueError("OLD SYSTEM WILL NOT WORK")
-            keys = ["estimator__alpha", "estimator__l1_ratio"]
-            #check_dict_keys_for_build_model(keys, input_dict, type_str)
-            estimator = BaggingRegressor(
-                MultiOutputRegressor(
-                ElasticNet(
-                    alpha       = model_hyper_params["ElasticNet"]["estimator__alpha"],
-                    l1_ratio    = model_hyper_params["ElasticNet"]["estimator__l1_ratio"],
-                    fit_intercept=True,
-                    #normalize=False,
-                    precompute=False,
-                    max_iter=16,
-                    copy_X=True,
-                    tol=0.1,
-                    warm_start=False,
-                    positive=False,
-                    random_state=None,
-                    selection='random'
-                )), n_estimators=10, random_state=0, max_features=0.5
-            )
-    elif model_hyper_params["name"] == "MLPRegressor":
-            raise ValueError("OLD SYSTEM WILL NOT WORK")
-            keys = ["estimator__hidden_layer_sizes", "estimator__activation"]
-            #check_dict_keys_for_build_model(keys, input_dict, type_str)
-            estimator = MLPRegressor(
-                activation          = model_hyper_params["MLPRegressor"]["estimator__activation"],
-                hidden_layer_sizes  = model_hyper_params["MLPRegressor"]["estimator__hidden_layer_sizes"],
-                alpha=0.001,
-                random_state=20,
-                early_stopping=False)
     else:
         raise ValueError("the model type: " + str(model_hyper_params["name"]) + " was not found in the method")
     
@@ -1259,42 +1230,34 @@ def initiate_model(outputs_params_dict, model_hyper_params):
 
 #%% temp sample DoE space for RNN
 
-"estimator__hidden_layer_sizes" = {0 : [("simple", 10)],
-    1 : [("bidirectional", 10)],
-    2 : [("LSTM", 10)],
-    3 : [("simple", 10), ("simple", 10)],
-    4 : [("bidirectional", 10), ("bidirectional", 10)],
-    5 : [("LSTM", 10), ("LSTM", 10)],
-    6 : [("simple", 30), ("simple", 20), ("simple", 10)],
-    7 : [("bidirectional", 30), ("bidirectional", 20), ("bidirectional", 20)],
-    8 : [("LSTM", 30), ("LSTM", 20), ("LSTM", 10)]}
-
-
-
 def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, sequence_length, dropout_cols):
     
-    hidden_layers_list = []
+    ensable_estimator = Sequential()
+
     #define hidden layers
-    for layer in model_hyper_params["model_hyper_params"]:
+    for layer in model_hyper_params["estimator__hidden_layer_sizes"]:
+        print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX       " + layer[0])
         if layer[0] == "simple":
-            hidden_layers_list += [SimpleRNN(units=layer[1], activation='relu', input_shape=(sequence_length, 1))]
+            #hidden_layers_list += [SimpleRNN(units=layer[1], activation=model_hyper_params["estimator__activation"])]#, input_shape=(sequence_length, 1))]
+            ensable_estimator.add(SimpleRNN(units=layer[1], activation=model_hyper_params["estimator__activation"]))
         elif layer[0] == "bidirectional":
-            hidden_layers_list += [Bidirectional(LSTM(units=layer[1], activation='relu', return_sequences=True))]
-        elif layer[0] == "LSTM":
-            hidden_layers_list += [LSTM(units=10, activation='relu'),]
+            #hidden_layers_list += [Bidirectional(LSTM(units=layer[1], activation=model_hyper_params["estimator__activation"]))]
+            ensable_estimator.add(Bidirectional(LSTM(units=layer[1], activation=model_hyper_params["estimator__activation"])))
+        #elif layer[0] == "LSTM":
+        #    #hidden_layers_list += [LSTM(units=layer[1], activation=model_hyper_params["estimator__activation"])]
+        #    ensable_estimator.add(LSTM(units=layer[1], activation=model_hyper_params["estimator__activation"]))
     #define output layer
-    hidden_layers_list += [Dense(units=1)]
+    #hidden_layers_list += [Dense(units=1)]
+    ensable_estimator.add(Dense(units=1))
+    
     
     # Compile the model
     ensable_estimator = Sequential(hidden_layers_list)
-    ensable_estimator.compile(optimizer='adam', loss='mse')
+    ensable_estimator.compile(optimizer='adam', loss='mae')
     ensable_estimator.random_state = global_random_state
     ensable_estimator.dropout_cols_ = dropout_cols
     
     return ensable_estimator
-    
-    
-    
     
 
 class DRSLinRegRNN():
@@ -1326,7 +1289,7 @@ class DRSLinRegRNN():
                                           bootstrap=True,
                                           bootstrap_features=False)
                                           #random_state=self.random_state SET ELSEWHERE
-        for key in self.model_hyper_params: #FG_action: ensure this is aligned
+        for key in self.model_hyper_params:
             setattr(estimator, key, self.model_hyper_params[key])
             
         estimator.base_estimator = self.base_estimator #FG_action: move?
@@ -1345,7 +1308,7 @@ class DRSLinRegRNN():
                 y_test  = y.loc[y.index[test_index].values].copy()
                 
                 # initisate new RNN
-                ensable_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, dropout_cols)
+                ensable_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features, dropout_cols)
                 global_random_state += 1
                 
                 # operate ensamble predictor
@@ -1429,8 +1392,6 @@ class DRSLinReg():
         additional_validation_dict = average_list_of_identical_dicts(additional_validation_dict_list)
         
         return self, training_scores_dict, validation_scores_dict, additional_validation_dict
-
-
 
     def predict_ensemble(self, X, output_name=None):
         
