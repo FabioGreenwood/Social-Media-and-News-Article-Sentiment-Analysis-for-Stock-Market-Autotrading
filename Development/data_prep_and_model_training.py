@@ -78,6 +78,9 @@ from stock_indicators.indicators.common.quote import Quote
 from stock_indicators.indicators.common.enums import Match
 from stock_indicators import PeriodSize, PivotPointType 
 from sklearn.model_selection import train_test_split
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import SimpleRNN, Bidirectional, LSTM, Dense
 
 
 #%% EXAMPLE INPUTS FOR MAIN METHOD
@@ -1085,85 +1088,6 @@ def save_topic_clusters(wordcloud=None, topic_model_dict=None, visualisation=Non
             pyLDAvis.save_html(visualisation, file_location_visualisation)
         except:
             print("vis not made")
-
-"""#def edit_scores_csv(predictor_name_entry, is_training_or_testing, score_types, mode="save", training_scores=None):
-#    global global_scores_database, global_strptime_str_filename
-#    DB_strptime_str = '%d/%m/%Y %H:%M:%S'
-#
-#    ID_str          = "ID"
-#    first_col_str   = "company_symbol (ps)"
-#    last_col_str    = "tweet_ratio_removed (t_ratio_r)"
-#    ERROR_multi_input = "There are multiple entries of the following experiment: {}"
-#    ERROR_mode_input_wrong = "'mode' input should be 'save' or 'load', recieved {}"
-#    ERROR_is_training_or_testing_input_wrong= "'is_training_or_testing' input should be 'training' or 'testing', recieved {}"
-#    score_col_str    =  is_training_or_testing + "_{}" # + score_type
-#    
-#    #expection handling
-#    if not is_training_or_testing == "training" and not is_training_or_testing == "testing":
-#        raise ValueError(ERROR_is_training_or_testing_input_wrong.format(is_training_or_testing))
-#        
-#    #format values
-#    company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed = predictor_name_entry
-#    train_period_start  = train_period_start.strftime(DB_strptime_str)
-#    train_period_end    = train_period_end.strftime(DB_strptime_str)
-#    apply_IDF           = str(apply_IDF)
-#    predictor_name_entry = company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed
-#    
-#    #prep DB, try using dont touch
-#    try:
-#        df_scores_database = pd.read_csv(global_scores_database + "DONTTOUCH", index_col=ID_str)
-#    except:
-#        df_scores_database = pd.DataFrame(columns=[ID_str, "company_symbol (ps)", "train_period_start (ps)", "train_period_end (pe)", "time_step_seconds (ts_sec)", "topic_model_qty (tm_qty)", "rel_lifetime (r_lt)", "rel_hlflfe (r_hl)", "topic_model_alpha (tm_alpha)", "apply_IDF (IDF)", "tweet_ratio_removed (t_ratio_r)", "training_r2", "training_mse", "training_mae", "testing_r2", "testing_mse",  "testing_mae"])
-#        df_scores_database = df_scores_database.set_index("ID")
-#                
-#    #format datetimes
-#    df_scores_database['train_period_start (ps)'] = df_scores_database['train_period_start (ps)'].apply(lambda x: str(x))
-#    df_scores_database['train_period_end (pe)'] = df_scores_database['train_period_end (pe)'].apply(lambda x: str(x))
-#        
-#    #find matches
-#    value_qty = len(df_scores_database.loc[:,first_col_str:last_col_str].columns)
-#    previous_values = df_scores_database.loc[:,"company_symbol (ps)":"tweet_ratio_removed (t_ratio_r)"]==predictor_name_entry
-#    previous_entries_indexes = list((previous_values[previous_values.sum(axis=1) == value_qty]).index)
-#    
-#    
-#    if mode=="load":
-#        output = dict()
-#        if len(previous_entries_indexes) == 1:
-#            for val in score_types:
-#                output[val] = df_scores_database.loc[previous_entries_indexes[0], score_col_str.format(val)]
-#            return output
-#        elif len(previous_entries_indexes) > 1:
-#            raise ValueError(ERROR_multi_input.format(str(predictor_name_entry)))
-#        else:
-#            output["na"] = math.nan
-#            return output
-#        
-#    elif mode=="save":
-#        #assign correct ID, given matches
-#        if len(previous_entries_indexes) == 1:
-#            ID = previous_entries_indexes[0]
-#        elif len(previous_entries_indexes) > 1:
-#            raise ValueError(ERROR_multi_input.format(str(predictor_name_entry)))
-#        else:
-#            ID = df_scores_database.index.max() + 1
-#            if math.isnan(ID):
-#                ID = 0
-#            df_scores_database.loc[ID,first_col_str:last_col_str] = list(predictor_name_entry)
-#
-#        #populate score
-#        for val in score_types:
-#            df_scores_database.loc[ID, score_col_str.format(val)] = training_scores[val]
-#
-#        #save
-#        try:
-#            df_scores_database.to_csv(global_scores_database)
-#            df_scores_database.to_csv(global_scores_database + "DONTTOUCH")
-#        except:
-#            df_scores_database.to_csv(global_scores_database + "DONTTOUCH")
-#            
-#            
-#    else:
-#        ERROR_mode_input_wrong.format(mode)"""
     
 def sent_to_words(sentences):
     for sentence in sentences:
@@ -1333,12 +1257,52 @@ def initiate_model(outputs_params_dict, model_hyper_params):
     
     return estimator
 
+#%% temp sample DoE space for RNN
+
+"estimator__hidden_layer_sizes" = {0 : [("simple", 10)],
+    1 : [("bidirectional", 10)],
+    2 : [("LSTM", 10)],
+    3 : [("simple", 10), ("simple", 10)],
+    4 : [("bidirectional", 10), ("bidirectional", 10)],
+    5 : [("LSTM", 10), ("LSTM", 10)],
+    6 : [("simple", 30), ("simple", 20), ("simple", 10)],
+    7 : [("bidirectional", 30), ("bidirectional", 20), ("bidirectional", 20)],
+    8 : [("LSTM", 30), ("LSTM", 20), ("LSTM", 10)]}
+
+
+
+def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, sequence_length, dropout_cols):
+    
+    hidden_layers_list = []
+    #define hidden layers
+    for layer in model_hyper_params["model_hyper_params"]:
+        if layer[0] == "simple":
+            hidden_layers_list += [SimpleRNN(units=layer[1], activation='relu', input_shape=(sequence_length, 1))]
+        elif layer[0] == "bidirectional":
+            hidden_layers_list += [Bidirectional(LSTM(units=layer[1], activation='relu', return_sequences=True))]
+        elif layer[0] == "LSTM":
+            hidden_layers_list += [LSTM(units=10, activation='relu'),]
+    #define output layer
+    hidden_layers_list += [Dense(units=1)]
+    
+    # Compile the model
+    ensable_estimator = Sequential(hidden_layers_list)
+    ensable_estimator.compile(optimizer='adam', loss='mse')
+    ensable_estimator.random_state = global_random_state
+    ensable_estimator.dropout_cols_ = dropout_cols
+    
+    return ensable_estimator
+    
+    
+    
+    
+
 class DRSLinRegRNN():
-    def __init__(self, base_estimator=MLPRegressor(),
+    def __init__(self, base_estimator=Sequential(),
                  model_hyper_params=model_hyper_params, 
                  ticker_name=outputs_params_dict["output_symbol_indicators_tuple"][0]):
         #expected keys: training_time_splits, max_depth, max_features, random_state,        
-        for key in model_hyper_params:
+        for key in model_hyper_params: #FG_action: ensure this is aligned
            setattr(self, key, model_hyper_params[key])
         self.model_hyper_params = model_hyper_params
         self.ticker_name = ticker_name
@@ -1348,7 +1312,6 @@ class DRSLinRegRNN():
         self.n_estimators = 1 #this is a hard coding as the n estimators is set by a random loop. this ensures that each version of the input (provided by the 'remove columns' function), is used to train just a single model
         
     def fit(self, X, y, pred_steps_list, confidences_before_betting_PC):
-        tscv = BlockingTimeSeriesSplit(n_splits=self.training_time_splits)
         count = 0
         global global_random_state
         training_scores_dict_list  = []
@@ -1363,7 +1326,7 @@ class DRSLinRegRNN():
                                           bootstrap=True,
                                           bootstrap_features=False)
                                           #random_state=self.random_state SET ELSEWHERE
-        for key in self.model_hyper_params:
+        for key in self.model_hyper_params: #FG_action: ensure this is aligned
             setattr(estimator, key, self.model_hyper_params[key])
             
         estimator.base_estimator = self.base_estimator #FG_action: move?
@@ -1382,12 +1345,8 @@ class DRSLinRegRNN():
                 y_test  = y.loc[y.index[test_index].values].copy()
                 
                 # initisate new RNN
-                ensable_estimator = return_RNN_estimator(self.model_hyper_params, global_random_state, dropout_cols)
+                ensable_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, dropout_cols)
                 global_random_state += 1
-                
-                estimator.random_state = global_random_state
-                
-                estimator.dropout_cols_ = dropout_cols
                 
                 # operate ensamble predictor
                 ensable_estimator.fit(X_train, y_train)
