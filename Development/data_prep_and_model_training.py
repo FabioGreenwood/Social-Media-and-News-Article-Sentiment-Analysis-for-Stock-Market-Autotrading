@@ -536,11 +536,6 @@ def retrieve_sentimental_data():
 
 
 
-
-
-
-
-
 def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, repeat_timer=10, training_or_testing="training", hardcode_df_annotated_tweets=None):
     
     #general parameters
@@ -763,7 +758,7 @@ def generate_and_save_topic_model(run_name, temporal_params_dict, fin_inputs_par
     #quick fix to reduce the amount of wasted time cleaning tweets
     global global_df_stocks_list_file
     df_prepped_tweets_company_agnostic_file_path = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["clean_tweets"]
-    if reclean_tweets == True:
+    if reclean_tweets == True or not os.path.exists(df_prepped_tweets_company_agnostic_file_path):
         df_prepped_tweets_company_agnostic          = prep_and_save_twitter_text_for_subject_discovery(df_prepped_tweets["body"], df_stocks_list_file=global_df_stocks_list_file, df_prepped_tweets_company_agnostic_file_path=df_prepped_tweets_company_agnostic_file_path, inc_new_combined_stopwords_list=inc_new_combined_stopwords_list)
     else:
         with open(df_prepped_tweets_company_agnostic_file_path, 'rb') as file:
@@ -1338,7 +1333,7 @@ def initiate_model(outputs_params_dict, model_hyper_params):
     
     return estimator
 
-class custom_simpleRNN():
+class DRSLinRegRNN():
     def __init__(self, base_estimator=MLPRegressor(),
                  model_hyper_params=model_hyper_params, 
                  ticker_name=outputs_params_dict["output_symbol_indicators_tuple"][0]):
@@ -1351,6 +1346,58 @@ class custom_simpleRNN():
         self.estimators_ = []
         self.training_time_splits = model_hyper_params["time_series_split_qty"]
         self.n_estimators = 1 #this is a hard coding as the n estimators is set by a random loop. this ensures that each version of the input (provided by the 'remove columns' function), is used to train just a single model
+        
+    def fit(self, X, y, pred_steps_list, confidences_before_betting_PC):
+        tscv = BlockingTimeSeriesSplit(n_splits=self.training_time_splits)
+        count = 0
+        global global_random_state
+        training_scores_dict_list  = []
+        validation_scores_dict_list  = []
+        additional_validation_dict_list = []
+        kf = KFold(n_splits=5, shuffle=False)
+        estimator = BaggingRegressor(base_estimator=self.base_estimator,
+                                          #the assignment of "one" estimator is overwritten by the rest of the method
+                                          n_estimators=1,#self.n_estimators,
+                                          max_samples=1.0,
+                                          max_features=1.0,
+                                          bootstrap=True,
+                                          bootstrap_features=False)
+                                          #random_state=self.random_state SET ELSEWHERE
+        for key in self.model_hyper_params:
+            setattr(estimator, key, self.model_hyper_params[key])
+            
+        estimator.base_estimator = self.base_estimator
+        for train_index, test_index in kf.split(X):
+            #these are the base values that will be updated if there isn't a passed value in the input dict
+            
+            
+            count += 1
+            for i_random in range(model_hyper_params["n_estimators_per_time_series_blocking"]):
+                # randomly select features to drop out
+                n_features = X.shape[1]
+                dropout_cols = return_columns_to_remove(columns_list=X.columns, self=self)
+                X_train = X.loc[X.index[train_index].values].copy()
+                X_train.loc[:, dropout_cols] = 0
+                y_train = y.loc[y.index[train_index].values].copy()
+                y_test  = y.loc[y.index[test_index].values].copy()
+                estimator.random_state = global_random_state
+                global_random_state += 1
+                estimator.dropout_cols_ = dropout_cols
+                estimator.fit(X_train, y_train)
+                # validate model
+                y_pred_train = estimator.predict(X.iloc[train_index].values)
+                y_pred_test = estimator.predict(X.iloc[test_index].values)
+                #collect training, validation and validation additional analysis scores
+                training_scores_dict_list   += [{"r2" : r2_score(y_train, y_pred_train), "mse" : mean_squared_error(y_train, y_pred_train), "mae" : mean_absolute_error(y_train, y_pred_train)}]
+                validation_scores_dict_list += [{"r2" : r2_score(y_test, y_pred_test),   "mse" : mean_squared_error(y_test, y_pred_test),   "mae" : mean_absolute_error(y_test, y_pred_test)}]
+                additional_validation_dict_list += [FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred_test, y.iloc[test_index], pred_steps_list, confidences_before_betting_PC=confidences_before_betting_PC)]
+                self.estimators_ = self.estimators_ + [estimator]
+        
+        training_scores_dict       = average_list_of_identical_dicts(training_scores_dict_list)
+        validation_scores_dict     = average_list_of_identical_dicts(validation_scores_dict_list)
+        additional_validation_dict = average_list_of_identical_dicts(additional_validation_dict_list)
+        
+        return self, training_scores_dict, validation_scores_dict, additional_validation_dict
 
 class DRSLinReg():
     def __init__(self, base_estimator=MLPRegressor(),
