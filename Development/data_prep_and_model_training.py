@@ -80,7 +80,7 @@ from stock_indicators import PeriodSize, PivotPointType
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import SimpleRNN, Bidirectional, LSTM, Dense
+from tensorflow.keras.layers import SimpleRNN, Bidirectional, LSTM, Dense, GRU
 
 
 #%% EXAMPLE INPUTS FOR MAIN METHOD
@@ -610,17 +610,17 @@ def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dic
     tweet_cohort_t1["tweet_cohort_end_post"]    = tweet_cohort_t1["tweet_cohort_start_post"].apply(lambda datetime: ((datetime - epoch_time)).total_seconds())
     tweet_cohort_t1["tweet_cohort_start_post"]  = tweet_cohort_t1["tweet_cohort_start_post"].apply(lambda datetime: ((datetime - epoch_time) - timedelta(seconds=relavance_lifetime)).total_seconds())
     
-    def process_row_2(row, df_annotated_tweets=df_annotated_tweets, topic_num=num_topics, relavance_lifetime=relavance_lifetime):
+    def process_row_2(row, df_annotated_tweets=df_annotated_tweets, topic_num=num_topics, relavance_halflife=relavance_halflife):
         tweet_cohort_start_post = row["tweet_cohort_start_post"]
         tweet_cohort_end_post = row["tweet_cohort_end_post"]
         tweet_cohort = return_tweet_cohort_from_scratch(df_annotated_tweets, tweet_cohort_start_post, tweet_cohort_end_post)
 
-        pre_calc_time_overall = np.exp((-3 / relavance_lifetime) * (tweet_cohort["post_date"] - tweet_cohort_start_post)) * tweet_cohort["~sent_overall"]
+        pre_calc_time_overall = np.exp((-3 / relavance_halflife) * (tweet_cohort["post_date"] - tweet_cohort_start_post)) * tweet_cohort["~sent_overall"]
 
         senti_scores = []
         for topic_num in range(num_topics):
             score_numer = np.sum(pre_calc_time_overall * tweet_cohort[f"~sent_topic_W{topic_num}"])
-            score_denom = np.sum(np.exp((-3 / relavance_lifetime) * (tweet_cohort["post_date"] -  tweet_cohort_start_post)) * tweet_cohort[f"~sent_topic_W{topic_num}"])
+            score_denom = np.sum(np.exp((-3 / relavance_halflife) * (tweet_cohort["post_date"] -  tweet_cohort_start_post)) * tweet_cohort[f"~sent_topic_W{topic_num}"])
             if score_denom > 0:
                 senti_scores = senti_scores + [score_numer / score_denom]
             elif score_denom == 0:
@@ -1230,34 +1230,34 @@ def initiate_model(outputs_params_dict, model_hyper_params):
 
 #%% temp sample DoE space for RNN
 
-def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, sequence_length, dropout_cols):
+def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_features, dropout_cols, lookback=1):
     
-    ensable_estimator = Sequential()
-
-    #define hidden layers
-    for layer in model_hyper_params["estimator__hidden_layer_sizes"]:
+    ensemble_estimator = Sequential()
+    for id, layer in enumerate(model_hyper_params["estimator__hidden_layer_sizes"]):
+        
         print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX       " + layer[0])
         if layer[0] == "simple":
-            #hidden_layers_list += [SimpleRNN(units=layer[1], activation=model_hyper_params["estimator__activation"])]#, input_shape=(sequence_length, 1))]
-            ensable_estimator.add(SimpleRNN(units=layer[1], activation=model_hyper_params["estimator__activation"]))
-        elif layer[0] == "bidirectional":
-            #hidden_layers_list += [Bidirectional(LSTM(units=layer[1], activation=model_hyper_params["estimator__activation"]))]
-            ensable_estimator.add(Bidirectional(LSTM(units=layer[1], activation=model_hyper_params["estimator__activation"])))
-        #elif layer[0] == "LSTM":
-        #    #hidden_layers_list += [LSTM(units=layer[1], activation=model_hyper_params["estimator__activation"])]
-        #    ensable_estimator.add(LSTM(units=layer[1], activation=model_hyper_params["estimator__activation"]))
-    #define output layer
-    #hidden_layers_list += [Dense(units=1)]
-    ensable_estimator.add(Dense(units=1))
+            if id == 0:
+                ensemble_estimator.add(SimpleRNN(units=layer[1], activation=model_hyper_params["estimator__activation"], input_shape=(n_features, lookback), return_sequences=True))
+            else:
+                ensemble_estimator.add(SimpleRNN(units=layer[1], activation=model_hyper_params["estimator__activation"], return_sequences=True))
+        elif layer[0] == "GRU":
+            if id == 0:
+                ensemble_estimator.add(Bidirectional(GRU(units=layer[1], activation=model_hyper_params["estimator__activation"], return_sequences=True), input_shape=(n_features, lookback)))
+            else:
+                ensemble_estimator.add(Bidirectional(GRU(units=layer[1], activation=model_hyper_params["estimator__activation"], return_sequences=True)))
+        elif layer[0] == "LSTM":
+            if id == 0:
+                ensemble_estimator.add(Bidirectional(LSTM(units=layer[1], activation=model_hyper_params["estimator__activation"], return_sequences=True), input_shape=(n_features, lookback)))
+            else:
+                ensemble_estimator.add(Bidirectional(LSTM(units=layer[1], activation=model_hyper_params["estimator__activation"], return_sequences=True)))
+                                      
+    ensemble_estimator.add(Dense(units=1))
+    ensemble_estimator.compile(optimizer='adam', loss='mse')
+    ensemble_estimator.random_state = global_random_state
+    ensemble_estimator.dropout_cols_ = dropout_cols
     
-    
-    # Compile the model
-    ensable_estimator = Sequential(hidden_layers_list)
-    ensable_estimator.compile(optimizer='adam', loss='mae')
-    ensable_estimator.random_state = global_random_state
-    ensable_estimator.dropout_cols_ = dropout_cols
-    
-    return ensable_estimator
+    return ensemble_estimator
     
 
 class DRSLinRegRNN():
@@ -1308,18 +1308,25 @@ class DRSLinRegRNN():
                 y_test  = y.loc[y.index[test_index].values].copy()
                 
                 # initisate new RNN
-                ensable_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features, dropout_cols)
+                ensemble_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features, dropout_cols)
                 global_random_state += 1
                 
                 # operate ensamble predictor
-                ensable_estimator.fit(X_train, y_train)
-                y_pred_train = ensable_estimator.predict(X.iloc[train_index].values)
-                y_pred_test = ensable_estimator.predict(X.iloc[test_index].values)
+                #X_train = X_train.values
+                #X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
+                
+                X_train_temp =  np.reshape(X_train.values, (X_train.shape[0], 1, X_train.shape[1]))
+                y_train_temp =  np.reshape(y_train.values, (y_train.shape[0], 1, y_train.shape[1]))
+                                
+                
+                ensemble_estimator.fit(X_train, y_train)
+                y_pred_train = ensemble_estimator.predict(X.iloc[train_index].values)
+                y_pred_test = ensemble_estimator.predict(X.iloc[test_index].values)
                 # collect training, validation and validation additional analysis scores
                 training_scores_dict_list   += [{"r2" : r2_score(y_train, y_pred_train), "mse" : mean_squared_error(y_train, y_pred_train), "mae" : mean_absolute_error(y_train, y_pred_train)}]
                 validation_scores_dict_list += [{"r2" : r2_score(y_test, y_pred_test),   "mse" : mean_squared_error(y_test, y_pred_test),   "mae" : mean_absolute_error(y_test, y_pred_test)}]
                 additional_validation_dict_list += [FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred_test, y.iloc[test_index], pred_steps_list, confidences_before_betting_PC=confidences_before_betting_PC)]
-                self.estimators_ = self.estimators_ + [ensable_estimator]
+                self.estimators_ = self.estimators_ + [ensemble_estimator]
         
         training_scores_dict       = average_list_of_identical_dicts(training_scores_dict_list)
         validation_scores_dict     = average_list_of_identical_dicts(validation_scores_dict_list)

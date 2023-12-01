@@ -36,6 +36,7 @@ if not sys.warnoptions:
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import matplotlib.pyplot as plt
 
+
 #%% Standard Parameters
 
 
@@ -107,9 +108,9 @@ default_senti_inputs_params_dict    = {
     "enforced_topics_dict_name" : "None",
     "enforced_topics_dict"  : None,
     "sentiment_method"      : SentimentIntensityAnalyzer(),
-    "tweet_file_location"   : r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\twitter data\Tweets about the Top Companies from 2015 to 2020\Tweet.csv\Tweet.csv",
+    "tweet_file_location"   : r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\twitter data\Tweets about the Top Companies from 2015 to 2020\Tweet.csv\apple.csv",
     "regenerate_cleaned_tweets_for_subject_discovery" : False,
-    "inc_new_combined_stopwords_list" : False,
+    "inc_new_combined_stopwords_list" : True,
     "topic_weight_square_factor" : 1
 }
 default_outputs_params_dict         = {
@@ -124,7 +125,8 @@ default_cohort_retention_rate_dict = {
             "~senti_*" : 0.4, #sentiment analysis
             "*": 0.5} # other missed values
 default_model_hyper_params          = {
-    "name" : "RandomSubspace_MLPRegressor", #Multi-layer Perceptron regressor
+    #"name" : "RandomSubspace_MLPRegressor", #Multi-layer Perceptron regressor
+    "name" : "RandomSubspace_RNN_Regressor", #Multi-layer Perceptron regressor
         #general hyperparameters
     "n_estimators_per_time_series_blocking" : 2,
     "training_error_measure_main"   : 'neg_mean_squared_error',
@@ -767,9 +769,8 @@ design_space_dict = {
         "topic_qty" : [5, 9, 13, 17],
         "topic_model_alpha" : [0.3, 0.7, 1, 2, 3, 5],
         "weighted_topics" : [False, True],
-        "relative_halflife" : [0.5 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR], 
+        "relative_halflife" : [0.25 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR], 
         "apply_IDF" : [False, True],
-        "inc_new_combined_stopwords_list" : [False, True],
         "topic_weight_square_factor" : [1, 2, 4]
         #,
         #"enforced_topics_dict"  : {
@@ -777,11 +778,16 @@ design_space_dict = {
         #    1 : [['investment', 'financing', 'losses'], ['risk', 'exposure', 'liability'], ["financial",  "forces" , "growth", "interest",  "rates"]]}
     },
     "model_hyper_params" : {
-        "estimator__hidden_layer_sizes" : {0 : (10, 10),
-                                           1 : (20, 10),
-                                           2 : (100, 10),
-                                           3 : (50, 20, 10),
-                                           4 : (40,30,20,10)},
+        "estimator__hidden_layer_sizes" : {
+            0 : [("simple", 50)],
+            1 : [("simple", 40), ("simple", 30)],
+            2 : [("GRU", 50)],
+            3 : [("GRU", 40), ("GRU", 30)],
+            4 : [("LSTM", 50)],
+            5 : [("LSTM", 50), ("LSTM", 30)],
+            7 : [("LSTM", 50), ("GRU", 50), ("simple", 50)],
+            8 : [("simple", 50), ("GRU", 50), ("LSTM", 50)]
+            },
         "estimator__alpha"                 : [1e-5, 1e-4, 1e-3, 1e-2, 5e-2, 1e-1]
     },
     "string_key" : {}
@@ -789,59 +795,7 @@ design_space_dict = {
 
 global_run_count = 0
 
-init_doe = 5
-#init_doe = [[5,	5,	 1, 25200, 1, 0, 1, 0, 1e-5],
-#            [5,  5,	  1, 7200,  1, 1, 4, 1, 1e-4],
-#            [13, 5,	  0, 25200, 1, 1, 1, 2, 1e-3],
-#            [5,  1,	  0, 25200, 1, 0, 1, 4, 1e-2],
-#            [5,  0.3, 1, 25200, 0, 1, 4, 0, 5e-2],
-#            [17, 5,	  1, 1800,  0, 0, 1, 0, 1e-1],
-#            [13, 5,	  1, 25200, 1, 1, 1, 2, 1e-5],
-#            [13, 2,	  0, 25200, 0, 0, 1, 2, 1e-4],
-#            [5,  1,	  1, 1800,  1, 1, 2, 1, 1e-3],
-#            [5,  0.3, 0, 25200, 1, 0, 4, 4, 1e-2],
-#            [17, 1,	  0, 1800,  1, 1, 1, 4, 5e-2],
-#            [13, 5,	  1, 25200, 0, 0, 2, 0, 1e-1],
-#            [5,  3,	  1, 1800,  0, 0, 1, 1, 1e-5],
-#            [5,  2,	  1, 1800,  1, 0, 4, 0, 1e-4],
-#            [17, 3,	  1, 7200,  0, 0, 4, 0, 1e-3],
-#            [9,  0.7, 0, 1800,  0, 1, 4, 2, 1e-2],
-#            [17, 0.3, 1, 7200,  0, 1, 1, 3, 5e-2],
-#            [17, 2,	  1, 1800,  0, 0, 2, 3, 1e-1],
-#            [9,  3,	  1, 7200,  1, 0, 4, 3, 1e-5],
-#            [17, 0.3, 1, 1800,  0, 0, 2, 2, 1e-4],
-#            [9,  0.3, 0, 1800,  0, 0, 2, 4, 1e-3],
-#            [17,  3,  1, 1800,  0, 1, 1, 4, 1e-2],
-#            [5,  5,	  1, 25200, 1, 1, 4, 1, 5e-2],
-#            [9,  3,	  0, 25200, 1, 0, 2, 0, 1e-1],
-#            [9,  0.3, 0, 25200, 0, 0, 1, 0, 1e-5],
-#            [9,  3,	  1, 7200,  0, 0, 2, 2, 1e-4],
-#            [13, 0.7, 0, 7200,  0, 1, 2, 0, 1e-3],
-#            [5,  0.7, 0, 7200,  0, 1, 2, 4, 1e-2],
-#            [13, 5,	  1, 25200, 0, 1, 1, 0, 5e-2],
-#            [5,  0.7, 0, 7200,  0, 1, 2, 3, 1e-1],
-#            [5,  5,   1, 25200, 1, 0, 4, 3, 1e-5],
-#            [17, 1,   1, 1800,  0, 0, 2, 1, 1e-4],
-#            [9,  0.3, 0, 7200,  0, 1, 1, 0, 1e-3],
-#            [17, 0.7, 1, 7200,  1, 1, 1, 0, 1e-2],
-#            [17, 0.3, 0, 7200,  1, 0, 2, 2, 5e-2],
-#            [13, 0.3, 1, 7200,  0, 1, 1, 3, 1e-1],
-#            [17, 2,   1, 25200, 1, 1, 4, 1, 1e-5],
-#            [13, 1,   0, 7200,  0, 0, 1, 4, 1e-4],
-#            [13, 1,   1, 1800,  1, 1, 4, 2, 1e-3],
-#            [5,  3,   1, 7200,  1, 1, 1, 3, 1e-2],
-#            [9,  3,   1, 7200,  0, 1, 1, 1, 5e-2],
-#            [17, 0.3, 1, 7200,  0, 1, 4, 1, 1e-1],
-#            [5,  2,   1, 7200,  0, 0, 1, 2, 1e-5],
-#            [13, 5,   0, 7200,  1, 1, 1, 3, 1e-4],
-#            [9,  1,   1, 25200, 0, 0, 4, 2, 1e-3],
-#            [13, 0.3, 0, 7200,  0, 0, 1, 3, 1e-2],
-#            [17, 0.7, 1, 7200,  0, 1, 4, 4, 5e-2],
-#            [17, 5,   0, 1800,  1, 1, 4, 1, 1e-1],
-#            [17, 2,   0, 25200, 1, 0, 2, 0, 1e-5],
-#            [13, 0.7, 1, 7200,  1, 1, 2, 1, 1e-4]]
-
-
+init_doe = 40
 
 """ experiment checklist:
 1. ensure that the value for steps ahead is updated on the dictionary line below
@@ -860,7 +814,7 @@ checklist for restarting the experiment
 # scenario parameters: topic_qty, pred_steps
 
 scenario_ID = 0
-removal_ratio = int(1e1)
+removal_ratio = int(2e0)
 scenario_dict = {
         0 : {"topics" : None, "pred_steps" : 1},
         1 : {"topics" : None, "pred_steps" : 3},
@@ -876,7 +830,7 @@ scenario_dict = {
         11: {"topics" : 0, "pred_steps" : 15}
     }
 
-for scenario_ID in scenario_dict.keys():
+for scenario_ID in [1,9,2,10]:#scenario_dict.keys():
     
     #editing topic quantity values for scenario, 2 lines
     topic_qty = scenario_dict[scenario_ID]["topics"]
@@ -900,7 +854,10 @@ for scenario_ID in scenario_dict.keys():
     optim_scores_vec = ["validation_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2, confidence_scoring_measure_tuple_3]
     
     inverse_for_minimise_vec = [True, False, False, False]
-       
+    
+    optim_scores_vec = ["validation_" + testing_measure]
+    inverse_for_minimise_vec = [True]
+    
 
     #what around to ensure that single topic sentimental data in more used in the model
     if default_senti_inputs_params_dict["topic_qty"] == 1:
@@ -909,7 +866,7 @@ for scenario_ID in scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = "post run tests"
+    
 
 
     if __name__ == '__main__':
@@ -919,13 +876,13 @@ for scenario_ID in scenario_dict.keys():
             scenario_name_str,
             design_space_dict,
             initial_doe_size_or_DoE=init_doe,
-            max_iter=2,
+            max_iter=25,
             model_start_time = model_start_time,
             force_restart_run = False,
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\post_run_tests.csv"
+            global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\post_run_tests_RNN.csv"
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
