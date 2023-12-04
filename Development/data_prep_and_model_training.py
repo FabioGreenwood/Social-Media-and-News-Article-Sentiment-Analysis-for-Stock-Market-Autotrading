@@ -81,7 +81,11 @@ from sklearn.model_selection import train_test_split
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import SimpleRNN, Bidirectional, LSTM, Dense, GRU
-
+import keras.utils
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.utils import timeseries_dataset_from_array
 
 #%% EXAMPLE INPUTS FOR MAIN METHOD
 
@@ -344,11 +348,16 @@ def import_financial_data(
         raise ValueError("value " + str(training_or_testing) + " for 'training_or_testing' input not recognised")
     
     #format the data
-    df_financial_data = pd.read_csv(target_file_path)
-    df_financial_data["date"] = df_financial_data["date"].str.replace("T", " ")
-    df_financial_data["date"] = df_financial_data["date"].str.replace("Z", "")
-    df_financial_data["date"] = df_financial_data["date"].str.replace(".000", "")
-    df_financial_data["date"] = pd.to_datetime(df_financial_data["date"], format='%Y-%m-%d %H:%M:%S')
+    
+    if target_file_path[-3:] == "txt":
+        columns = ["date", "open", "high", "low", "close", "volume"]
+        df_financial_data = pd.read_csv(target_file_path, header=None, names=columns, parse_dates=[0])
+    elif target_file_path[-3:] == "csv":
+        df_financial_data = pd.read_csv(target_file_path)
+        df_financial_data["date"] = df_financial_data["date"].str.replace("T", " ")
+        df_financial_data["date"] = df_financial_data["date"].str.replace("Z", "")
+        df_financial_data["date"] = df_financial_data["date"].str.replace(".000", "")
+        df_financial_data["date"] = pd.to_datetime(df_financial_data["date"], format='%Y-%m-%d %H:%M:%S')
     df_financial_data.set_index("date", inplace=True)
     df_financial_data.index.names = ['datetime']
     index = list(df_financial_data.index)
@@ -397,7 +406,6 @@ def return_technical_indicators_name(df, tech_indi_dict, match_doji, target_file
             file_string = file_string + "_" + str(val)
     file_string = file_string + "_" + str(match_doji)
     return file_string
-    
 
 
 def retrieve_or_generate_then_populate_technical_indicators(df, tech_indi_dict, match_doji, target_file_path):
@@ -1234,31 +1242,33 @@ def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_fea
     
     ensemble_estimator = Sequential()
     for id, layer in enumerate(model_hyper_params["estimator__hidden_layer_sizes"]):
-        
         print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX       " + layer[0])
+        # prep key word arguments
+        kwargs = {
+            "units" : layer[1], "activation" : model_hyper_params["estimator__activation", "return_sequences" : True]
+        }
+        if id == 0 :
+            kwargs["input_shape"] = (lookback, n_features)
+        if id == len(enumerate(model_hyper_params["estimator__hidden_layer_sizes"])) - 1:
+            kwargs["return_sequences"] = False
+        # add layer 
         if layer[0] == "simple":
-            if id == 0:
-                ensemble_estimator.add(SimpleRNN(units=layer[1], activation=model_hyper_params["estimator__activation"], input_shape=(n_features, lookback), return_sequences=True))
-            else:
-                ensemble_estimator.add(SimpleRNN(units=layer[1], activation=model_hyper_params["estimator__activation"], return_sequences=True))
+            ensemble_estimator.add(SimpleRNN(kwargs))            
         elif layer[0] == "GRU":
-            if id == 0:
-                ensemble_estimator.add(Bidirectional(GRU(units=layer[1], activation=model_hyper_params["estimator__activation"], return_sequences=True), input_shape=(n_features, lookback)))
-            else:
-                ensemble_estimator.add(Bidirectional(GRU(units=layer[1], activation=model_hyper_params["estimator__activation"], return_sequences=True)))
+            ensemble_estimator.add(GRU(kwargs))
         elif layer[0] == "LSTM":
-            if id == 0:
-                ensemble_estimator.add(Bidirectional(LSTM(units=layer[1], activation=model_hyper_params["estimator__activation"], return_sequences=True), input_shape=(n_features, lookback)))
-            else:
-                ensemble_estimator.add(Bidirectional(LSTM(units=layer[1], activation=model_hyper_params["estimator__activation"], return_sequences=True)))
-                                      
+            ensemble_estimator.add(LSTM(kwargs))
+    
     ensemble_estimator.add(Dense(units=1))
-    ensemble_estimator.compile(optimizer='adam', loss='mse')
+    ensemble_estimator.compile(optimizer='adam', loss='mae')
     ensemble_estimator.random_state = global_random_state
     ensemble_estimator.dropout_cols_ = dropout_cols
     
     return ensemble_estimator
-    
+
+
+
+
 
 class DRSLinRegRNN():
     def __init__(self, base_estimator=Sequential(),
@@ -1274,7 +1284,7 @@ class DRSLinRegRNN():
         self.training_time_splits = model_hyper_params["time_series_split_qty"]
         self.n_estimators = 1 #this is a hard coding as the n estimators is set by a random loop. this ensures that each version of the input (provided by the 'remove columns' function), is used to train just a single model
         
-    def fit(self, X, y, pred_steps_list, confidences_before_betting_PC):
+    def fit(self, X, y, pred_steps_list, confidences_before_betting_PC, lookbacks):
         count = 0
         global global_random_state
         training_scores_dict_list  = []
@@ -1293,7 +1303,7 @@ class DRSLinRegRNN():
             setattr(estimator, key, self.model_hyper_params[key])
             
         estimator.base_estimator = self.base_estimator #FG_action: move?
-        for train_index, test_index in kf.split(X):
+        for train_index, val_index in kf.split(X): 
             #these are the base values that will be updated if there isn't a passed value in the input dict
             
             
@@ -1305,7 +1315,7 @@ class DRSLinRegRNN():
                 X_train = X.loc[X.index[train_index].values].copy()
                 X_train.loc[:, dropout_cols] = 0
                 y_train = y.loc[y.index[train_index].values].copy()
-                y_test  = y.loc[y.index[test_index].values].copy()
+                y_val  = y.loc[y.index[val_index].values].copy()
                 
                 # initisate new RNN
                 ensemble_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features, dropout_cols)
@@ -1319,13 +1329,13 @@ class DRSLinRegRNN():
                 y_train_temp =  np.reshape(y_train.values, (y_train.shape[0], 1, y_train.shape[1]))
                                 
                 
-                ensemble_estimator.fit(X_train, y_train)
+                ensemble_estimator.fit(X_train, y_train, epochs=1, shuffle=False)
                 y_pred_train = ensemble_estimator.predict(X.iloc[train_index].values)
-                y_pred_test = ensemble_estimator.predict(X.iloc[test_index].values)
+                y_pred_val = ensemble_estimator.predict(X.iloc[val_index].values)
                 # collect training, validation and validation additional analysis scores
                 training_scores_dict_list   += [{"r2" : r2_score(y_train, y_pred_train), "mse" : mean_squared_error(y_train, y_pred_train), "mae" : mean_absolute_error(y_train, y_pred_train)}]
-                validation_scores_dict_list += [{"r2" : r2_score(y_test, y_pred_test),   "mse" : mean_squared_error(y_test, y_pred_test),   "mae" : mean_absolute_error(y_test, y_pred_test)}]
-                additional_validation_dict_list += [FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred_test, y.iloc[test_index], pred_steps_list, confidences_before_betting_PC=confidences_before_betting_PC)]
+                validation_scores_dict_list += [{"r2" : r2_score(y_val, y_pred_val),   "mse" : mean_squared_error(y_val, y_pred_val),   "mae" : mean_absolute_error(y_val, y_pred_val)}]
+                additional_validation_dict_list += [FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred_val, y.iloc[val_index], pred_steps_list, confidences_before_betting_PC=confidences_before_betting_PC)]
                 self.estimators_ = self.estimators_ + [ensemble_estimator]
         
         training_scores_dict       = average_list_of_identical_dicts(training_scores_dict_list)

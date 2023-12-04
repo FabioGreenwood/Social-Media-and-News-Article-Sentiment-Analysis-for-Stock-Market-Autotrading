@@ -77,25 +77,26 @@ FIVE_MIN_TIME_STEPS_IN_A_DAY = SECS_IN_A_DAY / (5*60)
 #%% Default Input Parameters
 
 default_temporal_params_dict    = {
-    "train_period_start"    : datetime.strptime('04/06/18 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/09/19 00:00:00', global_strptime_str),
+    "train_period_start"    : datetime.strptime('01/01/15 00:00:00', global_strptime_str),
+    "train_period_end"      : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
     "time_step_seconds"     : 5*60, #5 mins,
-    "test_period_start"     : datetime.strptime('01/09/19 00:00:00', global_strptime_str),
+    "test_period_start"     : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
     "test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str),
 }
 default_fin_inputs_params_dict      = {
     "index_cols"        : "date",    
     "cols_list"         : ["open", "high", "low", "close", "volume"],
     "fin_indi"          : {#additional financial indicators to generate
-        "sma" : [5, 15, 20, int(0.5*FIVE_MIN_TIME_STEPS_IN_A_DAY), int(FIVE_MIN_TIME_STEPS_IN_A_DAY), 5 * FIVE_MIN_TIME_STEPS_IN_A_DAY],
-        "ema" : [5, 15, 20, int(0.5*FIVE_MIN_TIME_STEPS_IN_A_DAY), int(FIVE_MIN_TIME_STEPS_IN_A_DAY), 5 * FIVE_MIN_TIME_STEPS_IN_A_DAY],
+        "sma" : [5, 20, 50, int(FIVE_MIN_TIME_STEPS_IN_A_DAY), int(5 * FIVE_MIN_TIME_STEPS_IN_A_DAY)],
+        "ema" : [5, 20, 50, int(FIVE_MIN_TIME_STEPS_IN_A_DAY), int(5 * FIVE_MIN_TIME_STEPS_IN_A_DAY)],
         "macd" : [[12, 26, 9]],
         "BollingerBands" : [[20, 2]],
         "PivotPoints" : [0]}, 
     "fin_match"         :{
         "Doji" : True},
     "index_col_str"     : "datetime",
-    "historical_file"   : "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\data\\financial data\\tiingo\\aapl.csv",
+    #"historical_file"   : "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\data\\financial data\\tiingo\\aapl.csv",
+    "historical_file"   : r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\financial data\firstratedata\AAPL_full_5min_adjsplit.txt"
 }
 default_senti_inputs_params_dict    = {
     "topic_qty"             : 7,
@@ -120,18 +121,17 @@ default_outputs_params_dict         = {
 default_cohort_retention_rate_dict = {
             "£_close" : 1, #output value
             "£_*": 1, #other OHLCV values
-            "$_*" : 0.3, # technical indicators
-            "match!_*" : 0.8, #pattern matchs
-            "~senti_*" : 0.4, #sentiment analysis
+            "$_*" : 0.4, # technical indicators
+            "match!_*" : 0.6, #pattern matchs
+            "~senti_*" : 0.6, #sentiment analysis
             "*": 0.5} # other missed values
 default_model_hyper_params          = {
-    #"name" : "RandomSubspace_MLPRegressor", #Multi-layer Perceptron regressor
-    "name" : "RandomSubspace_RNN_Regressor", #Multi-layer Perceptron regressor
+    "name" : "RandomSubspace_MLPRegressor", #Multi-layer Perceptron regressor
+    #"name" : "RandomSubspace_RNN_Regressor", #Multi-layer Perceptron regressor
         #general hyperparameters
     "n_estimators_per_time_series_blocking" : 2,
     "training_error_measure_main"   : 'neg_mean_squared_error',
     "testing_scoring"               : ["r2", "mse", "mae"],
-    "time_series_blocking"          : "btscv",
     "time_series_split_qty"         : 5,
         #model specific rows
     "estimator__alpha"                 : 0.05,
@@ -814,7 +814,7 @@ checklist for restarting the experiment
 # scenario parameters: topic_qty, pred_steps
 
 scenario_ID = 0
-removal_ratio = int(2e0)
+removal_ratio = int(2e2)
 scenario_dict = {
         0 : {"topics" : None, "pred_steps" : 1},
         1 : {"topics" : None, "pred_steps" : 3},
@@ -866,7 +866,7 @@ for scenario_ID in [1,9,2,10]:#scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    
+    scenario_name_str = "intergration_of_new_data_and_RNN"
 
 
     if __name__ == '__main__':
@@ -876,13 +876,13 @@ for scenario_ID in [1,9,2,10]:#scenario_dict.keys():
             scenario_name_str,
             design_space_dict,
             initial_doe_size_or_DoE=init_doe,
-            max_iter=25,
+            max_iter=0,
             model_start_time = model_start_time,
             force_restart_run = False,
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\post_run_tests_RNN.csv"
+            global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\intergration_of_new_data_and_RNN.csv"
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
