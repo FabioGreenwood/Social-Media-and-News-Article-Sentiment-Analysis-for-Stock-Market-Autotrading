@@ -18,7 +18,7 @@ from datetime import datetime
 # parameters
 master_folder_path = r"C:\Users\Public\fabio_uni_work\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading"
 example_input_path = os.path.join(master_folder_path, "example_input.csv")
-date_format = "%m/%d/%Y %H:%M"
+date_format = '%d/%m/%Y %H:%M'
 
 list_of_precalculated_asset_folders = ["always_up_down_results", "annotated_tweets", "cleaned_tweets_ready_for_subject_discovery", "experimental_records", "predictive_model", "sentiment_data", "technical_indicators", "temp_testing_dicts", "topic_models"]
 
@@ -90,10 +90,40 @@ def return_filtered_batches_that_dont_cross_two_days(training_generator, datetim
             filtered_training_generator_batch_list += [training_batch]
     return filtered_training_generator_batch_list
 
+import random
+
+def return_filtered_batches_that_dont_cross_two_days_v2(training_generator, datetime_generator):
+    mask, new_data, new_targets = [], np.empty((0,training_generator.data.shape[1])), np.empty((0,training_generator.targets.shape[1]))
+    for batch_x, output in datetime_generator:
+        if datetime.strptime(batch_x[0][0], date_format).day == datetime.strptime(batch_x[0][-1], date_format).day:
+            mask += [True]
+        else:
+            mask += [False]
+    for data_n, target_n, Bool_n in zip(training_generator.data, training_generator.targets, mask):
+        if Bool_n == True:
+            new_data    = np.append(new_data, [data_n], axis=0)
+            new_targets = np.append(new_targets, [target_n], axis=0)
+    print(str(sum(mask)) + str(len(mask)))
+    # replace removed batches with random batches
+    for i in range(sum(mask), len(mask)):
+        random_index = random.randint(0, sum(mask))
+        new_data    = np.append(new_data, [new_data[random_index]], axis=0)
+        new_targets = np.append(new_targets, [new_targets[random_index]], axis=0)
+    #the time series generator's final batches tend to be blank, causing the first for loop to skip them, it is best to just transfer these directly
+    for i in range(len(new_data), training_generator.data.shape[0]):
+        new_data    = np.append(new_data, [training_generator.data[i]], axis=0)
+        new_targets = np.append(new_targets, [training_generator.targets[i]], axis=0)
+
+    training_generator.data     = new_data
+    training_generator.targets  = new_targets
+    return training_generator
+
+
+
 ## Filter batches that cross two days
 #filtered_batches = [batch for batch in generator if not batch_crosses_two_days(batch)]
 
-filtered_training_generator_batch_list = return_filtered_batches_that_dont_cross_two_days(training_generator, datetime_generator)
+filtered_training_generator_batch_list = return_filtered_batches_that_dont_cross_two_days_v2(training_generator, datetime_generator)
 
 
 
@@ -104,6 +134,10 @@ model = Sequential([
     Dense(units=1, activation='linear')
 ])
 model.compile(optimizer='adam', loss='mae')
+
+model.fit(filtered_training_generator_batch_list, epochs=1)
+
+
 model.fit(training_generator, epochs=5)
 
 #training 
