@@ -1294,7 +1294,7 @@ class DRSLinRegRNN():
         global global_random_state
         # variables  
         training_scores_dict_list, validation_scores_dict_list, additional_validation_dict_list  = [], [], []
-        kf = KFold(n_splits=5, shuffle=False)
+        kf = KFold(n_splits=self.K_fold_splits, shuffle=False)
         estimator = BaggingRegressor(base_estimator=None,
                                           #the assignment of "one" estimator is overwritten by the rest of the method
                                           n_estimators=1,#self.n_estimators,
@@ -1309,10 +1309,8 @@ class DRSLinRegRNN():
         estimator.base_estimator = self.base_estimator #FG_action: move?
         for train_index, val_index in kf.split(df_X): 
             #these are the base values that will be updated if there isn't a passed value in the input dict
-            
-            
             count += 1
-            for i_random in range(model_hyper_params["n_estimators_per_time_series_blocking"]):
+            for i_random in range(self.n_estimators_per_time_series_blocking):
                 # define inputs - randomly select features to drop out
                 n_features = df_X.shape[1]
                 dropout_cols = return_columns_to_remove(columns_list=df_X.columns, self=self)
@@ -1427,7 +1425,6 @@ class DRSLinReg():
         self.n_estimators = 1 #this is a hard coding as the n estimators is set by a random loop. this ensures that each version of the input (provided by the 'remove columns' function), is used to train just a single model
         
     def fit(self, X, y, pred_steps_list, confidences_before_betting_PC):
-        tscv = BlockingTimeSeriesSplit(n_splits=self.training_time_splits)
         count = 0
         global global_random_state
         training_scores_dict_list  = []
@@ -1721,6 +1718,7 @@ def retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inp
         predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = generate_model_and_validation_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict)
         with open(predictor_location_file, "wb") as file:
             pickle.dump(predictor, file)
+            pickle.dump(predictor, file, protocol=pickle.HIGHEST_PROTOCOL)
         #edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="save", training_scores=validation_dict)
 
     return predictor, training_scores_dict, validation_scores_dict, additional_validation_dict
