@@ -49,6 +49,8 @@ import additional_reporting_and_model_trading_runs as FG_additional_reporting
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
     os.environ["PYTHONWARNINGS"] = "ignore"
+from sklearn.preprocessing import MinMaxScaler
+import random
 
 import pyLDAvis
 import pyLDAvis.gensim_models as gensimvis
@@ -103,6 +105,7 @@ from tensorflow.keras.utils import timeseries_dataset_from_array
 #    Inc rep number
 
 #GLOBAL PARAMETERS
+global_master_folder_path = r"C:\Users\Public\fabio_uni_work\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\"
 global_input_cols_to_include_list = ["<CLOSE>", "<HIGH>"]
 global_index_cols_list = ["<DATE>","<TIME>"]
 global_index_col_str = "datetime"
@@ -110,15 +113,15 @@ global_target_file_folder_path = ""
 global_feature_qty = 6
 global_outputs_folder_path = ".\\outputs\\"
 global_financial_history_folder_path = "FG action, do I need to update this?"
-global_df_stocks_list_file           = pd.read_csv(r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\support data\stock_info.csv")
+global_df_stocks_list_file           = pd.read_csv(os.path.join(global_master_folder_path,r"data\support_data\stock_info.csv"))
 global_start_time = datetime.now()
 global_error_str_1 = "the input {} is wrong for the input training_or_testing"
 global_random_state = 1
-global_scores_database = r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\scores_database.csv"
+global_scores_database = os.path.join(global_master_folder_path,r"outputs\scores_database.csv")
 global_strptime_str = '%d/%m/%y %H:%M:%S'
 global_strptime_str_filename = '%d_%m_%y %H:%M:%S'
-combined_stop_words_list_file_path = r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\support data\combined_stop_words.txt"
-custom_stop_words_list_file_path = r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\support data\specific_stop_words.txt"
+combined_stop_words_list_file_path = os.path.join(global_master_folder_path,r"data\support_data\combined_stop_words.txt")
+custom_stop_words_list_file_path   = os.path.join(global_master_folder_path,r"data\support_data\specific_stop_words.txt")
 
 temporal_params_dict    = {
     "train_period_start"    : datetime.strptime('04/06/18 00:00:00', global_strptime_str),
@@ -137,7 +140,7 @@ fin_inputs_params_dict      = {
     "fin_match"         :{
         "Doji" : True},
     "index_col_str"     : "datetime",
-    "historical_file"   : "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\data\\financial data\\tiingo\\aapl.csv",
+    "historical_file"   : os.path.join(global_master_folder_path,r"data\\financial data\\tiingo\\aapl.csv"),
 }
 
 senti_inputs_params_dict    = {
@@ -154,7 +157,7 @@ senti_inputs_params_dict    = {
     ['risk', 'exposure', 'liability'],
     ["financial forces" , "growth", "interest rates"]],
     "sentiment_method"      : SentimentIntensityAnalyzer(),
-    "tweet_file_location"   : r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\twitter data\Tweets about the Top Companies from 2015 to 2020\Tweet.csv\Tweet.csv",
+    "tweet_file_location"   : str(os.path.join(global_master_folder_path,r"data\twitter_data\Tweet.csv")),
     "regenerate_cleaned_tweets_for_subject_discovery" : False,
     "inc_new_combined_stopwords_list" : False
 }
@@ -205,11 +208,11 @@ input_dict = {
     }
 
 global_precalculated_assets_locations_dict = {
-    "root" : "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\precalculated_assets\\",
+    "root" : os.path.join(global_master_folder_path,r"precalculated_assets\\"),
     "topic_models"              : "topic_models\\",
     "annotated_tweets"          : "annotated_tweets\\",
     "predictive_model"          : "predictive_model\\",
-    "sentimental_data"          : "sentimental_data\\",
+    "sentiment_data"          : "sentiment_data\\",
     "technical_indicators"      : "technical_indicators\\",
     "experiment_records"        : "experiment_records\\",
     "clean_tweets"              : "cleaned_tweets_ready_for_subject_discovery\\tweets.pkl"
@@ -268,7 +271,7 @@ def return_annotated_tweets_name(company_symbol, train_period_start, train_perio
     name = name + return_topic_model_name(topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc)
     return name
 
-def return_sentimental_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe):
+def return_sentiment_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe):
     global global_strptime_str, global_strptime_str_filename
     name = return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor)
     name = name + "_ts_sec" + str(time_step_seconds) + "_r_lt" + str(rel_lifetime) + "_r_hl" + str(rel_hlflfe)
@@ -276,7 +279,7 @@ def return_sentimental_data_name(company_symbol, train_period_start, train_perio
 
 def return_predictor_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe, pred_steps_ahead, hidden_layers, estm_alpha, model_hyper_params):
     global global_strptime_str, global_strptime_str_filename
-    name = return_sentimental_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe)
+    name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe)
     name = name + "_steps" + str(pred_steps_ahead) + "_hiddenL" + str(hidden_layers) + "estm_A" + str(estm_alpha) + "estimHASH" + str(hash(str(model_hyper_params)))
     return name
 
@@ -463,8 +466,6 @@ def retrieve_or_generate_then_populate_technical_indicators(df, tech_indi_dict, 
                     print("tech indy")    
                     print("tech indy: " + str(key) + " " + str(value) +  " " + str(at) + " done " + datetime.now().strftime(global_strptime_str_filename))
             
-            
-            
         if match_doji == True:
             results = indicators.get_doji(quotes_list)
             df["match!_doji"] = ""
@@ -497,7 +498,7 @@ def retrieve_or_generate_then_populate_technical_indicators(df, tech_indi_dict, 
 
 #%% SubModule – Sentiment Data Prep
 
-def retrieve_or_generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training"):
+def retrieve_or_generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training"):
     #desc
     
     #general parameters
@@ -527,27 +528,27 @@ def retrieve_or_generate_sentimental_data(index, temporal_params_dict, fin_input
        
     #method
     #search for predictor
-    sentimental_data_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["sentimental_data"]
-    sentimental_data_name = return_sentimental_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe)
-    sentimental_data_location_file = sentimental_data_folder_location_string + sentimental_data_name + ".csv"
-    if os.path.exists(sentimental_data_location_file):
-        df_sentimental_data = pd.read_csv(sentimental_data_location_file)
-        df_sentimental_data.set_index(df_sentimental_data.columns[0], inplace=True)
-        df_sentimental_data.index.name = "datetime"
-    elif not os.path.exists(sentimental_data_location_file) and topic_model_qty > 0:
-        df_sentimental_data = generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing=training_or_testing)
-        df_sentimental_data.to_csv(sentimental_data_location_file)
+    sentiment_data_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["sentiment_data"]
+    sentiment_data_name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe)
+    sentiment_data_location_file = sentiment_data_folder_location_string + sentiment_data_name + ".csv"
+    if os.path.exists(sentiment_data_location_file):
+        df_sentiment_data = pd.read_csv(sentiment_data_location_file)
+        df_sentiment_data.set_index(df_sentiment_data.columns[0], inplace=True)
+        df_sentiment_data.index.name = "datetime"
+    elif not os.path.exists(sentiment_data_location_file) and topic_model_qty > 0:
+        df_sentiment_data = generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing=training_or_testing)
+        df_sentiment_data.to_csv(sentiment_data_location_file)
     else:
-        df_sentimental_data = None
-    return df_sentimental_data
+        df_sentiment_data = None
+    return df_sentiment_data
 
-def retrieve_sentimental_data():
+def retrieve_sentiment_data():
     raise ValueError('needs writing') 
     return None
 
 
 
-def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, repeat_timer=10, training_or_testing="training", hardcode_df_annotated_tweets=None):
+def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, repeat_timer=10, training_or_testing="training", hardcode_df_annotated_tweets=None):
     
     #general parameters
     global global_financial_history_folder_path, global_precalculated_assets_locations_dict
@@ -583,7 +584,7 @@ def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dic
     if isinstance(hardcode_df_annotated_tweets, pd.DataFrame):
         print("gate works")
         df_annotated_tweets = hardcode_df_annotated_tweets
-        print(datetime.now().strftime("%H:%M:%S") + " - generating sentimental data")
+        print(datetime.now().strftime("%H:%M:%S") + " - generating sentiment data")
     elif os.path.exists(annotated_tweets_location_file):
         df_annotated_tweets = pd.read_csv(annotated_tweets_location_file)
         df_annotated_tweets.set_index(df_annotated_tweets.columns[0], inplace=True)
@@ -591,9 +592,9 @@ def generate_sentimental_data(index, temporal_params_dict, fin_inputs_params_dic
     else:
         df_annotated_tweets = generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing=training_or_testing)
         df_annotated_tweets.to_csv(annotated_tweets_location_file)
-        print(datetime.now().strftime("%H:%M:%S") + " - generating sentimental data")
+        print(datetime.now().strftime("%H:%M:%S") + " - generating sentiment data")
     
-    #generate sentimental data from topic model and annotate tweets
+    #generate sentiment data from topic model and annotate tweets
     #index = generate_datetimes(train_period_start, train_period_end, seconds_per_time_steps)
     #df_sentiment_scores = pd.DataFrame()
     columns = []
@@ -1159,7 +1160,7 @@ class BlockingTimeSeriesSplit():
             mid = int(1.0 * (stop - start)) + start
             yield indices[start: mid], indices[mid + margin: stop]
 
-def create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list, pred_steps_ahead):
+def create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list, pred_steps_ahead):
     #this method populates each row with the next X output results, this is done so that, each time step can be trained
     #to predict the value of the next X steps
     
@@ -1167,10 +1168,10 @@ def create_step_responces(df_financial_data, df_sentimental_data, pred_output_an
     list_of_new_columns = []
     nan_values_replaced = 0
     train_test_split = 1
-    if isinstance(df_sentimental_data, pd.DataFrame):
-        df_sentimental_data.index = pd.to_datetime(df_sentimental_data.index)
-        df_sentimental_data = df_sentimental_data.loc[list(df_financial_data.index)]
-    data = pd.concat([df_financial_data, df_sentimental_data], axis=1, ignore_index=False)
+    if isinstance(df_sentiment_data, pd.DataFrame):
+        df_sentiment_data.index = pd.to_datetime(df_sentiment_data.index)
+        df_sentiment_data = df_sentiment_data.loc[list(df_financial_data.index)]
+    data = pd.concat([df_financial_data, df_sentiment_data], axis=1, ignore_index=False)
     #this method has been removed cos its doesn't work with negative values
     #df_financial_data, nan_values_replaced = current_infer_values_method(df_financial_data)
     
@@ -1188,6 +1189,7 @@ def create_step_responces(df_financial_data, df_sentimental_data, pred_output_an
     #split regressors and responses
     #Features = 6
 
+    data = data.dropna(axis=1, how='all', inplace=False)
     data = data.dropna(inplace=False)
 
     X = copy.deepcopy(data)
@@ -1245,21 +1247,21 @@ def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_fea
         print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX       " + layer[0])
         # prep key word arguments
         kwargs = {
-            "units" : layer[1], "activation" : model_hyper_params["estimator__activation", "return_sequences" : True]
+            "units" : layer[1], "activation" : model_hyper_params["estimator__activation"], "return_sequences" : True
         }
         if id == 0 :
             kwargs["input_shape"] = (lookback, n_features)
-        if id == len(enumerate(model_hyper_params["estimator__hidden_layer_sizes"])) - 1:
+        if id == len(model_hyper_params["estimator__hidden_layer_sizes"]) - 1:
             kwargs["return_sequences"] = False
         # add layer 
         if layer[0] == "simple":
-            ensemble_estimator.add(SimpleRNN(kwargs))            
+            ensemble_estimator.add(SimpleRNN(**kwargs))            
         elif layer[0] == "GRU":
-            ensemble_estimator.add(GRU(kwargs))
+            ensemble_estimator.add(GRU(**kwargs))
         elif layer[0] == "LSTM":
-            ensemble_estimator.add(LSTM(kwargs))
-    
-    ensemble_estimator.add(Dense(units=1))
+            ensemble_estimator.add(LSTM(**kwargs))
+        
+    ensemble_estimator.add(Dense(units=1, activation='linear'))
     ensemble_estimator.compile(optimizer='adam', loss='mae')
     ensemble_estimator.random_state = global_random_state
     ensemble_estimator.dropout_cols_ = dropout_cols
@@ -1271,6 +1273,9 @@ def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_fea
 
 
 class DRSLinRegRNN():
+    scalar_X = None
+    scalar_Y = None
+
     def __init__(self, base_estimator=Sequential(),
                  model_hyper_params=model_hyper_params, 
                  ticker_name=outputs_params_dict["output_symbol_indicators_tuple"][0]):
@@ -1284,12 +1289,11 @@ class DRSLinRegRNN():
         self.training_time_splits = model_hyper_params["time_series_split_qty"]
         self.n_estimators = 1 #this is a hard coding as the n estimators is set by a random loop. this ensures that each version of the input (provided by the 'remove columns' function), is used to train just a single model
         
-    def fit(self, X, y, pred_steps_list, confidences_before_betting_PC, lookbacks):
+    def fit(self, df_X, df_y, pred_steps_value, confidences_before_betting_PC, lookbacks=10):
         count = 0
         global global_random_state
-        training_scores_dict_list  = []
-        validation_scores_dict_list  = []
-        additional_validation_dict_list = []
+        # variables  
+        training_scores_dict_list, validation_scores_dict_list, additional_validation_dict_list  = [], [], []
         kf = KFold(n_splits=5, shuffle=False)
         estimator = BaggingRegressor(base_estimator=None,
                                           #the assignment of "one" estimator is overwritten by the rest of the method
@@ -1303,39 +1307,43 @@ class DRSLinRegRNN():
             setattr(estimator, key, self.model_hyper_params[key])
             
         estimator.base_estimator = self.base_estimator #FG_action: move?
-        for train_index, val_index in kf.split(X): 
+        for train_index, val_index in kf.split(df_X): 
             #these are the base values that will be updated if there isn't a passed value in the input dict
             
             
             count += 1
             for i_random in range(model_hyper_params["n_estimators_per_time_series_blocking"]):
                 # define inputs - randomly select features to drop out
-                n_features = X.shape[1]
-                dropout_cols = return_columns_to_remove(columns_list=X.columns, self=self)
-                X_train = X.loc[X.index[train_index].values].copy()
-                X_train.loc[:, dropout_cols] = 0
-                y_train = y.loc[y.index[train_index].values].copy()
-                y_val  = y.loc[y.index[val_index].values].copy()
+                n_features = df_X.shape[1]
+                dropout_cols = return_columns_to_remove(columns_list=df_X.columns, self=self)
                 
-                # initisate new RNN
+                X_train = df_X.loc[df_X.index[train_index].values].copy()
+                X_train.loc[:, dropout_cols] = 0
+                y_train = df_y.loc[df_y.index[train_index].values].copy()
+                y_train_scoring = y_train[:-self.lookbacks]
+                
+                X_val = df_X.loc[df_X.index[val_index].values].copy()
+                X_val.loc[:, dropout_cols] = 0
+                y_val = df_y.loc[df_y.index[val_index].values].copy()
+                y_val_scoring = y_val[:-self.lookbacks]
+
+
+                # RNN sepcific functions
                 ensemble_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features, dropout_cols)
                 global_random_state += 1
+                training_generator, scaler_X, scaler_y = self.return_filtered_training_generators_and_scalar_objects(X_train, y_train, scaler_X=None, scaler_y=None, lookbacks=self.lookbacks)
                 
-                # operate ensamble predictor
-                #X_train = X_train.values
-                #X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
-                
-                X_train_temp =  np.reshape(X_train.values, (X_train.shape[0], 1, X_train.shape[1]))
-                y_train_temp =  np.reshape(y_train.values, (y_train.shape[0], 1, y_train.shape[1]))
-                                
-                
-                ensemble_estimator.fit(X_train, y_train, epochs=1, shuffle=False)
-                y_pred_train = ensemble_estimator.predict(X.iloc[train_index].values)
-                y_pred_val = ensemble_estimator.predict(X.iloc[val_index].values)
+
+                ensemble_estimator.fit(training_generator, epochs=self.epochs, shuffle=self.shuffle_fit, verbose=1)
+                y_pred_train = ensemble_estimator.predict(training_generator)
+                y_pred_train = scaler_y.inverse_transform(y_pred_train).reshape(-1)
+                y_pred_val = ensemble_estimator.predict(self.return_filtered_training_generators_and_scalar_objects(X_val, y_val, scaler_X=scaler_X, scaler_y=scaler_y, lookbacks=self.lookbacks))
+                y_pred_val = scaler_y.inverse_transform(y_pred_val).reshape(-1)
+
                 # collect training, validation and validation additional analysis scores
-                training_scores_dict_list   += [{"r2" : r2_score(y_train, y_pred_train), "mse" : mean_squared_error(y_train, y_pred_train), "mae" : mean_absolute_error(y_train, y_pred_train)}]
-                validation_scores_dict_list += [{"r2" : r2_score(y_val, y_pred_val),   "mse" : mean_squared_error(y_val, y_pred_val),   "mae" : mean_absolute_error(y_val, y_pred_val)}]
-                additional_validation_dict_list += [FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred_val, y.iloc[val_index], pred_steps_list, confidences_before_betting_PC=confidences_before_betting_PC)]
+                training_scores_dict_list   += [{"r2" : r2_score(y_train_scoring, y_pred_train), "mse" : mean_squared_error(y_train_scoring, y_pred_train), "mae" : mean_absolute_error(y_train_scoring, y_pred_train)}]
+                validation_scores_dict_list += [{"r2" : r2_score(y_val_scoring, y_pred_val),   "mse" : mean_squared_error(y_val_scoring, y_pred_val),   "mae" : mean_absolute_error(y_val_scoring, y_pred_val)}]
+                additional_validation_dict_list += [FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred_val, y_val_scoring, pred_steps_value, confidences_before_betting_PC=confidences_before_betting_PC)]
                 self.estimators_ = self.estimators_ + [ensemble_estimator]
         
         training_scores_dict       = average_list_of_identical_dicts(training_scores_dict_list)
@@ -1344,110 +1352,65 @@ class DRSLinRegRNN():
         
         return self, training_scores_dict, validation_scores_dict, additional_validation_dict
 
-class DRSLinReg():
-    def __init__(self, base_estimator=MLPRegressor(),
-                 model_hyper_params=model_hyper_params, 
-                 ticker_name=outputs_params_dict["output_symbol_indicators_tuple"][0]):
-        #expected keys: training_time_splits, max_depth, max_features, random_state,        
-        for key in model_hyper_params:
-           setattr(self, key, model_hyper_params[key])
-        self.model_hyper_params = model_hyper_params
-        self.ticker_name = ticker_name
-        self.base_estimator = base_estimator
-        self.estimators_ = []
-        self.training_time_splits = model_hyper_params["time_series_split_qty"]
-        self.n_estimators = 1 #this is a hard coding as the n estimators is set by a random loop. this ensures that each version of the input (provided by the 'remove columns' function), is used to train just a single model
-        
-    def fit(self, X, y, pred_steps_list, confidences_before_betting_PC):
-        tscv = BlockingTimeSeriesSplit(n_splits=self.training_time_splits)
-        count = 0
-        global global_random_state
-        training_scores_dict_list  = []
-        validation_scores_dict_list  = []
-        additional_validation_dict_list = []
-        kf = KFold(n_splits=5, shuffle=False)
-        estimator = BaggingRegressor(base_estimator=self.base_estimator,
-                                          #the assignment of "one" estimator is overwritten by the rest of the method
-                                          n_estimators=1,#self.n_estimators,
-                                          max_samples=1.0,
-                                          max_features=1.0,
-                                          bootstrap=True,
-                                          bootstrap_features=False)
-                                          #random_state=self.random_state SET ELSEWHERE
-        for key in self.model_hyper_params:
-            setattr(estimator, key, self.model_hyper_params[key])
-            
-        estimator.base_estimator = self.base_estimator
-        for train_index, test_index in kf.split(X):
-            #these are the base values that will be updated if there isn't a passed value in the input dict
-            
-            
-            count += 1
-            for i_random in range(model_hyper_params["n_estimators_per_time_series_blocking"]):
-                # randomly select features to drop out
-                n_features = X.shape[1]
-                dropout_cols = return_columns_to_remove(columns_list=X.columns, self=self)
-                X_train = X.loc[X.index[train_index].values].copy()
-                X_train.loc[:, dropout_cols] = 0
-                y_train = y.loc[y.index[train_index].values].copy()
-                y_test  = y.loc[y.index[test_index].values].copy()
-                estimator.random_state = global_random_state
-                global_random_state += 1
-                estimator.dropout_cols_ = dropout_cols
-                estimator.fit(X_train, y_train)
-                # validate model
-                y_pred_train = estimator.predict(X.iloc[train_index].values)
-                y_pred_test = estimator.predict(X.iloc[test_index].values)
-                #collect training, validation and validation additional analysis scores
-                training_scores_dict_list   += [{"r2" : r2_score(y_train, y_pred_train), "mse" : mean_squared_error(y_train, y_pred_train), "mae" : mean_absolute_error(y_train, y_pred_train)}]
-                validation_scores_dict_list += [{"r2" : r2_score(y_test, y_pred_test),   "mse" : mean_squared_error(y_test, y_pred_test),   "mae" : mean_absolute_error(y_test, y_pred_test)}]
-                additional_validation_dict_list += [FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred_test, y.iloc[test_index], pred_steps_list, confidences_before_betting_PC=confidences_before_betting_PC)]
-                self.estimators_ = self.estimators_ + [estimator]
-        
-        training_scores_dict       = average_list_of_identical_dicts(training_scores_dict_list)
-        validation_scores_dict     = average_list_of_identical_dicts(validation_scores_dict_list)
-        additional_validation_dict = average_list_of_identical_dicts(additional_validation_dict_list)
-        
-        return self, training_scores_dict, validation_scores_dict, additional_validation_dict
+    def return_filtered_training_generators_and_scalar_objects(self, df_X, df_y, scaler_X=None, scaler_y=None, lookbacks=10):
+        global global_strptime_str_2
+        were_scalars_pre_set = True
+        if scaler_X == None:
+            were_scalars_pre_set = False
+            scaler_X = MinMaxScaler()
+            scaler_y = MinMaxScaler()
+            scaler_X.fit(df_X)
+            scaler_y.fit(df_y.values.reshape(-1, 1))
+        df_X_normalized = scaler_X.transform(df_X)
+        df_y_normalized = scaler_y.transform(df_y.values.reshape(-1, 1))
+        input_shape = (lookbacks, df_X.shape[1])
+        training_generator = tf.keras.preprocessing.sequence.TimeseriesGenerator(
+                df_X_normalized,
+                df_y_normalized,
+                lookbacks,
+                batch_size=1,
+                shuffle=False
+            )
+        datetime_generator = tf.keras.preprocessing.sequence.TimeseriesGenerator(
+                df_X.index,
+                df_y_normalized,
+                lookbacks,
+                batch_size=1,
+                shuffle=False
+            )
+        filtered_training_generator = self.return_filtered_batches_that_dont_cross_two_days(training_generator, datetime_generator)
+        if were_scalars_pre_set == True:
+            return filtered_training_generator
+        else:
+            return filtered_training_generator, scaler_X, scaler_y
 
-    def predict_ensemble(self, X, output_name=None):
-        
-        if output_name==None:
-            raise ValueError ("please ensure that the outputs are labelled")
-            output_name = ["output"]
-        
-        y_ave = []
-        y_ensemble = []
-        
-        for i, estimator_local in enumerate(self.estimators_):
-            # randomly select features to drop out
-            y_ensemble.insert(len(y_ensemble), estimator_local.predict(X))
-        
-        y_ensemble = np.array(y_ensemble)
-        for ts in range(len(y_ensemble[0])):
-            y_ave = y_ave + [y_ensemble[:,ts].mean()]
-        
-        output = pd.DataFrame(y_ave, columns=[output_name], index=X.index)
-        
-        return output
-    
-    def evaluate(self, X_test=None, y_test=None, y_pred=None, method=["r2"], return_high_good=False):
-        
-        output = dict()
-        
-        if y_pred is None:
-            y_pred = self.predict_ensemble(X_test, output_name=["test output"]).values
-        
-        for val in method:
-            if val == "r2":
-                output[val] = r2_score(y_test, y_pred)
-            elif val == "mse":
-                output[val] = mean_squared_error(y_test, y_pred)
-            elif val == "mae":
-                output[val] = mean_absolute_error(y_test, y_pred)
+    #def return_normalised_training_generators_with_single_day_batches_and_scalars(df_X, df_Y)
+    def return_filtered_batches_that_dont_cross_two_days(self, training_generator, datetime_generator):
+        mask, new_data, new_targets = [], np.empty((0,training_generator.data.shape[1])), np.empty((0,training_generator.targets.shape[1]))
+        for batch_x, output in datetime_generator:
+            if np.datetime_as_string(batch_x[0][0], unit='D')[-2:] == np.datetime_as_string(batch_x[0][-1], unit='D')[-2:]:
+                mask += [True]
             else:
-                raise ValueError("passed method string not found")
-        return output
+                mask += [False]
+        for data_n, target_n, Bool_n in zip(training_generator.data, training_generator.targets, mask):
+            if Bool_n == True:
+                new_data    = np.append(new_data, [data_n], axis=0)
+                new_targets = np.append(new_targets, [target_n], axis=0)
+
+        # replace removed batches with random batches
+        for i in range(sum(mask), len(mask)):
+            random_index = random.randint(0, sum(mask))
+            new_data    = np.append(new_data, [new_data[random_index]], axis=0)
+            new_targets = np.append(new_targets, [new_targets[random_index]], axis=0)
+        #the time series generator's final batches tend to be blank, causing the first for loop to skip them, it is best to just transfer these directly
+        for i in range(len(new_data), training_generator.data.shape[0]):
+            new_data    = np.append(new_data, [training_generator.data[i]], axis=0)
+            new_targets = np.append(new_targets, [training_generator.targets[i]], axis=0)
+
+        training_generator.data     = new_data
+        training_generator.targets  = new_targets
+        return training_generator
+
 
 def return_columns_to_remove(columns_list, self):
     
@@ -1501,13 +1464,13 @@ def generate_testing_scores(predictor, input_dict, return_time_series=False):
         temporal_params_dict = temporal_params_dict, training_or_testing="testing")
     df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"], fin_inputs_params_dict["historical_file"])
 
-    # step 1b: generate testing input data (sentimental)
-    print(datetime.now().strftime("%H:%M:%S") + " - testing - step 1b: generate testing input data (sentimental)")
-    df_sentimental_data = retrieve_or_generate_sentimental_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="testing")
+    # step 1b: generate testing input data (sentiment)
+    print(datetime.now().strftime("%H:%M:%S") + " - testing - step 1b: generate testing input data (sentiment)")
+    df_sentiment_data = retrieve_or_generate_sentiment_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="testing")
 
     # step 2: generate testing output data
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 2: generate testing output data")
-    X_testing, y_testing   = create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
+    X_testing, y_testing   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
         
     # step 3: generate y_pred
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 3: generate y_pred")
@@ -1534,9 +1497,9 @@ def retrieve_model_and_training_scores(predictor_location_file, predictor_name_e
         temporal_params_dict = temporal_params_dict, training_or_testing="training")
     #training_score = edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="load")
     df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"], fin_inputs_params_dict["historical_file"])
-    df_sentimental_data = retrieve_or_generate_sentimental_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training")
+    df_sentiment_data = retrieve_or_generate_sentiment_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training")
     
-    X_train, y_train   = create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
+    X_train, y_train   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
     model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.fit(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"])
     
     return model, training_scores_dict, validation_scores_dict, additional_validation_dict
@@ -1565,22 +1528,15 @@ def generate_model_and_validation_scores(temporal_params_dict,
 
     if senti_inputs_params_dict["topic_qty"] >= 1:
         #sentiment data prep
-        print(datetime.now().strftime("%H:%M:%S") + " - importing or prepping sentimental data")
-        df_sentimental_data = retrieve_or_generate_sentimental_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training")
+        print(datetime.now().strftime("%H:%M:%S") + " - importing or prepping sentiment data")
+        df_sentiment_data = retrieve_or_generate_sentiment_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training")
     elif senti_inputs_params_dict["topic_qty"] == 0:
-        df_sentimental_data = None
-    
-    #model training - time series blocking
-    if model_hyper_params["time_series_blocking"] == "btscv":
-        time_series_spliting = BlockingTimeSeriesSplit(n_splits=model_hyper_params["time_series_split_qty"])
-    else:
-        raise ValueError("model_hyper_params['time_series_blocking'], not recognised")
+        df_sentiment_data = None
         
     #model training - create regressors
-    X_train, y_train   = create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
+    X_train, y_train   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
     model              = initiate_model(outputs_params_dict, model_hyper_params)
-    model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.fit(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"])
-    
+    model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.fit(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"], lookbacks=10)
     #report timings
     print(datetime.now().strftime("%H:%M:%S") + " - complete generating model")
     global global_start_time
@@ -1603,8 +1559,8 @@ def quick_training_score_rerun(model, temporal_params_dict, fin_inputs_params_di
     df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"], fin_inputs_params_dict["historical_file"])
 
     #sentiment data prep
-    print(datetime.now().strftime("%H:%M:%S") + " - importing or prepping sentimental data")
-    df_sentimental_data = retrieve_or_generate_sentimental_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training")
+    print(datetime.now().strftime("%H:%M:%S") + " - importing or prepping sentiment data")
+    df_sentiment_data = retrieve_or_generate_sentiment_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training")
     
     
     #model training - time series blocking
@@ -1614,7 +1570,7 @@ def quick_training_score_rerun(model, temporal_params_dict, fin_inputs_params_di
         raise ValueError("model_hyper_params['time_series_blocking'], not recognised")
         
     #model training - create regressors
-    X_train, y_train   = create_step_responces(df_financial_data, df_sentimental_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
+    X_train, y_train   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
     training_scores = model.evaluate(X_test=X_train , y_test=y_train, method=model_hyper_params["testing_scoring"])
     return training_scores
 

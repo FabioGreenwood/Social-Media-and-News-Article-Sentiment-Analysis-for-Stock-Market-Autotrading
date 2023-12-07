@@ -1,9 +1,10 @@
 
 #%% Import Methods
 import data_prep_and_model_training as FG_model_training
-import GPyOpt
+
 import numpy as np
 import pandas as pd
+import GPyOpt
 import fnmatch
 import pickle
 import seaborn as sns 
@@ -19,12 +20,12 @@ if not sys.warnoptions:
     os.environ["PYTHONWARNINGS"] = "ignore"
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import matplotlib.pyplot as plt
-
+global_master_folder_path = r"C:\Users\Public\fabio_uni_work\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\"
 
 
 #%% methods
 
-def return_realign_plus_minus_table(preds, Y_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True):
+def return_realign_plus_minus_table(preds, Y_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True,global_master_folder_path=global_master_folder_path):
     input_col_str = "{}_{}"
     output_col_str = "{}_{}_{}"
     reaglined_plus_minus_dict = dict()
@@ -41,8 +42,8 @@ def return_realign_plus_minus_table(preds, Y_test, pred_steps_list, pred_output_
                 df_temp[output_col_str_2.format(step_backs)+"_before"] -= df_temp[input_col_str_curr]
         
         reaglined_plus_minus_dict[(ticker, output)] = df_temp
-        df_temp.to_csv("C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\" +"temp" + ".csv")
-        preds.to_csv("C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\" +"preds" + ".csv")
+        df_temp.to_csv(pd.read_csv(os.path.join(global_master_folder_path,r"temp.csv")))
+        preds.to_csv(pd.read_csv(os.path.join(global_master_folder_path, +r"\preds.csv")))
     
     return reaglined_plus_minus_dict
 

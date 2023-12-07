@@ -35,12 +35,13 @@ if not sys.warnoptions:
     os.environ["PYTHONWARNINGS"] = "ignore"
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import matplotlib.pyplot as plt
-
+import random
 
 #%% Standard Parameters
 
 
 #GLOBAL PARAMETERS
+global_master_folder_path = r"C:\Users\Public\fabio_uni_work\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\"
 global_input_cols_to_include_list = ["<CLOSE>", "<HIGH>"]
 global_index_cols_list = ["<DATE>","<TIME>"]
 global_index_col_str = "datetime"
@@ -48,24 +49,25 @@ global_target_file_folder_path = ""
 global_feature_qty = 6
 global_outputs_folder_path = ".\\outputs\\"
 global_financial_history_folder_path = "FG action, do I need to update this?"
-global_df_stocks_list_file           = pd.read_csv(r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\support data\stock_info.csv")
-global_start_time = datetime.now()
+global_df_stocks_list_file           = pd.read_csv(os.path.join(global_master_folder_path,r"data\support_data\stock_info.csv"))
+global_start_time                    = datetime.now()
 global_error_str_1 = "the input {} is wrong for the input training_or_testing"
 global_random_state = 1
-global_scores_database = r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\scores_database.csv"
+#global_scores_database = pd.read_csv(os.path.join(global_master_folder_path,r"outputs\scores_database.csv"))
 global_strptime_str = '%d/%m/%y %H:%M:%S'
 global_strptime_str_filename = '%d_%m_%y %H:%M:%S'
+global_strptime_str_2 = '%d/%m/%y %H:%M'
 global_precalculated_assets_locations_dict = {
-    "root" : "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\precalculated_assets\\",
+    "root" : os.path.join(global_master_folder_path,r"precalculated_assets\\"),
     "topic_models"              : "topic_models\\",
     "annotated_tweets"          : "annotated_tweets\\",
     "predictive_model"          : "predictive_model\\",
-    "sentimental_data"          : "sentimental_data\\",
+    "sentiment_data"          : "sentiment_data\\",
     "technical_indicators"      : "technical_indicators\\",
     "experiment_records"        : "experiment_records\\",
     "clean_tweets"              : "cleaned_tweets_ready_for_subject_discovery\\"
     }
-global_outputs_folder = "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\outputs\\"
+global_outputs_folder = os.path.join(global_master_folder_path,r"outputs\\")
 global_designs_record_final_columns_list = ["experiment_timestamp", "training_r2", "training_mse", "training_mae", "validation_r2", "validation_mse", "validation_mae", "testing_r2", "testing_mse", "testing_mae", "profitability", "predictor_names"]
 
 
@@ -78,9 +80,11 @@ FIVE_MIN_TIME_STEPS_IN_A_DAY = SECS_IN_A_DAY / (5*60)
 
 default_temporal_params_dict    = {
     "train_period_start"    : datetime.strptime('01/01/15 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
+    #"train_period_end"      : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
+    "train_period_end"      : datetime.strptime('01/02/15 00:00:00', global_strptime_str), #FG_placeholder
     "time_step_seconds"     : 5*60, #5 mins,
-    "test_period_start"     : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
+    "test_period_start"     : datetime.strptime('01/11/19 00:00:00', global_strptime_str), #FG_placeholder
+    #"test_period_start"     : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
     "test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str),
 }
 default_fin_inputs_params_dict      = {
@@ -96,7 +100,7 @@ default_fin_inputs_params_dict      = {
         "Doji" : True},
     "index_col_str"     : "datetime",
     #"historical_file"   : "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\data\\financial data\\tiingo\\aapl.csv",
-    "historical_file"   : r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\financial data\firstratedata\AAPL_full_5min_adjsplit.txt"
+    "historical_file"   : os.path.join(global_master_folder_path,r"data\financial_data\firstratedata\AAPL_full_5min_adjsplit.txt")
 }
 default_senti_inputs_params_dict    = {
     "topic_qty"             : 7,
@@ -109,7 +113,7 @@ default_senti_inputs_params_dict    = {
     "enforced_topics_dict_name" : "None",
     "enforced_topics_dict"  : None,
     "sentiment_method"      : SentimentIntensityAnalyzer(),
-    "tweet_file_location"   : r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\twitter data\Tweets about the Top Companies from 2015 to 2020\Tweet.csv\apple.csv",
+    "tweet_file_location"   : os.path.join(global_master_folder_path,r"data\twitter_data\apple.csv"),
     "regenerate_cleaned_tweets_for_subject_discovery" : False,
     "inc_new_combined_stopwords_list" : True,
     "topic_weight_square_factor" : 1
@@ -126,10 +130,10 @@ default_cohort_retention_rate_dict = {
             "~senti_*" : 0.6, #sentiment analysis
             "*": 0.5} # other missed values
 default_model_hyper_params          = {
-    "name" : "RandomSubspace_MLPRegressor", #Multi-layer Perceptron regressor
+    "name" : "RandomSubspace_RNN_Regressor", #Multi-layer Perceptron regressor
     #"name" : "RandomSubspace_RNN_Regressor", #Multi-layer Perceptron regressor
         #general hyperparameters
-    "n_estimators_per_time_series_blocking" : 2,
+    "n_estimators_per_time_series_blocking" : 1,
     "training_error_measure_main"   : 'neg_mean_squared_error',
     "testing_scoring"               : ["r2", "mse", "mae"],
     "time_series_split_qty"         : 5,
@@ -137,7 +141,10 @@ default_model_hyper_params          = {
     "estimator__alpha"                 : 0.05,
     "estimator__hidden_layer_sizes"    : (100,10), 
     "estimator__activation"            : 'relu',
-    "cohort_retention_rate_dict"       : default_cohort_retention_rate_dict}
+    "cohort_retention_rate_dict"       : default_cohort_retention_rate_dict,
+    "epochs" : 5,
+    "lookbacks" : 10,
+    "shuffle_fit" : False}
 default_reporting_dict              = {
     "confidence_thresholds" : [0, 0.01, 0.02, 0.035, 0.05, 0.1],
     "confidence_thresholds_inserted_to_df" : {
@@ -754,10 +761,6 @@ def experiment_manager(
     print(datetime.now().strftime("%H:%M:%S") + "   normal termination")
         
 
-        
-
-    
-    
 
 #%% main line
 
@@ -859,7 +862,7 @@ for scenario_ID in [1,9,2,10]:#scenario_dict.keys():
     inverse_for_minimise_vec = [True]
     
 
-    #what around to ensure that single topic sentimental data in more used in the model
+    #what around to ensure that single topic sentiment data in more used in the model
     if default_senti_inputs_params_dict["topic_qty"] == 1:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 1
     elif default_senti_inputs_params_dict["topic_qty"] == 0:
@@ -882,7 +885,7 @@ for scenario_ID in [1,9,2,10]:#scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\intergration_of_new_data_and_RNN.csv"
+            global_record_path=os.path.join(global_master_folder_path,r"outputs\intergration_of_new_data_and_RNN.csv")
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
