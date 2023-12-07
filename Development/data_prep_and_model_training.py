@@ -1412,6 +1412,111 @@ class DRSLinRegRNN():
         return training_generator
 
 
+class DRSLinReg():
+    def __init__(self, base_estimator=MLPRegressor(),
+                 model_hyper_params=model_hyper_params, 
+                 ticker_name=outputs_params_dict["output_symbol_indicators_tuple"][0]):
+        #expected keys: training_time_splits, max_depth, max_features, random_state,        
+        for key in model_hyper_params:
+           setattr(self, key, model_hyper_params[key])
+        self.model_hyper_params = model_hyper_params
+        self.ticker_name = ticker_name
+        self.base_estimator = base_estimator
+        self.estimators_ = []
+        self.training_time_splits = model_hyper_params["time_series_split_qty"]
+        self.n_estimators = 1 #this is a hard coding as the n estimators is set by a random loop. this ensures that each version of the input (provided by the 'remove columns' function), is used to train just a single model
+        
+    def fit(self, X, y, pred_steps_list, confidences_before_betting_PC):
+        tscv = BlockingTimeSeriesSplit(n_splits=self.training_time_splits)
+        count = 0
+        global global_random_state
+        training_scores_dict_list  = []
+        validation_scores_dict_list  = []
+        additional_validation_dict_list = []
+        kf = KFold(n_splits=5, shuffle=False)
+        estimator = BaggingRegressor(base_estimator=self.base_estimator,
+                                          #the assignment of "one" estimator is overwritten by the rest of the method
+                                          n_estimators=1,#self.n_estimators,
+                                          max_samples=1.0,
+                                          max_features=1.0,
+                                          bootstrap=True,
+                                          bootstrap_features=False)
+                                          #random_state=self.random_state SET ELSEWHERE
+        for key in self.model_hyper_params:
+            setattr(estimator, key, self.model_hyper_params[key])
+            
+        estimator.base_estimator = self.base_estimator
+        for train_index, test_index in kf.split(X):
+            #these are the base values that will be updated if there isn't a passed value in the input dict
+            
+            
+            count += 1
+            for i_random in range(model_hyper_params["n_estimators_per_time_series_blocking"]):
+                # randomly select features to drop out
+                n_features = X.shape[1]
+                dropout_cols = return_columns_to_remove(columns_list=X.columns, self=self)
+                X_train = X.loc[X.index[train_index].values].copy()
+                X_train.loc[:, dropout_cols] = 0
+                y_train = y.loc[y.index[train_index].values].copy()
+                y_test  = y.loc[y.index[test_index].values].copy()
+                estimator.random_state = global_random_state
+                global_random_state += 1
+                estimator.dropout_cols_ = dropout_cols
+                estimator.fit(X_train, y_train)
+                # validate model
+                y_pred_train = estimator.predict(X.iloc[train_index].values)
+                y_pred_test = estimator.predict(X.iloc[test_index].values)
+                #collect training, validation and validation additional analysis scores
+                training_scores_dict_list   += [{"r2" : r2_score(y_train, y_pred_train), "mse" : mean_squared_error(y_train, y_pred_train), "mae" : mean_absolute_error(y_train, y_pred_train)}]
+                validation_scores_dict_list += [{"r2" : r2_score(y_test, y_pred_test),   "mse" : mean_squared_error(y_test, y_pred_test),   "mae" : mean_absolute_error(y_test, y_pred_test)}]
+                additional_validation_dict_list += [FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred_test, y.iloc[test_index], pred_steps_list, confidences_before_betting_PC=confidences_before_betting_PC)]
+                self.estimators_ = self.estimators_ + [estimator]
+        
+        training_scores_dict       = average_list_of_identical_dicts(training_scores_dict_list)
+        validation_scores_dict     = average_list_of_identical_dicts(validation_scores_dict_list)
+        additional_validation_dict = average_list_of_identical_dicts(additional_validation_dict_list)
+        
+        return self, training_scores_dict, validation_scores_dict, additional_validation_dict
+
+    def predict_ensemble(self, X, output_name=None):
+        
+        if output_name==None:
+            raise ValueError ("please ensure that the outputs are labelled")
+            output_name = ["output"]
+        
+        y_ave = []
+        y_ensemble = []
+        
+        for i, estimator_local in enumerate(self.estimators_):
+            # randomly select features to drop out
+            y_ensemble.insert(len(y_ensemble), estimator_local.predict(X))
+        
+        y_ensemble = np.array(y_ensemble)
+        for ts in range(len(y_ensemble[0])):
+            y_ave = y_ave + [y_ensemble[:,ts].mean()]
+        
+        output = pd.DataFrame(y_ave, columns=[output_name], index=X.index)
+        
+        return output
+    
+    def evaluate(self, X_test=None, y_test=None, y_pred=None, method=["r2"], return_high_good=False):
+        
+        output = dict()
+        
+        if y_pred is None:
+            y_pred = self.predict_ensemble(X_test, output_name=["test output"]).values
+        
+        for val in method:
+            if val == "r2":
+                output[val] = r2_score(y_test, y_pred)
+            elif val == "mse":
+                output[val] = mean_squared_error(y_test, y_pred)
+            elif val == "mae":
+                output[val] = mean_absolute_error(y_test, y_pred)
+            else:
+                raise ValueError("passed method string not found")
+        return output
+
 def return_columns_to_remove(columns_list, self):
     
     columns_to_remove = list(copy.deepcopy(columns_list))
