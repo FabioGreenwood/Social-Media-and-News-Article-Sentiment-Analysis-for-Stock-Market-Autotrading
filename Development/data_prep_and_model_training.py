@@ -1356,7 +1356,7 @@ class DRSLinRegRNN():
         
         return self, training_scores_dict, validation_scores_dict, additional_validation_dict
 
-    def predict_ensemble(self, X, output_name=None):
+    def predict_ensemble(self, X, output_name=None): #FG_action: This is where the new error is
         
         if output_name==None:
             raise ValueError ("please ensure that the outputs are labelled")
@@ -1403,32 +1403,52 @@ def return_filtered_normalised_training_generators(df_X, df_y, scaler_X=None, sc
     else:
         return filtered_training_generator, scaler_X, scaler_y
 
-#def return_normalised_training_generators_with_single_day_batches_and_scalars(df_X, df_Y)
 def return_filtered_batches_that_dont_cross_two_days(training_generator, datetime_generator):
-    mask, new_data, new_targets = [], np.empty((0,training_generator.data.shape[1])), np.empty((0,training_generator.targets.shape[1]))
-    for batch_x, output in datetime_generator:
-        if np.datetime_as_string(batch_x[0][0], unit='D')[-2:] == np.datetime_as_string(batch_x[0][-1], unit='D')[-2:]:
-            mask += [True]
-        else:
-            mask += [False]
-    for data_n, target_n, Bool_n in zip(training_generator.data, training_generator.targets, mask):
-        if Bool_n == True:
-            new_data    = np.append(new_data, [data_n], axis=0)
-            new_targets = np.append(new_targets, [target_n], axis=0)
+    mask = np.array([np.datetime_as_string(batch_x[0][0], unit='D')[-2:] == np.datetime_as_string(batch_x[0][-1], unit='D')[-2:] for batch_x, _ in datetime_generator])
+    mask = np.concatenate([mask,[False] * int(training_generator.data.shape[0] - len(mask))])
+    new_data = training_generator.data[mask]
+    new_targets = training_generator.targets[mask]
 
-    # replace removed batches with random batches
+    # Replace removed batches with random batches
     for i in range(sum(mask), len(mask)):
-        random_index = random.randint(0, sum(mask))
-        new_data    = np.append(new_data, [new_data[random_index]], axis=0)
+        random_index = random.randint(0, sum(mask)-1)
+        new_data = np.append(new_data, [new_data[random_index]], axis=0)
         new_targets = np.append(new_targets, [new_targets[random_index]], axis=0)
-    #the time series generator's final batches tend to be blank, causing the first for loop to skip them, it is best to just transfer these directly
-    for i in range(len(new_data), training_generator.data.shape[0]):
-        new_data    = np.append(new_data, [training_generator.data[i]], axis=0)
-        new_targets = np.append(new_targets, [training_generator.targets[i]], axis=0)
 
-    training_generator.data     = new_data
-    training_generator.targets  = new_targets
+    # Transfer final batches directly
+    new_data = np.append(new_data, training_generator.data[len(new_data):], axis=0)
+    new_targets = np.append(new_targets, training_generator.targets[len(new_targets):], axis=0)
+
+    training_generator.data = new_data
+    training_generator.targets = new_targets
     return training_generator
+
+##def return_normalised_training_generators_with_single_day_batches_and_scalars(df_X, df_Y)
+#def return_filtered_batches_that_dont_cross_two_days(training_generator, datetime_generator):
+#    mask, new_data, new_targets = [], np.empty((0,training_generator.data.shape[1])), np.empty((0,training_generator.targets.shape[1]))
+#    for batch_x, output in datetime_generator:
+#        if np.datetime_as_string(batch_x[0][0], unit='D')[-2:] == np.datetime_as_string(batch_x[0][-1], unit='D')[-2:]:
+#            mask += [True]
+#        else:
+#            mask += [False]
+#    for data_n, target_n, Bool_n in zip(training_generator.data, training_generator.targets, mask):
+#        if Bool_n == True:
+#            new_data    = np.append(new_data, [data_n], axis=0)
+#            new_targets = np.append(new_targets, [target_n], axis=0)
+#
+#    # replace removed batches with random batches
+#    for i in range(sum(mask), len(mask)):
+#        random_index = random.randint(0, sum(mask))
+#        new_data    = np.append(new_data, [new_data[random_index]], axis=0)
+#        new_targets = np.append(new_targets, [new_targets[random_index]], axis=0)
+#    #the time series generator's final batches tend to be blank, causing the first for loop to skip them, it is best to just transfer these directly
+#    for i in range(len(new_data), training_generator.data.shape[0]):
+#        new_data    = np.append(new_data, [training_generator.data[i]], axis=0)
+#        new_targets = np.append(new_targets, [training_generator.targets[i]], axis=0)
+#
+#    training_generator.data     = new_data
+#    training_generator.targets  = new_targets
+#    return training_generator
 
 
 class DRSLinReg():

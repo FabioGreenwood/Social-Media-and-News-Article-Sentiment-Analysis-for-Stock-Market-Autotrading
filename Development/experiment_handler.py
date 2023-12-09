@@ -80,10 +80,12 @@ FIVE_MIN_TIME_STEPS_IN_A_DAY = 179#SECS_IN_A_DAY / (5*60)
 
 default_temporal_params_dict    = {
     "train_period_start"    : datetime.strptime('01/01/15 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
+    "train_period_end"      : datetime.strptime('01/03/15 00:00:00', global_strptime_str), #FG_Placeholder
+    #"train_period_end"      : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
     "time_step_seconds"     : 5*60, #5 mins,
     "test_period_start"     : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
-    "test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str),
+    "test_period_end"       : datetime.strptime('01/08/19 00:00:00', global_strptime_str), #FG_Placeholder
+    #"test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str),
 }
 default_fin_inputs_params_dict      = {
     "index_cols"        : "date",    
@@ -134,17 +136,20 @@ default_model_hyper_params          = {
     "n_estimators_per_time_series_blocking" : 1,
     "training_error_measure_main"   : 'neg_mean_squared_error',
     "testing_scoring"               : ["r2", "mse", "mae"],
-    "time_series_split_qty"         : 5,
+    #"time_series_split_qty"         : 5,
+    "time_series_split_qty"         : 2, #FG_placeholder
         #model specific rows
     "estimator__alpha"                 : 0.05,
     "estimator__hidden_layer_sizes"    : (100,10), 
     "estimator__activation"            : 'relu',
     "cohort_retention_rate_dict"       : default_cohort_retention_rate_dict,
     "general_adjusting_square_factor" : 1,
-    "epochs" : 3,
+    "epochs" : 1,
     "lookbacks" : 10,
     "shuffle_fit" : False,
-    "K_fold_splits" : 5}
+    #"K_fold_splits" : 5, 
+    "K_fold_splits" : 2 #FG_placeholder
+    }
 default_reporting_dict              = {
     "confidence_thresholds" : [0, 0.01, 0.02, 0.035, 0.05, 0.1],
     "confidence_thresholds_inserted_to_df" : {
