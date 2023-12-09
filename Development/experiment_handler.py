@@ -73,18 +73,16 @@ global_designs_record_final_columns_list = ["experiment_timestamp", "training_r2
 
 SECS_IN_A_DAY = 60*60*24
 SECS_IN_AN_HOUR = 60*60
-FIVE_MIN_TIME_STEPS_IN_A_DAY = SECS_IN_A_DAY / (5*60)
+FIVE_MIN_TIME_STEPS_IN_A_DAY = 179#SECS_IN_A_DAY / (5*60)
 
 
 #%% Default Input Parameters
 
 default_temporal_params_dict    = {
     "train_period_start"    : datetime.strptime('01/01/15 00:00:00', global_strptime_str),
-    #"train_period_end"      : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/02/15 00:00:00', global_strptime_str), #FG_placeholder
+    "train_period_end"      : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
     "time_step_seconds"     : 5*60, #5 mins,
-    "test_period_start"     : datetime.strptime('01/11/19 00:00:00', global_strptime_str), #FG_placeholder
-    #"test_period_start"     : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
+    "test_period_start"     : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
     "test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str),
 }
 default_fin_inputs_params_dict      = {
@@ -125,13 +123,13 @@ default_outputs_params_dict         = {
 default_cohort_retention_rate_dict = {
             "£_close" : 1, #output value
             "£_*": 1, #other OHLCV values
-            "$_*" : 0.4, # technical indicators
+            "$_*" : 0.6, # technical indicators
             "match!_*" : 0.6, #pattern matchs
             "~senti_*" : 0.6, #sentiment analysis
             "*": 0.5} # other missed values
 default_model_hyper_params          = {
+    #"name" : "RandomSubspace_MLPRegressor", #Multi-layer Perceptron regressor
     "name" : "RandomSubspace_RNN_Regressor", #Multi-layer Perceptron regressor
-    #"name" : "RandomSubspace_RNN_Regressor", #Multi-layer Perceptron regressor
         #general hyperparameters
     "n_estimators_per_time_series_blocking" : 1,
     "training_error_measure_main"   : 'neg_mean_squared_error',
@@ -142,15 +140,19 @@ default_model_hyper_params          = {
     "estimator__hidden_layer_sizes"    : (100,10), 
     "estimator__activation"            : 'relu',
     "cohort_retention_rate_dict"       : default_cohort_retention_rate_dict,
-    "epochs" : 5,
+    "general_adjusting_square_factor" : 1,
+    "epochs" : 3,
     "lookbacks" : 10,
-    "shuffle_fit" : False}
+    "shuffle_fit" : False,
+    "K_fold_splits" : 5}
 default_reporting_dict              = {
     "confidence_thresholds" : [0, 0.01, 0.02, 0.035, 0.05, 0.1],
     "confidence_thresholds_inserted_to_df" : {
         "PC_confindence" : [0.02],
         "score_confidence" : [0.02],
         "score_confidence_weighted" : [0.02]}}
+
+
 default_input_dict = {
     "temporal_params_dict"      : default_temporal_params_dict,
     "fin_inputs_params_dict"    : default_fin_inputs_params_dict,
@@ -769,16 +771,12 @@ model_start_time = now.strftime(global_strptime_str_filename)
     
 design_space_dict = {
     "senti_inputs_params_dict" : {
-        "topic_qty" : [5, 9, 13, 17],
+        "topic_qty" : [5, 9, 13, 17, 25],
         "topic_model_alpha" : [0.3, 0.7, 1, 2, 3, 5],
         "weighted_topics" : [False, True],
         "relative_halflife" : [0.25 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR], 
         "apply_IDF" : [False, True],
-        "topic_weight_square_factor" : [1, 2, 4]
-        #,
-        #"enforced_topics_dict"  : {
-        #    0: None,
-        #    1 : [['investment', 'financing', 'losses'], ['risk', 'exposure', 'liability'], ["financial",  "forces" , "growth", "interest",  "rates"]]}
+        "topic_weight_square_factor" : [1, 2, 4],
     },
     "model_hyper_params" : {
         "estimator__hidden_layer_sizes" : {
@@ -791,7 +789,8 @@ design_space_dict = {
             7 : [("LSTM", 50), ("GRU", 50), ("simple", 50)],
             8 : [("simple", 50), ("GRU", 50), ("LSTM", 50)]
             },
-        "estimator__alpha"                 : [1e-5, 1e-4, 1e-3, 1e-2, 5e-2, 1e-1]
+        "general_adjusting_square_factor" : [1.5, 1, 0.75],
+        "estimator__alpha"                : [1e-5, 1e-4, 1e-3, 1e-2, 5e-2, 1e-1, 5e-1, 9e-1]
     },
     "string_key" : {}
 }
@@ -869,7 +868,7 @@ for scenario_ID in [1,9,2,10]:#scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = "intergration_of_new_data_and_RNN"
+    scenario_name_str = "intergration_of_new_data_and_RNN4"
 
 
     if __name__ == '__main__':
@@ -885,7 +884,7 @@ for scenario_ID in [1,9,2,10]:#scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_master_folder_path,r"outputs\intergration_of_new_data_and_RNN.csv")
+            global_record_path=os.path.join(global_master_folder_path,r"outputs\intergration_of_new_data_and_RNN4.csv")
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 

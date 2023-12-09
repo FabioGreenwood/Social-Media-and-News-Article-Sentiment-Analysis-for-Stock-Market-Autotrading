@@ -1238,7 +1238,6 @@ def initiate_model(outputs_params_dict, model_hyper_params):
     
     return estimator
 
-#%% temp sample DoE space for RNN
 
 def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_features, dropout_cols, lookback=1):
     
@@ -1273,9 +1272,6 @@ def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_fea
 
 
 class DRSLinRegRNN():
-    scalar_X = None
-    scalar_Y = None
-
     def __init__(self, base_estimator=Sequential(),
                  model_hyper_params=model_hyper_params, 
                  ticker_name=outputs_params_dict["output_symbol_indicators_tuple"][0]):
@@ -1292,6 +1288,7 @@ class DRSLinRegRNN():
     def fit(self, df_X, df_y, pred_steps_value, confidences_before_betting_PC, lookbacks=10):
         count = 0
         global global_random_state
+        global_random_state = 42
         # variables  
         training_scores_dict_list, validation_scores_dict_list, additional_validation_dict_list  = [], [], []
         kf = KFold(n_splits=self.K_fold_splits, shuffle=False)
@@ -1305,11 +1302,19 @@ class DRSLinRegRNN():
                                           #random_state=self.random_state SET ELSEWHERE
         for key in self.model_hyper_params:
             setattr(estimator, key, self.model_hyper_params[key])
-            
+        
+        print(datetime.now().strftime("%H:%M:%S") + " - training model")
+        scaler_X = MinMaxScaler()
+        scaler_y = MinMaxScaler()
+        scaler_X.fit(df_X)
+        scaler_y.fit(df_y.values.reshape(-1, 1))
         estimator.base_estimator = self.base_estimator #FG_action: move?
+        estimator.scaler_X = scaler_X
+        estimator.scaler_y = scaler_y
         for train_index, val_index in kf.split(df_X): 
             #these are the base values that will be updated if there isn't a passed value in the input dict
             count += 1
+            print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
             for i_random in range(self.n_estimators_per_time_series_blocking):
                 # define inputs - randomly select features to drop out
                 n_features = df_X.shape[1]
@@ -1328,14 +1333,15 @@ class DRSLinRegRNN():
 
                 # RNN sepcific functions
                 ensemble_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features, dropout_cols)
+                print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
                 global_random_state += 1
-                training_generator, scaler_X, scaler_y = self.return_filtered_training_generators_and_scalar_objects(X_train, y_train, scaler_X=None, scaler_y=None, lookbacks=self.lookbacks)
+                training_generator = return_filtered_normalised_training_generators(X_train, y_train, scaler_X=scaler_X, scaler_y=scaler_y, lookbacks=self.lookbacks)
                 
 
-                ensemble_estimator.fit(training_generator, epochs=self.epochs, shuffle=self.shuffle_fit, verbose=1)
+                ensemble_estimator.fit(training_generator, epochs=self.epochs, shuffle=self.shuffle_fit)
                 y_pred_train = ensemble_estimator.predict(training_generator)
                 y_pred_train = scaler_y.inverse_transform(y_pred_train).reshape(-1)
-                y_pred_val = ensemble_estimator.predict(self.return_filtered_training_generators_and_scalar_objects(X_val, y_val, scaler_X=scaler_X, scaler_y=scaler_y, lookbacks=self.lookbacks))
+                y_pred_val = ensemble_estimator.predict(return_filtered_normalised_training_generators(X_val, y_val, scaler_X=scaler_X, scaler_y=scaler_y, lookbacks=self.lookbacks))
                 y_pred_val = scaler_y.inverse_transform(y_pred_val).reshape(-1)
 
                 # collect training, validation and validation additional analysis scores
@@ -1350,64 +1356,79 @@ class DRSLinRegRNN():
         
         return self, training_scores_dict, validation_scores_dict, additional_validation_dict
 
-    def return_filtered_training_generators_and_scalar_objects(self, df_X, df_y, scaler_X=None, scaler_y=None, lookbacks=10):
-        global global_strptime_str_2
-        were_scalars_pre_set = True
-        if scaler_X == None:
-            were_scalars_pre_set = False
-            scaler_X = MinMaxScaler()
-            scaler_y = MinMaxScaler()
-            scaler_X.fit(df_X)
-            scaler_y.fit(df_y.values.reshape(-1, 1))
-        df_X_normalized = scaler_X.transform(df_X)
-        df_y_normalized = scaler_y.transform(df_y.values.reshape(-1, 1))
-        input_shape = (lookbacks, df_X.shape[1])
-        training_generator = tf.keras.preprocessing.sequence.TimeseriesGenerator(
-                df_X_normalized,
-                df_y_normalized,
-                lookbacks,
-                batch_size=1,
-                shuffle=False
-            )
-        datetime_generator = tf.keras.preprocessing.sequence.TimeseriesGenerator(
-                df_X.index,
-                df_y_normalized,
-                lookbacks,
-                batch_size=1,
-                shuffle=False
-            )
-        filtered_training_generator = self.return_filtered_batches_that_dont_cross_two_days(training_generator, datetime_generator)
-        if were_scalars_pre_set == True:
-            return filtered_training_generator
+    def predict_ensemble(self, X, output_name=None):
+        
+        if output_name==None:
+            raise ValueError ("please ensure that the outputs are labelled")
+            output_name = ["output"]
+        
+        y_ave = []
+        y_ensemble = []
+        
+        for i, estimator_local in enumerate(self.estimators_):
+            # randomly select features to drop out
+            y_ensemble.insert(len(y_ensemble), estimator_local.predict(X))
+        
+        y_ensemble = np.array(y_ensemble)
+        for ts in range(len(y_ensemble[0])):
+            y_ave = y_ave + [y_ensemble[:,ts].mean()]
+        
+        output = pd.DataFrame(y_ave, columns=[output_name], index=X.index)
+        
+        return output
+
+def return_filtered_normalised_training_generators(df_X, df_y, scaler_X=None, scaler_y=None, lookbacks=10):
+    global global_strptime_str_2
+    were_scalars_pre_set = True
+    df_X_normalized = scaler_X.transform(df_X)
+    df_y_normalized = scaler_y.transform(df_y.values.reshape(-1, 1))
+    input_shape = (lookbacks, df_X.shape[1])
+    training_generator = tf.keras.preprocessing.sequence.TimeseriesGenerator(
+            df_X_normalized,
+            df_y_normalized,
+            lookbacks,
+            batch_size=1,
+            shuffle=False
+        )
+    datetime_generator = tf.keras.preprocessing.sequence.TimeseriesGenerator(
+            df_X.index,
+            df_y_normalized,
+            lookbacks,
+            batch_size=1,
+            shuffle=False
+        )
+    filtered_training_generator = return_filtered_batches_that_dont_cross_two_days(training_generator, datetime_generator)
+    if were_scalars_pre_set == True:
+        return filtered_training_generator
+    else:
+        return filtered_training_generator, scaler_X, scaler_y
+
+#def return_normalised_training_generators_with_single_day_batches_and_scalars(df_X, df_Y)
+def return_filtered_batches_that_dont_cross_two_days(training_generator, datetime_generator):
+    mask, new_data, new_targets = [], np.empty((0,training_generator.data.shape[1])), np.empty((0,training_generator.targets.shape[1]))
+    for batch_x, output in datetime_generator:
+        if np.datetime_as_string(batch_x[0][0], unit='D')[-2:] == np.datetime_as_string(batch_x[0][-1], unit='D')[-2:]:
+            mask += [True]
         else:
-            return filtered_training_generator, scaler_X, scaler_y
+            mask += [False]
+    for data_n, target_n, Bool_n in zip(training_generator.data, training_generator.targets, mask):
+        if Bool_n == True:
+            new_data    = np.append(new_data, [data_n], axis=0)
+            new_targets = np.append(new_targets, [target_n], axis=0)
 
-    #def return_normalised_training_generators_with_single_day_batches_and_scalars(df_X, df_Y)
-    def return_filtered_batches_that_dont_cross_two_days(self, training_generator, datetime_generator):
-        mask, new_data, new_targets = [], np.empty((0,training_generator.data.shape[1])), np.empty((0,training_generator.targets.shape[1]))
-        for batch_x, output in datetime_generator:
-            if np.datetime_as_string(batch_x[0][0], unit='D')[-2:] == np.datetime_as_string(batch_x[0][-1], unit='D')[-2:]:
-                mask += [True]
-            else:
-                mask += [False]
-        for data_n, target_n, Bool_n in zip(training_generator.data, training_generator.targets, mask):
-            if Bool_n == True:
-                new_data    = np.append(new_data, [data_n], axis=0)
-                new_targets = np.append(new_targets, [target_n], axis=0)
+    # replace removed batches with random batches
+    for i in range(sum(mask), len(mask)):
+        random_index = random.randint(0, sum(mask))
+        new_data    = np.append(new_data, [new_data[random_index]], axis=0)
+        new_targets = np.append(new_targets, [new_targets[random_index]], axis=0)
+    #the time series generator's final batches tend to be blank, causing the first for loop to skip them, it is best to just transfer these directly
+    for i in range(len(new_data), training_generator.data.shape[0]):
+        new_data    = np.append(new_data, [training_generator.data[i]], axis=0)
+        new_targets = np.append(new_targets, [training_generator.targets[i]], axis=0)
 
-        # replace removed batches with random batches
-        for i in range(sum(mask), len(mask)):
-            random_index = random.randint(0, sum(mask))
-            new_data    = np.append(new_data, [new_data[random_index]], axis=0)
-            new_targets = np.append(new_targets, [new_targets[random_index]], axis=0)
-        #the time series generator's final batches tend to be blank, causing the first for loop to skip them, it is best to just transfer these directly
-        for i in range(len(new_data), training_generator.data.shape[0]):
-            new_data    = np.append(new_data, [training_generator.data[i]], axis=0)
-            new_targets = np.append(new_targets, [training_generator.targets[i]], axis=0)
-
-        training_generator.data     = new_data
-        training_generator.targets  = new_targets
-        return training_generator
+    training_generator.data     = new_data
+    training_generator.targets  = new_targets
+    return training_generator
 
 
 class DRSLinReg():
@@ -1424,7 +1445,7 @@ class DRSLinReg():
         self.training_time_splits = model_hyper_params["time_series_split_qty"]
         self.n_estimators = 1 #this is a hard coding as the n estimators is set by a random loop. this ensures that each version of the input (provided by the 'remove columns' function), is used to train just a single model
         
-    def fit(self, X, y, pred_steps_list, confidences_before_betting_PC):
+    def fit(self, X, y, pred_steps_list, confidences_before_betting_PC, lookbacks):
         count = 0
         global global_random_state
         training_scores_dict_list  = []
@@ -1518,7 +1539,10 @@ def return_columns_to_remove(columns_list, self):
     
     columns_to_remove = list(copy.deepcopy(columns_list))
     retain_cols = []
+    
     retain_dict = self.model_hyper_params["cohort_retention_rate_dict"]
+    general_adjusting_square_factor = self.model_hyper_params["general_adjusting_square_factor"]
+
     #max_features = self.max_features
     stock_strings_list = []
     columns_list = list(columns_list)
@@ -1537,7 +1561,7 @@ def return_columns_to_remove(columns_list, self):
         if len(cohort) > 0:
             for col in cohort:
                 columns_list.remove(col)
-            retain_cols = retain_cols + list(np.random.choice(cohort, math.ceil(len(cohort) * retain_dict[key]), replace=False))
+            retain_cols = retain_cols + list(np.random.choice(cohort, math.ceil(len(cohort) * (retain_dict[key] ** general_adjusting_square_factor)), replace=False))
 
     for value in retain_cols:
         columns_to_remove.remove(value)
@@ -1716,10 +1740,11 @@ def retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inp
     else:
         print(datetime.now().strftime("%H:%M:%S") + " - generating model and testing scores")
         predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = generate_model_and_validation_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict)
-        with open(predictor_location_file, "wb") as file:
-            pickle.dump(predictor, file)
-            pickle.dump(predictor, file, protocol=pickle.HIGHEST_PROTOCOL)
-        #edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="save", training_scores=validation_dict)
+        try:
+            with open(predictor_location_file, "wb") as file:
+                pickle.dump(predictor, file)
+        except:
+            print("predictor not saved")
 
     return predictor, training_scores_dict, validation_scores_dict, additional_validation_dict
 
