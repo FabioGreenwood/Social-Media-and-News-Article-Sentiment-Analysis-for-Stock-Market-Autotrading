@@ -45,6 +45,7 @@ import warnings
 import sys
 from keras.models import Sequential
 from keras.layers import SimpleRNN, Dense
+from tensorflow.keras.models import clone_model
 import additional_reporting_and_model_trading_runs as FG_additional_reporting
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
@@ -1276,84 +1277,73 @@ class DRSLinRegRNN():
                  model_hyper_params=model_hyper_params, 
                  ticker_name=outputs_params_dict["output_symbol_indicators_tuple"][0]):
         #expected keys: training_time_splits, max_depth, max_features, random_state,        
+        self.estimator_info_pack = {}
         for key in model_hyper_params: #FG_action: ensure this is aligned
-           setattr(self, key, model_hyper_params[key])
-        self.model_hyper_params = model_hyper_params
-        self.ticker_name = ticker_name
-        self.base_estimator = base_estimator
-        self.estimators_ = []
-        self.training_time_splits = model_hyper_params["time_series_split_qty"]
-        self.n_estimators = 1 #this is a hard coding as the n estimators is set by a random loop. this ensures that each version of the input (provided by the 'remove columns' function), is used to train just a single model
+           self.estimator_info_pack[key] = key
+        self.estimators = []
+        self.estimator_info_pack["model_hyper_params"]   = model_hyper_params
+        self.estimator_info_pack["ticker_name"]          = ticker_name
+        self.estimator_info_pack["base_estimator"]       = base_estimator
+        self.estimator_info_pack["estimators_"]          = []
+        self.estimator_info_pack["training_time_splits"] = model_hyper_params["time_series_split_qty"]
         
     def fit(self, df_X, df_y, pred_steps_value, confidences_before_betting_PC, lookbacks=10):
         count = 0
         global global_random_state
         global_random_state = 42
-        # variables  
-        training_scores_dict_list, validation_scores_dict_list, additional_validation_dict_list  = [], [], []
+        # variables
+        training_scores_dict_list, validation_scores_dict_list, additional_validation_dict_list = [], [], []
         kf = KFold(n_splits=self.K_fold_splits, shuffle=False)
-        estimator = BaggingRegressor(base_estimator=None,
-                                          #the assignment of "one" estimator is overwritten by the rest of the method
-                                          n_estimators=1,#self.n_estimators,
-                                          max_samples=1.0,
-                                          max_features=1.0,
-                                          bootstrap=True,
-                                          bootstrap_features=False)
-                                          #random_state=self.random_state SET ELSEWHERE
-        for key in self.model_hyper_params:
-            setattr(estimator, key, self.model_hyper_params[key])
-        
+
         print(datetime.now().strftime("%H:%M:%S") + " - training model")
         scaler_X = MinMaxScaler()
         scaler_y = MinMaxScaler()
         scaler_X.fit(df_X)
         scaler_y.fit(df_y.values.reshape(-1, 1))
-        estimator.base_estimator = self.base_estimator #FG_action: move?
-        estimator.scaler_X = scaler_X
-        estimator.scaler_y = scaler_y
-        for train_index, val_index in kf.split(df_X): 
-            #these are the base values that will be updated if there isn't a passed value in the input dict
+
+        for train_index, val_index in kf.split(df_X):
             count += 1
             print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
             for i_random in range(self.n_estimators_per_time_series_blocking):
-                # define inputs - randomly select features to drop out
                 n_features = df_X.shape[1]
                 dropout_cols = return_columns_to_remove(columns_list=df_X.columns, self=self)
-                
+
                 X_train = df_X.loc[df_X.index[train_index].values].copy()
                 X_train.loc[:, dropout_cols] = 0
                 y_train = df_y.loc[df_y.index[train_index].values].copy()
                 y_train_scoring = y_train[:-self.lookbacks]
-                
+
                 X_val = df_X.loc[df_X.index[val_index].values].copy()
                 X_val.loc[:, dropout_cols] = 0
                 y_val = df_y.loc[df_y.index[val_index].values].copy()
                 y_val_scoring = y_val[:-self.lookbacks]
 
-
-                # RNN sepcific functions
                 ensemble_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features, dropout_cols)
                 print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
                 global_random_state += 1
-                training_generator = return_filtered_normalised_training_generators(X_train, y_train, scaler_X=scaler_X, scaler_y=scaler_y, lookbacks=self.lookbacks)
-                
+                training_generator = return_filtered_normalised_training_generators(X_train, y_train,
+                                                                                    scaler_X=scaler_X, scaler_y=scaler_y,
+                                                                                    lookbacks=self.lookbacks)
 
                 ensemble_estimator.fit(training_generator, epochs=self.epochs, shuffle=self.shuffle_fit)
                 y_pred_train = ensemble_estimator.predict(training_generator)
                 y_pred_train = scaler_y.inverse_transform(y_pred_train).reshape(-1)
-                y_pred_val = ensemble_estimator.predict(return_filtered_normalised_training_generators(X_val, y_val, scaler_X=scaler_X, scaler_y=scaler_y, lookbacks=self.lookbacks))
+                y_pred_val = ensemble_estimator.predict(
+                    return_filtered_normalised_training_generators(X_val, y_val, scaler_X=scaler_X, scaler_y=scaler_y,
+                                                                   lookbacks=self.lookbacks))
                 y_pred_val = scaler_y.inverse_transform(y_pred_val).reshape(-1)
 
-                # collect training, validation and validation additional analysis scores
-                training_scores_dict_list   += [{"r2" : r2_score(y_train_scoring, y_pred_train), "mse" : mean_squared_error(y_train_scoring, y_pred_train), "mae" : mean_absolute_error(y_train_scoring, y_pred_train)}]
-                validation_scores_dict_list += [{"r2" : r2_score(y_val_scoring, y_pred_val),   "mse" : mean_squared_error(y_val_scoring, y_pred_val),   "mae" : mean_absolute_error(y_val_scoring, y_pred_val)}]
-                additional_validation_dict_list += [FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred_val, y_val_scoring, pred_steps_value, confidences_before_betting_PC=confidences_before_betting_PC)]
-                self.estimators_ = self.estimators_ + [ensemble_estimator]
-        
-        training_scores_dict       = average_list_of_identical_dicts(training_scores_dict_list)
-        validation_scores_dict     = average_list_of_identical_dicts(validation_scores_dict_list)
+                # collect training, validation, and validation additional analysis scores
+                training_scores_dict_list += [{"r2": r2_score(y_train_scoring, y_pred_train), "mse": mean_squared_error(y_train_scoring, y_pred_train), "mae": mean_absolute_error(y_train_scoring, y_pred_train)}]
+                validation_scores_dict_list += [{"r2": r2_score(y_val_scoring, y_pred_val), "mse": mean_squared_error(y_val_scoring, y_pred_val), "mae": mean_absolute_error(y_val_scoring, y_pred_val)}]
+                additional_validation_dict_list += [
+                    FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred_val, y_val_scoring, pred_steps_value, confidences_before_betting_PC=confidences_before_betting_PC)]
+                self.estimators_ = self.estimators_ + [clone_model(ensemble_estimator)]
+
+        training_scores_dict = average_list_of_identical_dicts(training_scores_dict_list)
+        validation_scores_dict = average_list_of_identical_dicts(validation_scores_dict_list)
         additional_validation_dict = average_list_of_identical_dicts(additional_validation_dict_list)
-        
+
         return self, training_scores_dict, validation_scores_dict, additional_validation_dict
 
     def predict_ensemble(self, X, output_name=None): #FG_action: This is where the new error is
