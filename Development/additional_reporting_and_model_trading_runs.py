@@ -49,8 +49,8 @@ def return_realign_plus_minus_table(preds, Y_test, pred_steps_list, pred_output_
 
 def return_results_X_min_plus_minus_accuracy(y_preds, Y_test, pred_steps_list, confidences_before_betting_PC=[0, 0.01]):
         
-    if len(Y_test.columns) > 1:
-        raise ValueError("Y_test should only be one columns wide")
+    #if len(Y_test.columns) > 1:
+    #    raise ValueError("Y_test should only be one columns wide")
     
     df_temp = pd.DataFrame()
     pred_str = dict()

@@ -36,55 +36,19 @@ if not sys.warnoptions:
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import matplotlib.pyplot as plt
 import random
-
-#%% Standard Parameters
-
-
-#GLOBAL PARAMETERS
-global_master_folder_path = r"C:\Users\Public\fabio_uni_work\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\"
-global_input_cols_to_include_list = ["<CLOSE>", "<HIGH>"]
-global_index_cols_list = ["<DATE>","<TIME>"]
-global_index_col_str = "datetime"
-global_target_file_folder_path = ""
-global_feature_qty = 6
-global_outputs_folder_path = ".\\outputs\\"
-global_financial_history_folder_path = "FG action, do I need to update this?"
-global_df_stocks_list_file           = pd.read_csv(os.path.join(global_master_folder_path,r"data\support_data\stock_info.csv"))
-global_start_time                    = datetime.now()
-global_error_str_1 = "the input {} is wrong for the input training_or_testing"
-global_random_state = 1
-#global_scores_database = pd.read_csv(os.path.join(global_master_folder_path,r"outputs\scores_database.csv"))
-global_strptime_str = '%d/%m/%y %H:%M:%S'
-global_strptime_str_filename = '%d_%m_%y %H:%M:%S'
-global_strptime_str_2 = '%d/%m/%y %H:%M'
-global_precalculated_assets_locations_dict = {
-    "root" : os.path.join(global_master_folder_path,r"precalculated_assets\\"),
-    "topic_models"              : "topic_models\\",
-    "annotated_tweets"          : "annotated_tweets\\",
-    "predictive_model"          : "predictive_model\\",
-    "sentiment_data"          : "sentiment_data\\",
-    "technical_indicators"      : "technical_indicators\\",
-    "experiment_records"        : "experiment_records\\",
-    "clean_tweets"              : "cleaned_tweets_ready_for_subject_discovery\\"
-    }
-global_outputs_folder = os.path.join(global_master_folder_path,r"outputs\\")
-global_designs_record_final_columns_list = ["experiment_timestamp", "training_r2", "training_mse", "training_mae", "validation_r2", "validation_mse", "validation_mae", "testing_r2", "testing_mse", "testing_mae", "profitability", "predictor_names"]
-
-
-SECS_IN_A_DAY = 60*60*24
-SECS_IN_AN_HOUR = 60*60
-FIVE_MIN_TIME_STEPS_IN_A_DAY = 179#SECS_IN_A_DAY / (5*60)
+from config import global_general_folder, global_outputs_folder, global_input_cols_to_include_list, global_index_cols_list, global_index_col_str, global_target_file_folder_path, global_feature_qty, global_outputs_folder_path, global_financial_history_folder_path, global_df_stocks_list_file          , global_start_time, global_error_str_1, global_random_state, global_scores_database, global_strptime_str, global_strptime_str_2, global_strptime_str_filename, global_precalculated_assets_locations_dict, global_designs_record_final_columns_list, SECS_IN_A_DAY, SECS_IN_AN_HOUR, FIVE_MIN_TIME_STEPS_IN_A_DAY
+import hashlib
 
 
 #%% Default Input Parameters
 
 default_temporal_params_dict    = {
     "train_period_start"    : datetime.strptime('01/01/15 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/03/15 00:00:00', global_strptime_str), #FG_Placeholder
+    "train_period_end"      : datetime.strptime('01/02/15 00:00:00', global_strptime_str), #FG_Placeholder
     #"train_period_end"      : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
     "time_step_seconds"     : 5*60, #5 mins,
     "test_period_start"     : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
-    "test_period_end"       : datetime.strptime('01/08/19 00:00:00', global_strptime_str), #FG_Placeholder
+    "test_period_end"       : datetime.strptime('01/07/19 00:00:00', global_strptime_str), #FG_Placeholder
     #"test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str),
 }
 default_fin_inputs_params_dict      = {
@@ -100,7 +64,7 @@ default_fin_inputs_params_dict      = {
         "Doji" : True},
     "index_col_str"     : "datetime",
     #"historical_file"   : "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\data\\financial data\\tiingo\\aapl.csv",
-    "historical_file"   : os.path.join(global_master_folder_path,r"data\financial_data\firstratedata\AAPL_full_5min_adjsplit.txt")
+    "historical_file"   : os.path.join(global_general_folder,r"data\financial_data\firstratedata\AAPL_full_5min_adjsplit.txt")
 }
 default_senti_inputs_params_dict    = {
     "topic_qty"             : 7,
@@ -113,7 +77,8 @@ default_senti_inputs_params_dict    = {
     "enforced_topics_dict_name" : "None",
     "enforced_topics_dict"  : None,
     "sentiment_method"      : SentimentIntensityAnalyzer(),
-    "tweet_file_location"   : os.path.join(global_master_folder_path,r"data\twitter_data\apple.csv"),
+    "tweet_file_location"   : os.path.join(global_general_folder,r"data\twitter_data\apple.csv"),
+    "cleaned_tweet_file_location"   : os.path.join(global_general_folder,r"data\twitter_data\apple_cleaned.csv"),
     "regenerate_cleaned_tweets_for_subject_discovery" : False,
     "inc_new_combined_stopwords_list" : True,
     "topic_weight_square_factor" : 1
@@ -130,24 +95,18 @@ default_cohort_retention_rate_dict = {
             "~senti_*" : 0.6, #sentiment analysis
             "*": 0.5} # other missed values
 default_model_hyper_params          = {
-    #"name" : "RandomSubspace_MLPRegressor", #Multi-layer Perceptron regressor
     "name" : "RandomSubspace_RNN_Regressor", #Multi-layer Perceptron regressor
         #general hyperparameters
     "n_estimators_per_time_series_blocking" : 1,
-    "training_error_measure_main"   : 'neg_mean_squared_error',
     "testing_scoring"               : ["r2", "mse", "mae"],
-    #"time_series_split_qty"         : 5,
-    "time_series_split_qty"         : 2, #FG_placeholder
-        #model specific rows
     "estimator__alpha"                 : 0.05,
-    "estimator__hidden_layer_sizes"    : (100,10), 
     "estimator__activation"            : 'relu',
     "cohort_retention_rate_dict"       : default_cohort_retention_rate_dict,
     "general_adjusting_square_factor" : 1,
     "epochs" : 1,
     "lookbacks" : 10,
+    "batch_ratio" : 0.1,
     "shuffle_fit" : False,
-    #"K_fold_splits" : 5, 
     "K_fold_splits" : 2 #FG_placeholder
     }
 default_reporting_dict              = {
@@ -375,13 +334,6 @@ def template_experiment_requester(GPyOpt_input, design_space_dict, default_input
     prepped_outputs_params_dict       = prepped_input_dict["outputs_params_dict"]
     prepped_model_hyper_params        = prepped_input_dict["model_hyper_params"]
     reporting_dict                    = prepped_input_dict["reporting_dict"]
-    
-    if type(prepped_input_dict["model_hyper_params"]["estimator__hidden_layer_sizes"]) == str or type(prepped_input_dict["model_hyper_params"]["estimator__hidden_layer_sizes"]) == np.str_:
-        original_value = prepped_input_dict["model_hyper_params"]["estimator__hidden_layer_sizes"]
-        updated_val = []
-        for x in original_value.split("_"):
-            updated_val = updated_val + [x]
-        prepped_input_dict["model_hyper_params"]["estimator__hidden_layer_sizes"] = tuple(updated_val)
     
     global global_run_count
     
@@ -873,7 +825,7 @@ for scenario_ID in [1,9,2,10]:#scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = "intergration_of_new_data_and_RNN4"
+    scenario_name_str = "intergration_of_new_data_and_RNN5"
 
 
     if __name__ == '__main__':
@@ -889,7 +841,7 @@ for scenario_ID in [1,9,2,10]:#scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_master_folder_path,r"outputs\intergration_of_new_data_and_RNN4.csv")
+            global_record_path=os.path.join(global_general_folder,r"outputs\intergration_of_new_data_and_RNN5.csv")
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
