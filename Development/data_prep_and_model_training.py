@@ -93,7 +93,7 @@ from config import global_strptime_str, global_strptime_str_filename, global_pre
 from tensorflow.keras.models import Sequential, clone_model, load_model
 from tensorflow.keras.layers import Dense
 import hashlib
-import new_methods
+
 
 #%% EXAMPLE INPUTS FOR MAIN METHOD
 
@@ -207,7 +207,7 @@ def return_predictor_name(input_dict):
 
     print("-----")
     name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe)
-    predictor_hash = str(input_dict["model_hyper_params"]["n_estimators_per_time_series_blocking"]) + str(input_dict["model_hyper_params"]["testing_scoring"]) + str(input_dict["model_hyper_params"]["estimator__alpha"]) + str(input_dict["model_hyper_params"]["estimator__activation"]) + str(input_dict["model_hyper_params"]["cohort_retention_rate_dict"]) + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + str(input_dict["model_hyper_params"]["epochs"]) + str(input_dict["model_hyper_params"]["lookbacks"]) + str(input_dict["model_hyper_params"]["shuffle_fit"]) + str(input_dict["model_hyper_params"]["K_fold_splits"]) + str(pred_steps_ahead) + input_dict["model_hyper_params"]["estimator__alpha"] + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + str(input_dict["model_hyper_params"]["lookbacks"]) + str(input_dict["model_hyper_params"]["batch_ratio"])
+    predictor_hash = str(input_dict["model_hyper_params"]["n_estimators_per_time_series_blocking"]) + str(input_dict["model_hyper_params"]["testing_scoring"]) + str(input_dict["model_hyper_params"]["estimator__alpha"]) + str(input_dict["model_hyper_params"]["estimator__activation"]) + str(input_dict["model_hyper_params"]["cohort_retention_rate_dict"]) + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + str(input_dict["model_hyper_params"]["epochs"]) + str(input_dict["model_hyper_params"]["lookbacks"]) + str(input_dict["model_hyper_params"]["shuffle_fit"]) + str(input_dict["model_hyper_params"]["K_fold_splits"]) + str(pred_steps_ahead) + str(input_dict["model_hyper_params"]["estimator__alpha"]) + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + str(input_dict["model_hyper_params"]["lookbacks"]) + str(input_dict["model_hyper_params"]["batch_ratio"])
     name = name + predictor_hash
     return str(name)
     
@@ -703,7 +703,7 @@ def generate_and_save_topic_model(run_name, temporal_params_dict, fin_inputs_par
         df_prepped_tweets = pd.read_csv(senti_inputs_params_dict["tweet_file_location"])
         print(len(df_prepped_tweets))
         tweets_list = list(df_prepped_tweets["body"])
-        df_prepped_tweets_company_agnostic = prep_and_save_twitter_text_for_subject_discovery(tweets_list[::int(len(tweets_list)/2e2)], df_stocks_list_file=global_df_stocks_list_file, save_location=senti_inputs_params_dict["cleaned_tweet_file_location"], inc_new_combined_stopwords_list=inc_new_combined_stopwords_list)
+        df_prepped_tweets_company_agnostic = prep_and_save_twitter_text_for_subject_discovery(tweets_list[::int(len(tweets_list)/5e2)], df_stocks_list_file=global_df_stocks_list_file, save_location=senti_inputs_params_dict["cleaned_tweet_file_location"], inc_new_combined_stopwords_list=inc_new_combined_stopwords_list)
         #with open(senti_inputs_params_dict["tweet_file_location"], 'rb') as file:
         #    df_prepped_tweets_company_agnostic = pickle.load(file)
     print(datetime.now().strftime("%H:%M:%S"))
@@ -1222,13 +1222,13 @@ class DRSLinRegRNN():
                 X_train.loc[:, dropout_cols] = 0
                 y_train = df_y.loc[df_y.index[train_index].values].copy()
 
-                #predicted_index_training, _ = new_methods.return_lookback_appropriate_index_andor_data(X_train, self.lookbacks, return_index=True, return_input=True, scaler=scaler_X)
+                #predicted_index_training, _ = return_lookback_appropriate_index_andor_data(X_train, self.lookbacks, return_index=True, return_input=True, scaler=scaler_X)
                 #y_train_scoring = y_train[y_train.index.isin(predicted_index_training)].values.reshape(-1)
                 X_val = df_X.loc[df_X.index[val_index].values].copy()
                 X_val.loc[:, dropout_cols] = 0
                 y_val = df_y.loc[df_y.index[val_index].values].copy()
 
-                #predicted_index_val, _      = new_methods.return_lookback_appropriate_index_andor_data(X_val, self.lookbacks, return_index=True, return_input=True, scaler=scaler_X)
+                #predicted_index_val, _      = return_lookback_appropriate_index_andor_data(X_val, self.lookbacks, return_index=True, return_input=True, scaler=scaler_X)
                 #y_val_scoring = y_val[y_val.index.isin(predicted_index_val)].values.reshape(-1)
                 
                 # initialising and prepping
@@ -1246,7 +1246,7 @@ class DRSLinRegRNN():
                 # collect training, validation, and validation additional analysis scores
                 training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"])
                 validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"])
-
+                print("temp print mae: " + str(training_scores_dict_list_new["mae"]))
                 training_scores_dict_list += [training_scores_dict_list_new]
                 validation_scores_dict_list += [validation_scores_dict_list_new]
                 additional_validation_dict_list += [additional_validation_dict_list_new]
@@ -1263,7 +1263,7 @@ class DRSLinRegRNN():
         if self.lookbacks == None or self.scaler_X==None or self.scaler_y==None:
             raise ValueError("lookbacks, scaler must be set")
         cols                = df_X.columns
-        index, input_data   = new_methods.return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
+        index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
         y_pred_values       = single_estimator.predict(input_data)
         y_pred_values       = self.scaler_y.inverse_transform(y_pred_values)
         #if return_df == True:
@@ -1349,12 +1349,46 @@ def load_RNN_predictor(input_dict, predictor_location_folder_path):
         predictor.load(predictor_location_folder_path)
         return predictor
 
+def return_lookback_appropriate_index_andor_data(df_x, lookbacks, return_index=False, return_input=False, scaler=None):
+    # this method, according to result bools, returns the index and input data so that time 
+    # periods spanning two days are removed
+    if return_index == False and return_input == False:
+        raise ValueError("this method should at least request one of the outputs")
 
+    output_input, output_index = [], []
+    trim_from_indexes = lookbacks-1
+    ori_index = df_x.index
+    if not scaler == None:
+        df_x = pd.DataFrame(scaler.transform(df_x), index=df_x.index, columns=df_x.columns)
+
+    if return_index==True:
+        for ts0, ts1 in zip(ori_index[:-trim_from_indexes], ori_index[trim_from_indexes:]):
+            if ts0.day == ts1.day:
+                output_index += [ts1]
+        output_index = np.array(output_index)
+        output_single = np.array(output_index)
+    
+    if return_input==True:
+        for ts0, ts1 in zip(ori_index[:-trim_from_indexes], ori_index[trim_from_indexes:]):
+            if ts0.day == ts1.day:
+                output_input += [list(df_x.loc[ts0:ts1,:].values)]
+                #output_input += [list(ori_index[ts0:ts1].values)]
+        output_input = np.array(output_input)
+        output_single = np.array(output_input)
+
+    if return_index==True and return_input==True:
+        return output_index, output_input
+    else:
+        return output_single
 
 def return_filtered_normalised_RNN_generators(df_X, df_y, scaler_X=None, scaler_y=None, lookbacks=10, batch_ratio=None):
     global global_strptime_str_2
     if batch_ratio == None:
         raise ValueError("please feed in batch_size")
+    if batch_ratio == 0:
+        entry_batch_ratio = 1
+    else:
+        entry_batch_ratio = batch_ratio*len(df_X)
 
     df_X_normalized = scaler_X.transform(df_X)
     df_y_normalized = scaler_y.transform(df_y.values.reshape(-1, 1))
@@ -1363,14 +1397,14 @@ def return_filtered_normalised_RNN_generators(df_X, df_y, scaler_X=None, scaler_
             df_X_normalized,
             df_y_normalized,
             lookbacks,
-            batch_size=int(batch_ratio*len(df_X)),
+            batch_size=entry_batch_ratio,
             shuffle=False
         )
     datetime_generator = tf.keras.preprocessing.sequence.TimeseriesGenerator(
             df_X.index,
             df_y_normalized,
-            lookbacks,
-            batch_size=int(batch_ratio*len(df_X)),
+            len(df_X)-lookbacks,
+            batch_size=entry_batch_ratio,
             shuffle=False
         )
     filtered_training_generator = return_filtered_batches_that_dont_cross_two_days(training_generator, datetime_generator)

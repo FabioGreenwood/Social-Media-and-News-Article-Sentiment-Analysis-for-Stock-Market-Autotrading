@@ -44,12 +44,12 @@ import hashlib
 
 default_temporal_params_dict    = {
     "train_period_start"    : datetime.strptime('01/01/15 00:00:00', global_strptime_str),
-    #"train_period_end"      : datetime.strptime('01/02/15 00:00:00', global_strptime_str), #FG_Placeholder
-    "train_period_end"      : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
+    "train_period_end"      : datetime.strptime('01/04/15 00:00:00', global_strptime_str), #FG_Placeholder
+    #"train_period_end"      : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
     "time_step_seconds"     : 5*60, #5 mins,
     "test_period_start"     : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
-    #"test_period_end"       : datetime.strptime('01/07/19 00:00:00', global_strptime_str), #FG_Placeholder
-    "test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str),
+    "test_period_end"       : datetime.strptime('01/10/19 00:00:00', global_strptime_str), #FG_Placeholder
+    #"test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str),
 }
 default_fin_inputs_params_dict      = {
     "index_cols"        : "date",    
@@ -757,9 +757,10 @@ design_space_dict = {
             8 : [("simple", 50), ("GRU", 50), ("LSTM", 50)]
             },
         "general_adjusting_square_factor" : [2, 1, 0],
-        "estimator__alpha"                : [1e-5, 1e-4, 1e-3, 1e-2, 5e-2, 1e-1, 5e-1, 9e-1], 
+        #"estimator__alpha"                : [1e-5, 1e-4, 1e-3, 1e-2, 5e-2, 1e-1, 5e-1, 9e-1], 
+        "estimator__alpha"                : [1e-5],  #fg_placeholder
         "lookbacks"                       : [8,10,15],
-        "batch_ratio"                     : [None, 0.1, 0.25]
+        "batch_ratio"                     : [0, 0.1, 0.25]
 
     },
     "string_key" : {}
@@ -769,7 +770,12 @@ design_space_dict = {
 
 global_run_count = 0
 
-init_doe = 40
+init_doe = 1
+init_doe = [
+    [17, 0.3, 1, 25200, 0, 1, 2, 0, 0.001, 10, 0]
+]
+
+
 
 """ experiment checklist:
 1. ensure that the value for steps ahead is updated on the dictionary line below
@@ -788,7 +794,7 @@ checklist for restarting the experiment
 # scenario parameters: topic_qty, pred_steps
 
 scenario_ID = 0
-removal_ratio = int(2e2)
+removal_ratio = int(4.5e0)
 scenario_dict = {
         0 : {"topics" : None, "pred_steps" : 1},
         1 : {"topics" : None, "pred_steps" : 3},
@@ -804,7 +810,7 @@ scenario_dict = {
         11: {"topics" : 0, "pred_steps" : 15}
     }
 
-for scenario_ID in [1,9,2,10]:#scenario_dict.keys():
+for scenario_ID in [1,5,9]:#scenario_dict.keys():
     
     #editing topic quantity values for scenario, 2 lines
     topic_qty = scenario_dict[scenario_ID]["topics"]
@@ -840,7 +846,7 @@ for scenario_ID in [1,9,2,10]:#scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = "intergration_of_new_data_and_RNN8"
+    scenario_name_str = scenario_name_str + "overall_test3a"
 
 
     if __name__ == '__main__':
@@ -856,7 +862,7 @@ for scenario_ID in [1,9,2,10]:#scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs\intergration_of_new_data_and_RNN8.csv")
+            global_record_path=os.path.join(global_general_folder,r"outputs\overall_test3a.csv")
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
