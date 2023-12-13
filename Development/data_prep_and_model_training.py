@@ -1194,15 +1194,15 @@ class DRSLinRegRNN():
         self.base_estimator       = base_estimator
         self.estimators_          = []
 
-    def return_single_ensable_model_fitted(model, X, Y):
-        X_indy, X = return_lookback_appropriate_index_andor_data(X, model.lookbacks, return_input=True, scaler=self.scaler_X)
-        Y_indy, Y = return_lookback_appropriate_index_andor_data(y, model.lookbacks, return_input=True, scaler=self.scaler_X)
-        model.fit(X, Y, epochs=model.epochs, shuffle=model.shuffle_fit)
+    def return_single_ensable_model_fitted(self, model, X, Y):
+        X_indy, X = return_lookback_appropriate_index_andor_data(X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
+        Y_indy, Y = return_lookback_appropriate_index_andor_data(Y, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
+        model.fit(X, Y, epochs=self.epochs, shuffle=self.shuffle_fit)
         return model
 
 
 
-    def fit(self, df_X, df_y, pred_steps_value, confidences_before_betting_PC):
+    def fit_ensemble(self, df_X, df_y, pred_steps_value, confidences_before_betting_PC):
         count = 0
         global global_random_state
         global_random_state = 42
@@ -1243,9 +1243,9 @@ class DRSLinRegRNN():
                 single_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features, dropout_cols)
                 print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
                 global_random_state += 1
-                training_generator = return_filtered_normalised_RNN_generators(X_train, y_train, scaler_X=self.scaler_X, scaler_y=self.scaler_y, lookbacks=self.lookbacks, batch_ratio=self.batch_ratio)
-                single_estimator.fit(training_generator, epochs=self.epochs, shuffle=self.shuffle_fit)
-
+                #training_generator = return_filtered_normalised_RNN_generators(X_train, y_train, scaler_X=self.scaler_X, scaler_y=self.scaler_y, lookbacks=self.lookbacks, batch_ratio=self.batch_ratio)
+                single_estimator = self.return_single_ensable_model_fitted(single_estimator, X_train, y_train)
+                
                 # produce standard training scores
                 y_pred_train = self.custom_single_predict(X_train, single_estimator)
                 y_pred_val = self.custom_single_predict(X_val, single_estimator)
@@ -1531,7 +1531,7 @@ def retrieve_model_and_training_scores(predictor_location_folder_path, temporal_
     df_sentiment_data = retrieve_or_generate_sentiment_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training")
     
     X_train, y_train   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
-    model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.fit(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"])
+    model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.fit_ensemble(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"])
     
     return model, training_scores_dict, validation_scores_dict, additional_validation_dict
 
@@ -1566,7 +1566,7 @@ def generate_model_and_validation_scores(temporal_params_dict,
     #model training - create regressors
     X_train, y_train   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
     model              = initiate_model(input_dict)
-    model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.fit(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"])
+    model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.fit_ensemble(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"])
     #report timings
     print(datetime.now().strftime("%H:%M:%S") + " - complete generating model")
     global global_start_time
