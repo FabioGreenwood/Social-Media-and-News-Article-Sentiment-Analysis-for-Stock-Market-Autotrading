@@ -1194,6 +1194,14 @@ class DRSLinRegRNN():
         self.base_estimator       = base_estimator
         self.estimators_          = []
 
+    def return_single_ensable_model_fitted(model, X, Y):
+        X_indy, X = return_lookback_appropriate_index_andor_data(X, model.lookbacks, return_input=True, scaler=self.scaler_X)
+        Y_indy, Y = return_lookback_appropriate_index_andor_data(y, model.lookbacks, return_input=True, scaler=self.scaler_X)
+        model.fit(X, Y, epochs=model.epochs, shuffle=model.shuffle_fit)
+        return model
+
+
+
     def fit(self, df_X, df_y, pred_steps_value, confidences_before_betting_PC):
         count = 0
         global global_random_state
@@ -1403,7 +1411,7 @@ def return_filtered_normalised_RNN_generators(df_X, df_y, scaler_X=None, scaler_
     datetime_generator = tf.keras.preprocessing.sequence.TimeseriesGenerator(
             df_X.index,
             df_y_normalized,
-            len(df_X)-lookbacks,
+            lookbacks,
             batch_size=entry_batch_ratio,
             shuffle=False
         )
@@ -1417,11 +1425,11 @@ def return_filtered_batches_that_dont_cross_two_days(training_generator, datetim
     new_data = training_generator.data[mask]
     new_targets = training_generator.targets[mask]
 
-    # Replace removed batches with random batches
-    for i in range(sum(mask), len(mask)):
-        random_index = random.randint(0, sum(mask)-1)
-        new_data = np.append(new_data, [new_data[random_index]], axis=0)
-        new_targets = np.append(new_targets, [new_targets[random_index]], axis=0)
+    ## Replace removed batches with random batches
+    #for i in range(sum(mask), len(mask)):
+    #    random_index = random.randint(0, sum(mask)-1)
+    #    new_data = np.append(new_data, [new_data[random_index]], axis=0)
+    #    new_targets = np.append(new_targets, [new_targets[random_index]], axis=0)
 
     # Transfer final batches directly
     new_data = np.append(new_data, training_generator.data[len(new_data):], axis=0)
