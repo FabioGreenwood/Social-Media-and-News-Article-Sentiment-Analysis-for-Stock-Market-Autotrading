@@ -197,11 +197,17 @@ def return_predictor_name(input_dict):
     rel_lifetime        = input_dict["senti_inputs_params_dict"]["relative_lifetime"]
     rel_hlflfe          = input_dict["senti_inputs_params_dict"]["relative_halflife"]
     pred_steps_ahead    = input_dict["outputs_params_dict"]["pred_steps_ahead"]
-    hidden_layers       = input_dict["model_hyper_params"]["estimator__hidden_layer_sizes"]
     estm_alpha          = input_dict["model_hyper_params"]["estimator__alpha"]
+    general_adjusting_square_factor   = input_dict["model_hyper_params"]["general_adjusting_square_factor"]
+    lookbacks                         = input_dict["model_hyper_params"]["lookbacks"]
+    batch_ratio                       = input_dict["model_hyper_params"]["batch_ratio"]
+
+
+    
+
     print("-----")
     name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe)
-    predictor_hash = str(input_dict["model_hyper_params"]["n_estimators_per_time_series_blocking"]) + str(input_dict["model_hyper_params"]["testing_scoring"]) + str(input_dict["model_hyper_params"]["estimator__alpha"]) + str(input_dict["model_hyper_params"]["estimator__activation"]) + str(input_dict["model_hyper_params"]["cohort_retention_rate_dict"]) + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + str(input_dict["model_hyper_params"]["epochs"]) + str(input_dict["model_hyper_params"]["lookbacks"]) + str(input_dict["model_hyper_params"]["shuffle_fit"]) + str(input_dict["model_hyper_params"]["K_fold_splits"]) + str(pred_steps_ahead)
+    predictor_hash = str(input_dict["model_hyper_params"]["n_estimators_per_time_series_blocking"]) + str(input_dict["model_hyper_params"]["testing_scoring"]) + str(input_dict["model_hyper_params"]["estimator__alpha"]) + str(input_dict["model_hyper_params"]["estimator__activation"]) + str(input_dict["model_hyper_params"]["cohort_retention_rate_dict"]) + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + str(input_dict["model_hyper_params"]["epochs"]) + str(input_dict["model_hyper_params"]["lookbacks"]) + str(input_dict["model_hyper_params"]["shuffle_fit"]) + str(input_dict["model_hyper_params"]["K_fold_splits"]) + str(pred_steps_ahead) + input_dict["model_hyper_params"]["estimator__alpha"] + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + str(input_dict["model_hyper_params"]["lookbacks"]) + str(input_dict["model_hyper_params"]["batch_ratio"])
     name = name + predictor_hash
     return str(name)
     
@@ -697,7 +703,7 @@ def generate_and_save_topic_model(run_name, temporal_params_dict, fin_inputs_par
         df_prepped_tweets = pd.read_csv(senti_inputs_params_dict["tweet_file_location"])
         print(len(df_prepped_tweets))
         tweets_list = list(df_prepped_tweets["body"])
-        df_prepped_tweets_company_agnostic = prep_and_save_twitter_text_for_subject_discovery(tweets_list[::200], df_stocks_list_file=global_df_stocks_list_file, save_location=senti_inputs_params_dict["cleaned_tweet_file_location"], inc_new_combined_stopwords_list=inc_new_combined_stopwords_list)
+        df_prepped_tweets_company_agnostic = prep_and_save_twitter_text_for_subject_discovery(tweets_list[::int(len(tweets_list)/2e2)], df_stocks_list_file=global_df_stocks_list_file, save_location=senti_inputs_params_dict["cleaned_tweet_file_location"], inc_new_combined_stopwords_list=inc_new_combined_stopwords_list)
         #with open(senti_inputs_params_dict["tweet_file_location"], 'rb') as file:
         #    df_prepped_tweets_company_agnostic = pickle.load(file)
     print(datetime.now().strftime("%H:%M:%S"))
@@ -851,10 +857,11 @@ def prep_and_save_twitter_text_for_subject_discovery(input_list, df_stocks_list_
         #    recombined_tweet = recombined_tweet.replace(stock_name, "")
         output = output + [recombined_tweet]
     
-    
-    if not save_location == None:
-        with open(save_location, "wb") as file:
-            pickle.dump(output, file)
+    df_output = pd.DataFrame(output, columns=["body"])
+    df_output.to_csv(save_location)
+    #if not save_location == None:
+    #    with open(save_location, "wb") as file:
+    #        pickle.dump(output, file)
     
     return output
 
@@ -1186,8 +1193,7 @@ class DRSLinRegRNN():
         self.input_dict           = input_dict
         self.base_estimator       = base_estimator
         self.estimators_          = []
-        
-        
+
     def fit(self, df_X, df_y, pred_steps_value, confidences_before_betting_PC):
         count = 0
         global global_random_state
@@ -1226,24 +1232,25 @@ class DRSLinRegRNN():
                 #y_val_scoring = y_val[y_val.index.isin(predicted_index_val)].values.reshape(-1)
                 
                 # initialising and prepping
-                ensemble_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features, dropout_cols)
+                single_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features, dropout_cols)
                 print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
                 global_random_state += 1
                 training_generator = return_filtered_normalised_RNN_generators(X_train, y_train, scaler_X=self.scaler_X, scaler_y=self.scaler_y, lookbacks=self.lookbacks, batch_ratio=self.batch_ratio)
-                ensemble_estimator.fit(training_generator, epochs=self.epochs, shuffle=self.shuffle_fit)
+                single_estimator.fit(training_generator, epochs=self.epochs, shuffle=self.shuffle_fit)
 
                 # produce standard training scores
-                y_pred_train = ensemble_estimator.custom_single_predict(X_train)
+                y_pred_train = self.custom_single_predict(X_train, single_estimator)
+                y_pred_val = self.custom_single_predict(X_val, single_estimator)
                 
-                y_pred_val = ensemble_estimator.predict(new_methods.return_lookback_appropriate_index_andor_data(X_val, self.lookbacks, return_input=True, scaler=scaler_X))
-                y_pred_val = scaler_y.inverse_transform(y_pred_val).reshape(-1)
 
                 # collect training, validation, and validation additional analysis scores
-                training_scores_dict_list += [{"r2": r2_score(y_train_scoring, y_pred_train), "mse": mean_squared_error(y_train_scoring, y_pred_train), "mae": mean_absolute_error(y_train_scoring, y_pred_train)}]
-                validation_scores_dict_list += [{"r2": r2_score(y_val_scoring, y_pred_val), "mse": mean_squared_error(y_val_scoring, y_pred_val), "mae": mean_absolute_error(y_val_scoring, y_pred_val)}]
-                additional_validation_dict_list += [
-                    FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred_val, y_val_scoring, pred_steps_value, confidences_before_betting_PC=confidences_before_betting_PC)]
-                self.estimators_ = self.estimators_ + [clone_model(ensemble_estimator)]
+                training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"])
+                validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"])
+
+                training_scores_dict_list += [training_scores_dict_list_new]
+                validation_scores_dict_list += [validation_scores_dict_list_new]
+                additional_validation_dict_list += [additional_validation_dict_list_new]
+                self.estimators_ = self.estimators_ + [single_estimator]
 
         training_scores_dict = average_list_of_identical_dicts(training_scores_dict_list)
         validation_scores_dict = average_list_of_identical_dicts(validation_scores_dict_list)
@@ -1252,19 +1259,34 @@ class DRSLinRegRNN():
 
         return self, training_scores_dict, validation_scores_dict, additional_validation_dict
 
-    def custom_single_predict(self, df_X):
-        if self.lookbacks == None or self.scaler==None:
+    def custom_single_predict(self, df_X, single_estimator, return_df=False):
+        if self.lookbacks == None or self.scaler_X==None or self.scaler_y==None:
             raise ValueError("lookbacks, scaler must be set")
-        cols = df_X.columns
-        index, pred_values = self.predict(new_methods.return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X))
-        y_pred_train = self.scaler.inverse_transform(pred_values)
-        df_X2 = pd.DataFrame(pred_values, columns=cols, index=index)
+        cols                = df_X.columns
+        index, input_data   = new_methods.return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
+        y_pred_values       = single_estimator.predict(input_data)
+        y_pred_values       = self.scaler_y.inverse_transform(y_pred_values)
+        #if return_df == True:
+        y_pred_values = pd.DataFrame(y_pred_values, index=index)
+        y_pred_values = y_pred_values.shift(self.input_dict["outputs_params_dict"]["pred_steps_ahead"])
+        y_pred_values = y_pred_values.dropna()
+        return y_pred_values
         
+    def evaluate(self, y_test, y_pred, outputs_params_dict, reporting_dict):
+        
+        pred_steps_value              = outputs_params_dict["pred_steps_ahead"]
+        confidences_before_betting_PC = reporting_dict["confidence_thresholds"]
 
+        #align indices
+        merged_df = pd.merge(y_test, pd.DataFrame(y_pred), left_index=True, right_index=True, how='inner')
+        y_test = y_test.loc[merged_df.index]
+        y_pred = y_pred.loc[merged_df.index]
         
+        traditional_scores_dict_list = {"r2": r2_score(y_test, y_pred), "mse": mean_squared_error(y_test, y_pred), "mae": mean_absolute_error(y_test, y_pred)}
+        additional_results_dict_list = FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred, y_test, pred_steps_value, confidences_before_betting_PC=confidences_before_betting_PC)
+        return traditional_scores_dict_list, additional_results_dict_list
         
-
-    def save(self, general_save_dir = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["predictive_model"]):
+    def save(self, general_save_dir = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["predictive_model"], Y_preds_testing=None, y_testing=None):
         model_name = return_predictor_name(self.input_dict)
         folder_path = os.path.join(general_save_dir, custom_hash(model_name) + "\\")
         extension = ".h5"
@@ -1272,7 +1294,7 @@ class DRSLinRegRNN():
             os.makedirs(folder_path)
         else:
             # Delete existing model files with the same extension
-            extensions_to_del = extension + [".csv", ".pkl"]
+            extensions_to_del = [extension, ".csv", ".pkl"]
             files_to_delete = []
             for ex in extensions_to_del:
                 files_to_delete += [f for f in os.listdir(folder_path) if f.endswith(f'.{ex}')]
@@ -1284,32 +1306,25 @@ class DRSLinRegRNN():
         with open(os.path.join(folder_path,"input_dict.pkl"), "wb") as file:
                 pickle.dump(self.input_dict, file)
         print("I need to save the other items") #FG_actions
-
-    def predict_ensemble(self, X, output_name=None): #FG_action: This is where the new error is
+        #save predictions if specified
+        if isinstance(Y_preds_testing, pd.Series) or isinstance(Y_preds_testing, pd.DataFrame):
+            Y_preds_testing.to_csv(os.path.join(folder_path, 'Y_preds_testing.csv'))
+        if isinstance(y_testing, pd.Series) or isinstance(y_testing, pd.DataFrame):
+            y_testing.to_csv(os.path.join(folder_path, 'y_testing.csv'))
         
-        if output_name==None:
-            raise ValueError ("please ensure that the outputs are labelled")
-            output_name = ["output"]
         
-        y_ave = []
-        y_ensemble = []
         
-        prediction_generator = return_filtered_normalised_RNN_generators(X, X.index,
-                                                                            scaler_X=self.scaler_X, scaler_y=self.scaler_y,
-                                                                            lookbacks=self.lookbacks, batch_ratio=self.batch_ratio)
 
-        filtered_index, filtered_X = new_methods.return_lookback_appropriate_index_andor_prediction_input(X, self.lookbacks, return_index=True, return_input=True)
-
-        for i, estimator_local in enumerate(self.estimators_):
+    def predict_ensemble(self, X): #FG_action: This is where the new error is
+        
+        y_ensemble = pd.DataFrame()
+        
+        for i, single_estimator in enumerate(self.estimators_):
             # randomly select features to drop out
-            y_ensemble.insert(len(y_ensemble), estimator_local.predict(filtered_X))
+            y_ensemble[i] = self.custom_single_predict(X, single_estimator)
         
-        y_ensemble = np.array(y_ensemble)
-        for ts in range(len(y_ensemble[0])):
-            y_ave = y_ave + [y_ensemble[:,ts].mean()]
-        
-        output = pd.DataFrame(y_ave, columns=[output_name], index=filtered_index)
-        
+        output = y_ensemble.mean(axis=1)
+
         return output
     
     def load(self, predictor_location_folder_path):
@@ -1427,6 +1442,7 @@ def generate_testing_scores(predictor, input_dict, return_time_series=False):
     senti_inputs_params_dict = input_dict["senti_inputs_params_dict"]
     outputs_params_dict     = input_dict["outputs_params_dict"]
     model_hyper_params      = input_dict["model_hyper_params"]
+    reporting_dict          = input_dict["reporting_dict"]
     
     # step 1a: generate testing input data (finanical)
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 1a: generate testing input data")
@@ -1446,11 +1462,12 @@ def generate_testing_scores(predictor, input_dict, return_time_series=False):
         
     # step 3: generate y_pred
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 3: generate y_pred")
-    Y_preds_testing = predictor.predict_ensemble(X_testing, output_name=["77777777"])
+    Y_preds_testing = predictor.predict_ensemble(X_testing)
     
     # step 4: generate score
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 4: generate score")
-    testing_scores = predictor.evaluate(y_test=y_testing, y_pred=Y_preds_testing, method=model_hyper_params["testing_scoring"])
+    testing_scores, additional_results_dict = predictor.evaluate(y_testing, Y_preds_testing, outputs_params_dict, reporting_dict)
+    predictor.save(Y_preds_testing=Y_preds_testing, y_testing=y_testing)
     if return_time_series == False:
         return testing_scores
     else:
@@ -1520,30 +1537,6 @@ def generate_model_and_validation_scores(temporal_params_dict,
     return model, training_scores_dict, validation_scores_dict, additional_validation_dict
 
 
-def quick_training_score_rerun(model, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params):
-
-    df_financial_data = import_financial_data(
-        target_file_path          = fin_inputs_params_dict["historical_file"], 
-        input_cols_to_include_list  = fin_inputs_params_dict["cols_list"],
-        temporal_params_dict = temporal_params_dict, training_or_testing="training")
-    
-    df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"], fin_inputs_params_dict["historical_file"])
-
-    #sentiment data prep
-    print(datetime.now().strftime("%H:%M:%S") + " - importing or prepping sentiment data")
-    df_sentiment_data = retrieve_or_generate_sentiment_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training")
-    
-    
-    ##model training - time series blocking FG_del
-    #if model_hyper_params["time_series_blocking"] == "btscv":
-    #    time_series_spliting = BlockingTimeSeriesSplit(n_splits=model_hyper_params["time_series_split_qty"])
-    #else:
-    #    raise ValueError("model_hyper_params['time_series_blocking'], not recognised")
-        
-    #model training - create regressors
-    X_train, y_train   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
-    training_scores = model.evaluate(X_test=X_train , y_test=y_train, method=model_hyper_params["testing_scoring"])
-    return training_scores
 
 
 #%% main line

@@ -17,7 +17,7 @@ import warnings
 import sys
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
-    os.environ["PYTHONWARNINGS"] = "ignore"
+    os.environ["PyTHONWARNINGS"] = "ignore"
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import matplotlib.pyplot as plt
 global_master_folder_path = r"C:\Users\Public\fabio_uni_work\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\"
@@ -25,14 +25,14 @@ global_master_folder_path = r"C:\Users\Public\fabio_uni_work\Social-Media-and-Ne
 
 #%% methods
 
-def return_realign_plus_minus_table(preds, Y_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True,global_master_folder_path=global_master_folder_path):
+def return_realign_plus_minus_table(preds, y_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True,global_master_folder_path=global_master_folder_path):
     input_col_str = "{}_{}"
     output_col_str = "{}_{}_{}"
     reaglined_plus_minus_dict = dict()
     for ticker, output in pred_output_and_tickers_combos_list:
         #initial output
         input_col_str_curr = input_col_str.format(ticker, output)
-        df_temp = pd.DataFrame(Y_test[input_col_str_curr])
+        df_temp = pd.DataFrame(y_test[input_col_str_curr])
         #pop the preditions
         output_col_str_2 = output_col_str.format(ticker, output, {})
     
@@ -47,10 +47,10 @@ def return_realign_plus_minus_table(preds, Y_test, pred_steps_list, pred_output_
     
     return reaglined_plus_minus_dict
 
-def return_results_X_min_plus_minus_accuracy(y_preds, Y_test, pred_steps_list, confidences_before_betting_PC=[0, 0.01]):
+def return_results_X_min_plus_minus_accuracy(y_preds, y_test, pred_steps_list, confidences_before_betting_PC=[0, 0.01]):
         
-    #if len(Y_test.columns) > 1:
-    #    raise ValueError("Y_test should only be one columns wide")
+    #if len(y_test.columns) > 1:
+    #    raise ValueError("y_test should only be one columns wide")
     
     df_temp = pd.DataFrame()
     pred_str = dict()
@@ -60,7 +60,7 @@ def return_results_X_min_plus_minus_accuracy(y_preds, Y_test, pred_steps_list, c
     if type(pred_steps_list) == int:
         pred_steps_list = [pred_steps_list]
     
-    time_series_index = Y_test.index
+    time_series_index = y_test.index
     
     results_bets_with_confidence_proportion             = dict()
     results_x_min_plus_minus_PC                         = dict()
@@ -76,7 +76,7 @@ def return_results_X_min_plus_minus_accuracy(y_preds, Y_test, pred_steps_list, c
     count_correct_bets_with_confidence_score_weight = dict()
     count_correct_bets_with_confidence_score_weight_total = dict()
     
-    time_series_index = Y_test.index
+    time_series_index = y_test.index
     
     for steps_back in pred_steps_list:
         #initialise variables
@@ -107,20 +107,20 @@ def return_results_X_min_plus_minus_accuracy(y_preds, Y_test, pred_steps_list, c
 
         
         # values
-        max_pred_value = max(pred_steps_list)
-        x_values = list(Y_test.iloc[:,0].values)
-        if isinstance(y_preds, np.ndarray):
-            y_values = list(y_preds.reshape((1,-1))[0])
-        else:
-            y_values = list(y_preds.values.reshape((1,-1))[0])
+        y_preds = pd.DataFrame(y_preds)
+        merged_df = pd.merge(y_test, y_preds, left_index=True, right_index=True, how='inner')
+        y_test = y_test.loc[merged_df.index]
+        y_preds = y_preds.loc[merged_df.index]
         
-        for time_step in range(max(pred_steps_list), len(Y_test.index)):
+        x_values = list(y_test.iloc[:,0].values)
+        y_values = list(y_preds.iloc[:,0].values)
+        for time_step in range(max(pred_steps_list), len(y_test.index)):
             
             #basic values
             
             original_value      = x_values[time_step - steps_back]
-            expected_difference = y_values[time_step] - x_values[time_step]
-            actual_difference   = x_values[time_step] - x_values[time_step - steps_back]
+            expected_difference = y_values[time_step] - original_value
+            actual_difference   = x_values[time_step] - original_value
             relative_confidence = expected_difference / original_value
             if not actual_difference * expected_difference == 0:
                 count += 1
@@ -249,7 +249,7 @@ def run_additional_reporting(preds=None,
                             confidences_before_betting_PC=None
                             ):
     
-    #df_realigned_dict                   = return_realign_plus_minus_table(preds, Y_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
+    #df_realigned_dict                   = return_realign_plus_minus_table(preds, y_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
     results_tables_dict                 = return_results_X_min_plus_minus_accuracy(preds, y_testing, pred_steps_list, confidences_before_betting_PC=confidences_before_betting_PC)
     #plt, df_realigned_dict              = return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_list, results_tables_dict, DoE_name = DoE_orders_dict["name"], model_type_name=model_type_name, model_start_time = model_start_time, outputs_folder_path = outputs_path, timestamp = False)
     

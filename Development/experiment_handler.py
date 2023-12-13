@@ -44,12 +44,12 @@ import hashlib
 
 default_temporal_params_dict    = {
     "train_period_start"    : datetime.strptime('01/01/15 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/02/15 00:00:00', global_strptime_str), #FG_Placeholder
-    #"train_period_end"      : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
+    #"train_period_end"      : datetime.strptime('01/02/15 00:00:00', global_strptime_str), #FG_Placeholder
+    "train_period_end"      : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
     "time_step_seconds"     : 5*60, #5 mins,
     "test_period_start"     : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
-    "test_period_end"       : datetime.strptime('01/07/19 00:00:00', global_strptime_str), #FG_Placeholder
-    #"test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str),
+    #"test_period_end"       : datetime.strptime('01/07/19 00:00:00', global_strptime_str), #FG_Placeholder
+    "test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str),
 }
 default_fin_inputs_params_dict      = {
     "index_cols"        : "date",    
@@ -88,12 +88,12 @@ default_outputs_params_dict         = {
     "pred_steps_ahead"                  : 1
 }
 default_cohort_retention_rate_dict = {
-            "£_close" : 1, #output value
-            "£_*": 1, #other OHLCV values
-            "$_*" : 0.6, # technical indicators
-            "match!_*" : 0.6, #pattern matchs
-            "~senti_*" : 0.6, #sentiment analysis
-            "*": 0.5} # other missed values
+    "£_close" : 1, #output value
+    "£_*": 1, #other OHLCV values
+    "$_*" : 0.6, # technical indicators
+    "match!_*" : 0.6, #pattern matchs
+    "~senti_*" : 0.6, #sentiment analysis
+    "*": 0.5} # other missed values
 default_model_hyper_params          = {
     "name" : "RandomSubspace_RNN_Regressor", #Multi-layer Perceptron regressor
         #general hyperparameters
@@ -107,7 +107,7 @@ default_model_hyper_params          = {
     "lookbacks" : 10,
     "batch_ratio" : 0.1,
     "shuffle_fit" : False,
-    "K_fold_splits" : 2 #FG_placeholder
+    "K_fold_splits" : 5 #FG_placeholder
     }
 default_reporting_dict              = {
     "confidence_thresholds" : [0, 0.01, 0.02, 0.035, 0.05, 0.1],
@@ -160,6 +160,15 @@ def return_keys_within_2_level_dict(input_dict):
 def save_designs_record_csv_and_dict(records_path_list, df_designs_record=None, design_history_dict=None, optim_run_name=None):
     if not type(records_path_list) == list:
         records_path_list = [records_path_list]
+
+    #remove items with weak predictors and add names of predictors
+    for id in design_history_dict.keys():
+        if "predictor" in design_history_dict[id].keys():
+            if not isinstance(design_history_dict[id]["predictor"],str):
+                predictor_name = FG_model_training.custom_hash(design_history_dict[id]["predictor"].input_dict)
+                design_history_dict[id]["predictor"] = predictor_name
+            df_designs_record.loc[id, "predictor_names"] = design_history_dict[id]["predictor"]
+
     for path in records_path_list:
         file_path = os.path.join(path, optim_run_name)
         
@@ -259,6 +268,7 @@ def return_scenario_name_str(topic_qty, pred_steps, ratio_removed):
     return output + str(pred_steps) + "_" + removal_str
 
 def update_design_hist_dict_post_training(design_history_dict_single, predictor, training_scores_dict, validation_scores_dict, additional_validation_dict):
+    #design_history_dict_single["predictor"] = FG_model_training.custom_hash(FG_model_training.return_predictor_name(predictor.input_dict))
     design_history_dict_single["predictor"] = predictor
     design_history_dict_single["training_r2"], design_history_dict_single["training_mse"], design_history_dict_single["training_mae"] = training_scores_dict["r2"], training_scores_dict["mse"], training_scores_dict["mae"]
     design_history_dict_single["validation_r2"], design_history_dict_single["validation_mse"], design_history_dict_single["validation_mae"] = validation_scores_dict["r2"], validation_scores_dict["mse"], validation_scores_dict["mae"]
@@ -746,11 +756,16 @@ design_space_dict = {
             7 : [("LSTM", 50), ("GRU", 50), ("simple", 50)],
             8 : [("simple", 50), ("GRU", 50), ("LSTM", 50)]
             },
-        "general_adjusting_square_factor" : [1.5, 1, 0.75],
-        "estimator__alpha"                : [1e-5, 1e-4, 1e-3, 1e-2, 5e-2, 1e-1, 5e-1, 9e-1]
+        "general_adjusting_square_factor" : [2, 1, 0],
+        "estimator__alpha"                : [1e-5, 1e-4, 1e-3, 1e-2, 5e-2, 1e-1, 5e-1, 9e-1], 
+        "lookbacks"                       : [8,10,15],
+        "batch_ratio"                     : [None, 0.1, 0.25]
+
     },
     "string_key" : {}
 }
+
+
 
 global_run_count = 0
 
@@ -825,7 +840,7 @@ for scenario_ID in [1,9,2,10]:#scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = "intergration_of_new_data_and_RNN5"
+    scenario_name_str = "intergration_of_new_data_and_RNN8"
 
 
     if __name__ == '__main__':
@@ -841,7 +856,7 @@ for scenario_ID in [1,9,2,10]:#scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs\intergration_of_new_data_and_RNN5.csv")
+            global_record_path=os.path.join(global_general_folder,r"outputs\intergration_of_new_data_and_RNN8.csv")
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
