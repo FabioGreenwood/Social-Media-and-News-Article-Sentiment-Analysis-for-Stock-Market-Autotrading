@@ -42,7 +42,7 @@ import hashlib
 
 #%% Default Input Parameters
 
-default_temporal_params_dict    = {
+default_temporal_params_dict        = {
     "train_period_start"    : datetime.strptime('01/01/15 00:00:00', global_strptime_str),
     "train_period_end"      : datetime.strptime('01/04/15 00:00:00', global_strptime_str), #FG_Placeholder
     #"train_period_end"      : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
@@ -87,7 +87,7 @@ default_outputs_params_dict         = {
     "output_symbol_indicators_tuple"    : ("aapl", "close"), 
     "pred_steps_ahead"                  : 1
 }
-default_cohort_retention_rate_dict = {
+default_cohort_retention_rate_dict  = {
     "£_close" : 1, #output value
     "£_*": 1, #other OHLCV values
     "$_*" : 0.6, # technical indicators
@@ -107,7 +107,8 @@ default_model_hyper_params          = {
     "lookbacks" : 10,
     "batch_ratio" : 0.1,
     "shuffle_fit" : False,
-    "K_fold_splits" : 5 #FG_placeholder
+    "K_fold_splits" : 5, #FG_placeholder,
+    "scaler_cat" : 0
     }
 default_reporting_dict              = {
     "confidence_thresholds" : [0, 0.01, 0.02, 0.035, 0.05, 0.1],
@@ -203,7 +204,7 @@ def update_df_designs_record(df_designs_record, design_history_dict, design_spac
                 for result_type in design_history_dict[ID][additional_results_dict].keys():
                     for steps_back in design_history_dict[ID][additional_results_dict][result_type].keys():
                         for confidence in design_history_dict[ID][additional_results_dict][result_type][steps_back]:
-                            df_designs_record.loc[ID, return_name_of_additional_reporting_col(prefix, result_type, confidence)] = design_history_dict[ID][additional_results_dict][result_type][steps_back][confidence]
+                            df_designs_record.loc[ID, return_name_of_additional_reporting_col(prefix, result_type, confidence)] = float(design_history_dict[ID][additional_results_dict][result_type][steps_back][confidence])
                 
     return df_designs_record
 
@@ -347,8 +348,8 @@ def template_experiment_requester(GPyOpt_input, design_space_dict, default_input
     
     global global_run_count
     
-    print("xxxxxxxxxxxxxx" + str(global_run_count))
-    print(GPyOpt_input)
+    #print("xxxxxxxxxxxxxx" + str(global_run_count))
+    #print(GPyOpt_input)
     global_run_count += 1
     
     predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = experiment_method(prepped_temporal_params_dict, prepped_fin_inputs_params_dict, prepped_senti_inputs_params_dict, prepped_outputs_params_dict, prepped_model_hyper_params, reporting_dict)
@@ -676,7 +677,7 @@ def experiment_manager(
         design_history_dict[ID]["X"] = convert_floats_to_int_if_whole(design_history_dict[ID]["X"])#[:len(design_history_dict[ID-1]["X"])]
         # only run value if testing measure missing
         if design_history_dict[ID]["testing_" + testing_measure] == None:
-            print(return_keys_within_2_level_dict(design_space_dict))
+            #print(return_keys_within_2_level_dict(design_space_dict))
             print(str(design_history_dict[ID]["X"]) + " running ID:" + str(ID))
             design_history_dict[ID] = run_experiment_and_return_updated_design_history_dict(design_history_dict[ID], experiment_requester, model_testing_method, testing_measure="mae", confidences_before_betting_PC=default_input_dict["reporting_dict"]["confidence_thresholds"])
             # save
@@ -705,7 +706,7 @@ def experiment_manager(
         bo.run_optimization()
         # find next design
         dice_roll = random.random()
-        print("dice_roll: " + str(dice_roll))
+        #print("dice_roll: " + str(dice_roll))
         if  dice_roll < 0.0:#25:
             x_next = define_DoE(bounds, 1)
             x_next = x_next[0]
@@ -739,7 +740,7 @@ model_start_time = now.strftime(global_strptime_str_filename)
 design_space_dict = {
     "senti_inputs_params_dict" : {
         "topic_qty" : [5, 9, 13, 17, 25],
-        "topic_model_alpha" : [0.3, 0.7, 1, 2, 3, 5],
+        "topic_model_alpha" : [0.3, 0.7, 1, 2, 3, 5, 7, 13],
         "weighted_topics" : [False, True],
         "relative_halflife" : [0.25 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR], 
         "apply_IDF" : [False, True],
@@ -760,7 +761,8 @@ design_space_dict = {
         #"estimator__alpha"                : [1e-5, 1e-4, 1e-3, 1e-2, 5e-2, 1e-1, 5e-1, 9e-1], 
         "estimator__alpha"                : [1e-5],  #fg_placeholder
         "lookbacks"                       : [8,10,15],
-        "batch_ratio"                     : [0, 0.1, 0.25]
+        "batch_ratio"                     : [0, 0.01, 0.025],
+        "scaler_cat"                      : [0,1,2]
 
     },
     "string_key" : {}
@@ -772,7 +774,12 @@ global_run_count = 0
 
 init_doe = 1
 init_doe = [
-    [17, 0.3, 1, 25200, 0, 1, 2, 0, 0.001, 10, 0]
+    [25, 7, 1, 25200, 1, 4, 3, 0, 1e-7, 15, 0, 1],
+    [25, 7, 1, 25200, 1, 4, 3, 0, 1e-6, 15, 0, 1],
+    [25, 7, 1, 25200, 1, 4, 3, 0, 1e-5, 15, 0, 1],
+    [25, 7, 1, 25200, 1, 4, 3, 0, 1e-4, 15, 0, 1],
+    [25, 7, 1, 25200, 1, 4, 3, 0, 1e-3, 15, 0, 1]
+    
 ]
 
 
@@ -846,7 +853,7 @@ for scenario_ID in [1,5,9]:#scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "overall_test3a"
+    scenario_name_str = scenario_name_str + "testing_val_loss_stop"
 
 
     if __name__ == '__main__':
@@ -862,7 +869,7 @@ for scenario_ID in [1,5,9]:#scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs\overall_test3a.csv")
+            global_record_path=os.path.join(global_general_folder,r"outputs\testing_val_loss_stop.csv")
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 

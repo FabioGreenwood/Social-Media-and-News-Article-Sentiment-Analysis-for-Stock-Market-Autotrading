@@ -107,7 +107,7 @@ def return_results_X_min_plus_minus_accuracy(y_preds, y_test, pred_steps_list, c
 
         
         # values
-        y_preds = pd.DataFrame(y_preds)
+        
         merged_df = pd.merge(y_test, y_preds, left_index=True, right_index=True, how='inner')
         y_test = y_test.loc[merged_df.index]
         y_preds = y_preds.loc[merged_df.index]

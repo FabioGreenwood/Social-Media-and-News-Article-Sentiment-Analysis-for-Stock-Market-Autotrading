@@ -93,6 +93,7 @@ from config import global_strptime_str, global_strptime_str_filename, global_pre
 from tensorflow.keras.models import Sequential, clone_model, load_model
 from tensorflow.keras.layers import Dense
 import hashlib
+from tensorflow.keras.callbacks import EarlyStopping
 
 
 #%% EXAMPLE INPUTS FOR MAIN METHOD
@@ -205,9 +206,8 @@ def return_predictor_name(input_dict):
 
     
 
-    print("-----")
     name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe)
-    predictor_hash = str(input_dict["model_hyper_params"]["n_estimators_per_time_series_blocking"]) + str(input_dict["model_hyper_params"]["testing_scoring"]) + str(input_dict["model_hyper_params"]["estimator__alpha"]) + str(input_dict["model_hyper_params"]["estimator__activation"]) + str(input_dict["model_hyper_params"]["cohort_retention_rate_dict"]) + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + str(input_dict["model_hyper_params"]["epochs"]) + str(input_dict["model_hyper_params"]["lookbacks"]) + str(input_dict["model_hyper_params"]["shuffle_fit"]) + str(input_dict["model_hyper_params"]["K_fold_splits"]) + str(pred_steps_ahead) + str(input_dict["model_hyper_params"]["estimator__alpha"]) + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + str(input_dict["model_hyper_params"]["lookbacks"]) + str(input_dict["model_hyper_params"]["batch_ratio"])
+    predictor_hash = "_" + str(input_dict["model_hyper_params"]["n_estimators_per_time_series_blocking"]) + "_" + str(input_dict["model_hyper_params"]["testing_scoring"]) + "_" + str(input_dict["model_hyper_params"]["estimator__alpha"]) + "_" + str(input_dict["model_hyper_params"]["estimator__activation"]) + "_" + str(input_dict["model_hyper_params"]["cohort_retention_rate_dict"]) + "_" + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + "_" + str(input_dict["model_hyper_params"]["epochs"]) + "_" + str(input_dict["model_hyper_params"]["lookbacks"]) + "_" + str(input_dict["model_hyper_params"]["shuffle_fit"]) + "_" + str(input_dict["model_hyper_params"]["K_fold_splits"]) + "_" + str(pred_steps_ahead) + "_" + str(input_dict["model_hyper_params"]["estimator__alpha"]) + "_" + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + "_" + str(input_dict["model_hyper_params"]["lookbacks"]) + "_" + str(input_dict["model_hyper_params"]["batch_ratio"]) + "_" + str(input_dict["model_hyper_params"]["scaler_cat"])
     name = name + predictor_hash
     return str(name)
     
@@ -1153,7 +1153,6 @@ def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_fea
 
     
     for id, layer in enumerate(model_hyper_params["estimator__hidden_layer_sizes"]):
-        print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX       " + layer[0])
         # prep key word arguments
         kwargs = {
             "units" : layer[1], "activation" : model_hyper_params["estimator__activation"], "return_sequences" : True
@@ -1200,7 +1199,23 @@ class DRSLinRegRNN():
         model.fit(X, Y, epochs=self.epochs, shuffle=self.shuffle_fit)
         return model
 
+    def return_single_ensable_model_fitted_with_early_stopping(self, model, X, Y, X_val, Y_val):
+        X_indy, X = return_lookback_appropriate_index_andor_data(X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
+        Y_indy, Y = return_lookback_appropriate_index_andor_data(Y, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
+        X_indy_val, X_val = return_lookback_appropriate_index_andor_data(X_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
+        Y_indy_val, Y_val = return_lookback_appropriate_index_andor_data(Y_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
 
+        early_stopping = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
+
+        #FG_placeholder
+        # Train the model with early stopping
+        history = model.fit(X, Y, epochs=100, validation_data=(X_val, Y_val), callbacks=[early_stopping])
+        model.train_loss = history.history['loss']
+        model.val_loss   = history.history['val_loss']
+        
+        #model.fit(X, Y, epochs=self.epochs, shuffle=self.shuffle_fit)
+        return model, history.history['loss'][-1], history.history['val_loss'][-1]
+             
 
     def fit_ensemble(self, df_X, df_y, pred_steps_value, confidences_before_betting_PC):
         count = 0
@@ -1211,12 +1226,19 @@ class DRSLinRegRNN():
         kf = KFold(n_splits=self.K_fold_splits, shuffle=False)
 
         print(datetime.now().strftime("%H:%M:%S") + " - training model")
-        scaler_X = MinMaxScaler()
-        scaler_y = MinMaxScaler()
-        scaler_X.fit(df_X)
-        scaler_y.fit(df_y.values.reshape(-1, 1))
-        self.scaler_X, self.scaler_y = scaler_X, scaler_y
-        del scaler_X, scaler_y
+        if self.scaler_cat > 0:
+            scaler_X = MinMaxScaler()
+            scaler_y = MinMaxScaler()
+            col = df_X.columns
+            scaler_X.fit(df_X)
+            scaler_y.fit(df_y.values.reshape(-1, 1))
+            if self.scaler_cat == 2:
+                scaler_X = self.adjust_scaler_to_accept_distant_pricings(scaler_X, df_X)
+                scaler_y = self.adjust_scaler_to_accept_distant_pricings(scaler_y, df_y)
+            self.scaler_X, self.scaler_y = scaler_X, scaler_y
+            del scaler_X, scaler_y
+        else:
+            self.scaler_X, self.scaler_y = None, None
 
         for train_index, val_index in kf.split(df_X):
             count += 1
@@ -1230,21 +1252,16 @@ class DRSLinRegRNN():
                 X_train.loc[:, dropout_cols] = 0
                 y_train = df_y.loc[df_y.index[train_index].values].copy()
 
-                #predicted_index_training, _ = return_lookback_appropriate_index_andor_data(X_train, self.lookbacks, return_index=True, return_input=True, scaler=scaler_X)
-                #y_train_scoring = y_train[y_train.index.isin(predicted_index_training)].values.reshape(-1)
                 X_val = df_X.loc[df_X.index[val_index].values].copy()
                 X_val.loc[:, dropout_cols] = 0
                 y_val = df_y.loc[df_y.index[val_index].values].copy()
 
-                #predicted_index_val, _      = return_lookback_appropriate_index_andor_data(X_val, self.lookbacks, return_index=True, return_input=True, scaler=scaler_X)
-                #y_val_scoring = y_val[y_val.index.isin(predicted_index_val)].values.reshape(-1)
                 
                 # initialising and prepping
                 single_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features, dropout_cols)
-                print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
                 global_random_state += 1
-                #training_generator = return_filtered_normalised_RNN_generators(X_train, y_train, scaler_X=self.scaler_X, scaler_y=self.scaler_y, lookbacks=self.lookbacks, batch_ratio=self.batch_ratio)
-                single_estimator = self.return_single_ensable_model_fitted(single_estimator, X_train, y_train)
+                #single_estimator = self.return_single_ensable_model_fitted(single_estimator, X_train, y_train)
+                single_estimator, train_loss, val_loss = self.return_single_ensable_model_fitted_with_early_stopping(single_estimator, X_train, y_train, X_val, y_val) #FG_placeholder
                 
                 # produce standard training scores
                 y_pred_train = self.custom_single_predict(X_train, single_estimator)
@@ -1254,7 +1271,6 @@ class DRSLinRegRNN():
                 # collect training, validation, and validation additional analysis scores
                 training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"])
                 validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"])
-                print("temp print mae: " + str(training_scores_dict_list_new["mae"]))
                 training_scores_dict_list += [training_scores_dict_list_new]
                 validation_scores_dict_list += [validation_scores_dict_list_new]
                 additional_validation_dict_list += [additional_validation_dict_list_new]
@@ -1267,17 +1283,39 @@ class DRSLinRegRNN():
 
         return self, training_scores_dict, validation_scores_dict, additional_validation_dict
 
+
+    def adjust_scaler_to_accept_distant_pricings(self, scaler, df):
+        lowest_expected_close_price  = 2.5
+        largest_expected_close_price = 132
+
+        df_new = pd.DataFrame(columns=df.columns)
+        #create min line
+        min_dict = dict()
+        max_dict = dict()
+        for col in df.columns:
+            if any(substring in col for substring in ["£_", "$_"]) and not "macd" in col:
+                min_dict[col] = lowest_expected_close_price
+                max_dict[col] = largest_expected_close_price
+            else:
+                min_dict[col] = min(df.loc[:,col])
+                max_dict[col] = max(df.loc[:,col])
+        df_new = pd.concat([df_new, pd.DataFrame([min_dict.values()], columns=min_dict.keys())], axis=0)
+        df_new = pd.concat([df_new, pd.DataFrame([max_dict.values()], columns=max_dict.keys())], axis=0)
+        scaler.fit(df_new)
+
+        return scaler
+
+
     def custom_single_predict(self, df_X, single_estimator, return_df=False):
-        if self.lookbacks == None or self.scaler_X==None or self.scaler_y==None:
-            raise ValueError("lookbacks, scaler must be set")
+        
         cols                = df_X.columns
         index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
-        y_pred_values       = single_estimator.predict(input_data)
-        y_pred_values       = self.scaler_y.inverse_transform(y_pred_values)
-        #if return_df == True:
+        y_pred_values       = single_estimator.predict(input_data, verbose=0)
+        if not self.scaler_X == None:
+            y_pred_values       = self.scaler_y.inverse_transform(y_pred_values)
         y_pred_values = pd.DataFrame(y_pred_values, index=index)
-        y_pred_values = y_pred_values.shift(self.input_dict["outputs_params_dict"]["pred_steps_ahead"])
-        y_pred_values = y_pred_values.dropna()
+
+        #if return_df == True:
         return y_pred_values
         
     def evaluate(self, y_test, y_pred, outputs_params_dict, reporting_dict):
@@ -1286,7 +1324,7 @@ class DRSLinRegRNN():
         confidences_before_betting_PC = reporting_dict["confidence_thresholds"]
 
         #align indices
-        merged_df = pd.merge(y_test, pd.DataFrame(y_pred), left_index=True, right_index=True, how='inner')
+        merged_df = pd.merge(y_test, y_pred, left_index=True, right_index=True, how='inner')
         y_test = y_test.loc[merged_df.index]
         y_pred = y_pred.loc[merged_df.index]
         
@@ -1295,7 +1333,7 @@ class DRSLinRegRNN():
         return traditional_scores_dict_list, additional_results_dict_list
         
     def save(self, general_save_dir = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["predictive_model"], Y_preds_testing=None, y_testing=None):
-        model_name = return_predictor_name(self.input_dict)
+        model_name = return_predictor_name(self.input_dict["outputs_params_dict"]["pred_steps_ahead"])
         folder_path = os.path.join(general_save_dir, custom_hash(model_name) + "\\")
         extension = ".h5"
         if not os.path.exists(folder_path):
@@ -1313,16 +1351,13 @@ class DRSLinRegRNN():
             model.save(os.path.join(folder_path, f'ensemble_model_{i}.{extension}'))
         with open(os.path.join(folder_path,"input_dict.pkl"), "wb") as file:
                 pickle.dump(self.input_dict, file)
-        print("I need to save the other items") #FG_actions
         #save predictions if specified
         if isinstance(Y_preds_testing, pd.Series) or isinstance(Y_preds_testing, pd.DataFrame):
+            Y_preds_testing.shift(self.input_dict[""])
             Y_preds_testing.to_csv(os.path.join(folder_path, 'Y_preds_testing.csv'))
         if isinstance(y_testing, pd.Series) or isinstance(y_testing, pd.DataFrame):
             y_testing.to_csv(os.path.join(folder_path, 'y_testing.csv'))
-        
-        
-        
-
+   
     def predict_ensemble(self, X): #FG_action: This is where the new error is
         
         y_ensemble = pd.DataFrame()
@@ -1389,34 +1424,6 @@ def return_lookback_appropriate_index_andor_data(df_x, lookbacks, return_index=F
     else:
         return output_single
 
-def return_filtered_normalised_RNN_generators(df_X, df_y, scaler_X=None, scaler_y=None, lookbacks=10, batch_ratio=None):
-    global global_strptime_str_2
-    if batch_ratio == None:
-        raise ValueError("please feed in batch_size")
-    if batch_ratio == 0:
-        entry_batch_ratio = 1
-    else:
-        entry_batch_ratio = batch_ratio*len(df_X)
-
-    df_X_normalized = scaler_X.transform(df_X)
-    df_y_normalized = scaler_y.transform(df_y.values.reshape(-1, 1))
-    input_shape = (lookbacks, df_X.shape[1])
-    training_generator = tf.keras.preprocessing.sequence.TimeseriesGenerator(
-            df_X_normalized,
-            df_y_normalized,
-            lookbacks,
-            batch_size=entry_batch_ratio,
-            shuffle=False
-        )
-    datetime_generator = tf.keras.preprocessing.sequence.TimeseriesGenerator(
-            df_X.index,
-            df_y_normalized,
-            lookbacks,
-            batch_size=entry_batch_ratio,
-            shuffle=False
-        )
-    filtered_training_generator = return_filtered_batches_that_dont_cross_two_days(training_generator, datetime_generator)
-    return filtered_training_generator#,training_generator
 
 
 def return_filtered_batches_that_dont_cross_two_days(training_generator, datetime_generator):
@@ -1500,7 +1507,7 @@ def generate_testing_scores(predictor, input_dict, return_time_series=False):
 
     # step 2: generate testing output data
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 2: generate testing output data")
-    X_testing, y_testing   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
+    X_testing, y_testing = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
         
     # step 3: generate y_pred
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 3: generate y_pred")
