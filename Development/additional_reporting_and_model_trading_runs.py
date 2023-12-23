@@ -255,7 +255,7 @@ def run_additional_reporting(preds=None,
                             y_testing = None, 
                             pred_steps_list = None,
                             confidences_before_betting_PC=None,
-                            financial_scaling=financial_scaling
+                            financial_scaling=None
                             ):
     
     #df_realigned_dict                   = return_realign_plus_minus_table(preds, y_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)

@@ -426,7 +426,7 @@ def run_experiment_and_return_updated_design_history_dict(design_history_dict_si
                 y_testing = y_testing, 
                 pred_steps_list = default_input_dict["outputs_params_dict"]["pred_steps_ahead"],
                 confidences_before_betting_PC = confidences_before_betting_PC,
-                financial_scaling=default_input_dict["fin_inputs_params_dict"]["scaler_cat"]
+                financial_scaling=default_input_dict["fin_inputs_params_dict"]["financial_value_scaling"]
                 )
         design_history_dict_single = update_design_hist_dict_post_testing(design_history_dict_single, testing_scores, testing_results_dict)
         

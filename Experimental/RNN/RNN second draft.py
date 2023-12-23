@@ -20,7 +20,7 @@ master_folder_path = r"C:\Users\Public\fabio_uni_work\Social-Media-and-News-Arti
 example_input_path = os.path.join(master_folder_path, "example_input.csv")
 date_format = '%d/%m/%Y %H:%M'
 
-list_of_precalculated_asset_folders = ["always_up_down_results", "annotated_tweets", "cleaned_tweets_ready_for_subject_discovery", "experimental_records", "predictive_model", "sentiment_data", "technical_indicators", "temp_testing_dicts", "topic_models"]
+
 
 # Example multivariate time series data (replace this with your actual time series)
 # Assuming two features in the time series
@@ -77,22 +77,9 @@ datetime_generator = tf.keras.preprocessing.sequence.TimeseriesGenerator(
 #        training_generator[id] = None, None
 
 
+
+
 def return_filtered_batches_that_dont_cross_two_days(training_generator, datetime_generator):
-    mask = []
-    for batch_x, output in datetime_generator:
-        if datetime.strptime(batch_x[0][0], date_format).day == datetime.strptime(batch_x[0][-1], date_format).day:
-            mask += [True]
-        else:
-            mask += [False]
-    filtered_training_generator_batch_list = []
-    for training_batch, Bool in zip(training_generator, mask):
-        if Bool == True:
-            filtered_training_generator_batch_list += [training_batch]
-    return filtered_training_generator_batch_list
-
-import random
-
-def return_filtered_batches_that_dont_cross_two_days_v2(training_generator, datetime_generator):
     mask, new_data, new_targets = [], np.empty((0,training_generator.data.shape[1])), np.empty((0,training_generator.targets.shape[1]))
     for batch_x, output in datetime_generator:
         if datetime.strptime(batch_x[0][0], date_format).day == datetime.strptime(batch_x[0][-1], date_format).day:
@@ -103,7 +90,7 @@ def return_filtered_batches_that_dont_cross_two_days_v2(training_generator, date
         if Bool_n == True:
             new_data    = np.append(new_data, [data_n], axis=0)
             new_targets = np.append(new_targets, [target_n], axis=0)
-    print(str(sum(mask)) + str(len(mask)))
+    
     # replace removed batches with random batches
     for i in range(sum(mask), len(mask)):
         random_index = random.randint(0, sum(mask))
@@ -123,7 +110,7 @@ def return_filtered_batches_that_dont_cross_two_days_v2(training_generator, date
 ## Filter batches that cross two days
 #filtered_batches = [batch for batch in generator if not batch_crosses_two_days(batch)]
 
-filtered_training_generator_batch_list = return_filtered_batches_that_dont_cross_two_days_v2(training_generator, datetime_generator)
+filtered_training_generator_batch_list = return_filtered_batches_that_dont_cross_two_days(training_generator, datetime_generator)
 
 
 
@@ -135,7 +122,7 @@ model = Sequential([
 ])
 model.compile(optimizer='adam', loss='mae')
 
-model.fit(filtered_training_generator_batch_list, epochs=1)
+model.fit(filtered_training_generator_batch_list, epochs=5)
 
 
 model.fit(training_generator, epochs=5)

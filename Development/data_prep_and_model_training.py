@@ -412,6 +412,7 @@ def retrieve_or_generate_then_populate_technical_indicators(df, tech_indi_dict, 
                     df[temp_val.columns] = temp_val
                 else:
                     raise ValueError("technical indicator " + key + " not programmed")
+        df = df.dropna(axis=1, how='all')
 
         df.to_csv(technical_indicators_location_file)
 
