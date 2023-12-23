@@ -762,10 +762,10 @@ design_space_dict = {
             8 : [("simple", 50), ("GRU", 50), ("LSTM", 50)]
             },
         "general_adjusting_square_factor" : [2, 1, 0],
-        "estimator__alpha"                : [1e-8, 1e-7, 1e-6, 1e-5, 1e-4], 
-        "lookbacks"                       : [8,10,15],
+        "estimator__alpha"                : [1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4], 
+        "lookbacks"                       : [8,10,15, 25],
         "batch_ratio"                     : [0, 0.01, 0.025],
-        "scaler_cat"                      : [0,1,2,3]
+        "scaler_cat"                      : [2,3]
 
     },
     "string_key" : {}
@@ -775,17 +775,16 @@ design_space_dict = {
 
 global_run_count = 0
 
-init_doe = 40
+#init_doe = 40
 init_doe = [
-    [0, 16, 7, 1, 25200, 1, 4, 3, 0, 1e-4, 15, 0, 3],
-    [0, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-5, 15, 0, 3],
-    [0, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-7, 15, 0, 3],    
-    [1, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-4, 15, 0, 3],
-    [1, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-5, 15, 0, 3],
-    [1, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-7, 15, 0, 3],    
-    [2, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-4, 15, 0, 3],
+    [2, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-9, 15, 0, 3],
+    [3, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-9, 15, 0, 3],
+    [2, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-9, 25, 0, 3],
+    [2, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-6, 15, 0, 3],
+    [3, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-6, 15, 0, 3],
     [2, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-5, 15, 0, 3],
-    [2, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-7, 15, 0, 3],    
+    [3, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-5, 15, 0, 3],
+    
 ]
 
 
@@ -823,7 +822,7 @@ scenario_dict = {
         11: {"topics" : 0, "pred_steps" : 15}
     }
 
-for scenario_ID in scenario_dict.keys():
+for scenario_ID in [2]:#scenario_dict.keys():
     
     index_of_topic_qty = return_keys_within_2_level_dict(design_space_dict).index("senti_inputs_params_dict_topic_qty")
 
@@ -871,7 +870,7 @@ for scenario_ID in scenario_dict.keys():
             scenario_name_str,
             design_space_dict,
             initial_doe_size_or_DoE=init_doe,
-            max_iter=20,
+            max_iter=0,
             model_start_time = model_start_time,
             force_restart_run = False,
             inverse_for_minimise_vec = inverse_for_minimise_vec,
