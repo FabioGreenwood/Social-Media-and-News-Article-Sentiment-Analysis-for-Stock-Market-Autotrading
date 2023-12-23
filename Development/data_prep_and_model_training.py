@@ -76,10 +76,10 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import multiprocessing
 from multiprocessing import Process
 import itertools as it
-from stock_indicators import indicators, Quote
-from stock_indicators.indicators.common.quote import Quote
-from stock_indicators.indicators.common.enums import Match
-from stock_indicators import PeriodSize, PivotPointType 
+#from stock_indicators import indicators, Quote
+#from stock_indicators.indicators.common.quote import Quote
+#from stock_indicators.indicators.common.enums import Match
+#from stock_indicators import PeriodSize, PivotPointType 
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
