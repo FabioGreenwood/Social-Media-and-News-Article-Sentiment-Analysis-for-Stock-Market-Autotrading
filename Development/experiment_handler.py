@@ -43,7 +43,7 @@ import hashlib
 #%% Default Input Parameters
 
 default_temporal_params_dict        = {
-    "train_period_start"    : datetime.strptime('01/01/15 00:00:00', global_strptime_str),
+    "train_period_start"    : datetime.strptime('01/01/16 00:00:00', global_strptime_str),
     #"train_period_end"      : datetime.strptime('01/03/15 00:00:00', global_strptime_str), #FG_Placeholder
     "train_period_end"      : datetime.strptime('01/06/20 00:00:00', global_strptime_str),
     #"train_period_end"      : datetime.strptime('01/03/19 00:00:00', global_strptime_str),
@@ -60,12 +60,11 @@ default_fin_inputs_params_dict      = {
         "sma" : [5, 20, 50, int(FIVE_MIN_TIME_STEPS_IN_A_DAY), int(5 * FIVE_MIN_TIME_STEPS_IN_A_DAY)],
         "ema" : [5, 20, 50, int(FIVE_MIN_TIME_STEPS_IN_A_DAY), int(5 * FIVE_MIN_TIME_STEPS_IN_A_DAY)],
         "macd" : [[12, 26, 9]],
-        "BollingerBands" : [[20, 2]],
-        "PivotPoints" : [0]}, 
+        "BollingerBands" : [[20, 2]]}, 
     "fin_match"         : {"Doji" : True},
     "index_col_str"     : "datetime",
     #"historical_file"   : "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\data\\financial data\\tiingo\\aapl.csv",
-    "historical_file"   : os.path.join(global_general_folder,r"data\financial_data\firstratedata\AAPL_full_5min_adjsplit.txt"),
+    "historical_file"   : os.path.join(global_general_folder,r"data/financial_data/firstratedata/AAPL_full_5min_adjsplit.txt"),
     "financial_value_scaling" : None # None, "day_scaled", "delta_scaled"
 }
 default_senti_inputs_params_dict    = {
@@ -79,8 +78,8 @@ default_senti_inputs_params_dict    = {
     "enforced_topics_dict_name" : "None",
     "enforced_topics_dict"  : None,
     "sentiment_method"      : SentimentIntensityAnalyzer(),
-    "tweet_file_location"   : os.path.join(global_general_folder,r"data\twitter_data\apple.csv"),
-    "cleaned_tweet_file_location"   : os.path.join(global_general_folder,r"data\twitter_data\apple_cleaned.csv"),
+    "tweet_file_location"   : os.path.join(global_general_folder,r"data/twitter_data/apple.csv"),
+    "cleaned_tweet_file_location"   : os.path.join(global_general_folder,r"data/twitter_data/apple_cleaned.csv"),
     "regenerate_cleaned_tweets_for_subject_discovery" : False,
     "inc_new_combined_stopwords_list" : True,
     "topic_weight_square_factor" : 1
@@ -781,7 +780,7 @@ global_run_count = 0
 
 init_doe = 1
 init_doe = [
-    [0, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-4, 15, 0, 3],
+    [0, 16, 7, 1, 25200, 1, 4, 3, 0, 1e-4, 15, 0, 3],
     [0, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-5, 15, 0, 3],
     [0, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-7, 15, 0, 3],    
     [1, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-4, 15, 0, 3],
@@ -881,7 +880,7 @@ for scenario_ID in [2,6,10]:#scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs\delta_doe.csv")
+            global_record_path=os.path.join(global_general_folder,r"outputs/delta_doe.csv")
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 

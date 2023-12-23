@@ -3,10 +3,10 @@ from datetime import datetime
 import os
 
 
-# global_general_folder = "C:\\Users\\Public\\fabio_uni_work\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\"
-# global_outputs_folder = "C:\\Users\\Public\\fabio_uni_work\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\outputs\\"
-global_general_folder = "/home/accounts/studenti/id110xaq/final_project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/"
-global_outputs_folder = "/home/accounts/studenti/id110xaq/final_project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/outputs/"
+global_general_folder = "C:\\Users\\Public\\fabio_uni_work\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\"
+global_outputs_folder = "C:\\Users\\Public\\fabio_uni_work\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\outputs\\"
+#global_general_folder = "/home/accounts/studenti/id110xaq/final_project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/"
+#global_outputs_folder = "/home/accounts/studenti/id110xaq/final_project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/outputs/"
 #'/home/accounts/studenti/id110xaq/final_project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/data/support_data/stock_info.csv'
 
 global_input_cols_to_include_list = ["<CLOSE>", "<HIGH>"]
@@ -29,7 +29,7 @@ global_precalculated_assets_locations_dict = {
     "topic_models"              : "topic_models/",
     "annotated_tweets"          : "annotated_tweets/",
     "predictive_model"          : "predictive_model/",
-    "sentiment_data"          : "sentiment_data/",
+    "sentiment_data"           : "sentiment_data/",
     "technical_indicators"      : "technical_indicators/",
     "experiment_records"        : "experiment_records/",
     }

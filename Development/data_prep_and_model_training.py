@@ -356,18 +356,33 @@ def rescale_financial_data_if_needed(df_fin_data, format):
 
     return df_fin_data
 
+import pandas_ta as ta
+from datetime import datetime
+import os
+from dataclasses import dataclass
+
+@dataclass
+class Quote:
+    date: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
 
 def retrieve_or_generate_then_populate_technical_indicators(df, tech_indi_dict, match_doji, target_file_path, fin_data_scale):
     global global_strptime_str_filename
+
     quotes_list = [
-        Quote(d,o,h,l,c,v) 
-        for d,o,h,l,c,v 
+        Quote(d, o, h, l, c, v)
+        for d, o, h, l, c, v
         in zip(df.index, df['£_open'], df['£_high'], df['£_low'], df['£_close'], df['£_volume'])
     ]
-    
+
     technical_indicators_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["technical_indicators"]
     technical_indicators_name = return_technical_indicators_name(df, tech_indi_dict, match_doji, target_file_path)
     technical_indicators_location_file = technical_indicators_folder_location_string + technical_indicators_name + ".csv"
+
     if os.path.exists(technical_indicators_location_file):
         df = pd.read_csv(technical_indicators_location_file)
         df.set_index(df.columns[0], inplace=True)
@@ -376,72 +391,28 @@ def retrieve_or_generate_then_populate_technical_indicators(df, tech_indi_dict, 
     else:
         for key in tech_indi_dict:
             for value in tech_indi_dict[key]:
-                #calculate indicators
+                # calculate indicators
                 if key == "sma":
-                    results = indicators.get_sma(quotes_list, int(value))
-                    attr = ["sma"]
-                    col_pref = ""
+                    df[f'$_sma_{value}'] = ta.sma(df['£_close'], length=int(value))
                 elif key == "ema":
-                    results = indicators.get_ema(quotes_list, int(value))
-                    attr = ["ema"]
-                    col_pref = ""
+                    df[f'$_ema_{value}'] = ta.ema(df['£_close'], length=int(value))
                 elif key == "macd":
                     if not len(value) == 3:
                         raise ValueError("the entries for macd, must be lists of a 3 value length")
-                    results = indicators.get_macd(quotes_list, int(value[0]), int(value[1]), int(value[2]))
-                    attr = ["macd", "signal", "histogram", "fast_ema", "slow_ema"]
-                    col_pref = "macd_"
+                    df[f'$_macd_{value[0]}_{value[1]}_{value[2]}'], _, _ = ta.macd(df['£_close'], fast=int(value[0]), slow=int(value[1]), signal=int(value[2]))
                 elif key == "BollingerBands":
                     if not len(value) == 2:
                         raise ValueError("the entries for BollingerBands, must be lists of a 2 value length")
-                    results = indicators.get_bollinger_bands(quotes_list, int(value[0]), int(value[1]))
-                    attr = ["upper_band", "lower_band", "percent_b", "z_score", "width"]
-                    col_pref = "Bollinger_"
-                elif key == "PivotPoints":
-                    results = indicators.get_pivot_points(quotes_list, PeriodSize.MONTH, PivotPointType.WOODIE);
-                    attr = ["r3", "r2", "r1", "pp", "s1", "s2", "s3"]
-                    col_pref = "PivotPoints"
+                    temp_val = ta.bbands(df['£_close'], length=value[0], std=value[1])
+                    df[temp_val.columns] = temp_val
                 else:
                     raise ValueError("technical indicator " + key + " not programmed")
-                # populate indicator
-                for at in attr:
-                    col_str = "$_" + col_pref + at + "_" + str(value)
-                    df[col_str] = ""
-                    for r in results:
-                        df.at[r.date, col_str] = getattr(r,at)
-                    print("tech indy")    
-                    print("tech indy: " + str(key) + " " + str(value) +  " " + str(at) + " done " + datetime.now().strftime(global_strptime_str_filename))
-            
-        if match_doji == True:
-            results = indicators.get_doji(quotes_list)
-            df["match!_doji"] = ""
-            for r in results:
-                mat = r.match
-                if mat == Match.BULL_CONFIRMED:
-                    val = 3
-                elif mat == Match.BULL_SIGNAL:
-                    val = 2
-                elif mat == Match.BULL_BASIS:
-                    val = 1
-                elif mat == Match.NEUTRAL:
-                    val = 0
-                elif mat == Match.NONE:
-                    val = 0
-                elif mat == Match.BEAR_BASIS:
-                    val = -1
-                elif mat == Match.BEAR_SIGNAL:
-                    val = -2
-                elif mat == Match.BEAR_CONFIRMED:
-                    val = -3
-                else:
-                    raise ValueError(str(mat) + "not found in list")
-                df.at[r.date, "match!_doji"] = val
-        df.to_csv(technical_indicators_location_file)      
+
+        df.to_csv(technical_indicators_location_file)
 
     df = rescale_financial_data_if_needed(df, fin_data_scale)
 
     return df
-
 
 #%% SubModule – Sentiment Data Prep
 
