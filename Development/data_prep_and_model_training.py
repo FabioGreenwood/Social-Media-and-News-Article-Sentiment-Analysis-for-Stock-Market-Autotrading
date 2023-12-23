@@ -54,7 +54,11 @@ from sklearn.preprocessing import MinMaxScaler
 import random
 
 import pyLDAvis
-import pyLDAvis.gensim_models as gensimvis
+
+from gensim.models import LdaModel
+from gensim.corpora import Dictionary
+import pyLDAvis.gensim as gensimvis
+
 import pickle 
 from gensim.models.ldamulticore import LdaMulticore
 import gensim.models.ldamodel
@@ -399,7 +403,8 @@ def retrieve_or_generate_then_populate_technical_indicators(df, tech_indi_dict, 
                 elif key == "macd":
                     if not len(value) == 3:
                         raise ValueError("the entries for macd, must be lists of a 3 value length")
-                    df[f'$_macd_{value[0]}_{value[1]}_{value[2]}'], _, _ = ta.macd(df['£_close'], fast=int(value[0]), slow=int(value[1]), signal=int(value[2]))
+                    temp_val = ta.macd(df['£_close'], fast=int(value[0]), slow=int(value[1]), signal=int(value[2]))
+                    df[temp_val.columns] = temp_val
                 elif key == "BollingerBands":
                     if not len(value) == 2:
                         raise ValueError("the entries for BollingerBands, must be lists of a 2 value length")
@@ -698,8 +703,8 @@ def generate_and_save_topic_model(run_name, temporal_params_dict, fin_inputs_par
     print(datetime.now().strftime("%H:%M:%S"))
     print("-------------------------------- Creating Subject Keys --------------------------------")
     wordcloud, topic_model_dict, visualisation  = return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty = num_topics, topic_model_alpha=topic_model_alpha, apply_IDF=apply_IDF,
-                                                                      enforced_topics_dict=enforced_topics_dict, return_LDA_model=True, return_png_visualisation=True, return_html_visualisation=True)
-    save_topic_clusters(wordcloud, topic_model_dict, visualisation, file_location_wordcloud, file_location_topic_model_dict, file_location_visualisation)
+                                                                      enforced_topics_dict=enforced_topics_dict, return_LDA_model=True, return_png_visualisation=True, return_html_visualisation=False)
+    save_topic_clusters(wordcloud, topic_model_dict, None, file_location_wordcloud, file_location_topic_model_dict, file_location_visualisation)
     print(datetime.now().strftime("%H:%M:%S"))
     print("-------------------------------- Completed Subject Keys --------------------------------")
     print(datetime.now().strftime("%H:%M:%S"))
@@ -903,7 +908,7 @@ def return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty=10, enforc
     data_words = list(sent_to_words(data))
     
     if return_LDA_model < return_html_visualisation:
-        raise ValueError("You must return the LDA visualisation if you return the LDA model")
+        raise ValueError("You must return the LDA model if you return the LDA visualisation")
 
     if return_png_visualisation:
         # Create a long string for word cloud visualization
@@ -911,9 +916,9 @@ def return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty=10, enforc
         for w in data_words:
             long_string = long_string + ',' + ','.join(w)
         wordcloud = WordCloud(background_color="white", max_words=1000, contour_width=3, contour_color='steelblue')
-        wordcloud.generate(long_string)
-        wordcloud.to_image()
-        output = output + [wordcloud]
+        #wordcloud.generate(long_string)
+        #wordcloud.to_image()
+        output = output + [None]
     else:
         output = output + [None]
 
@@ -996,6 +1001,7 @@ def return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty=10, enforc
     if return_html_visualisation:
         pyLDAvis.enable_notebook
         if topic_qty > 1:
+            
             LDAvis_prepared = gensimvis.prepare(lda_model, corpus_train, id2word)
         else:
             LDAvis_prepared = None
