@@ -44,13 +44,9 @@ import hashlib
 
 default_temporal_params_dict        = {
     "train_period_start"    : datetime.strptime('01/01/16 00:00:00', global_strptime_str),
-    #"train_period_end"      : datetime.strptime('01/03/15 00:00:00', global_strptime_str), #FG_Placeholder
     "train_period_end"      : datetime.strptime('01/06/20 00:00:00', global_strptime_str),
-    #"train_period_end"      : datetime.strptime('01/03/19 00:00:00', global_strptime_str),
     "time_step_seconds"     : 5*60, #5 mins,
     "test_period_start"     : datetime.strptime('01/06/20 00:00:00', global_strptime_str),
-    #"test_period_end"       : datetime.strptime('01/08/19 00:00:00', global_strptime_str), #FG_Placeholder
-    #"test_period_end"       : datetime.strptime('01/09/19 00:00:00', global_strptime_str)
     "test_period_end"       : datetime.strptime('01/01/21 00:00:00', global_strptime_str),
 }
 default_fin_inputs_params_dict      = {
@@ -109,7 +105,7 @@ default_model_hyper_params          = {
     "batch_ratio" : 0.1,
     "shuffle_fit" : False,
     "K_fold_splits" : 5, #FG_placeholder,
-    "scaler_cat" : 0 # 0:no scaling, 1: standard scaling, 2: custom scaling, 3: individual scaling
+    "scaler_cat" : 0 # 0:no scaling, 1: standard scaling (only from the MinMaxScaler object), 2: custom scaling, 3: individual scaling
     }
 default_reporting_dict              = {
     "confidence_thresholds" : [0, 0.01, 0.02, 0.035, 0.05, 0.1],
@@ -219,7 +215,7 @@ def return_cols_for_additional_reporting(input_dict):
     confidences = input_dict["reporting_dict"]["confidence_thresholds"]
     pred_steps_ahead_list = input_dict["outputs_params_dict"]["pred_steps_ahead"]
     
-    template = FG_additional_reporting.run_additional_reporting(y_testing=pd.DataFrame(), pred_steps_list=[])
+    template = FG_additional_reporting.run_additional_reporting(y_testing=pd.DataFrame(), pred_steps_list=[], financial_scaling=0)
     
     if type(pred_steps_ahead_list) == int:
         pred_steps_ahead_list = [pred_steps_ahead_list]
@@ -429,7 +425,8 @@ def run_experiment_and_return_updated_design_history_dict(design_history_dict_si
         testing_results_dict = FG_additional_reporting.run_additional_reporting(preds=Y_preds,
                 y_testing = y_testing, 
                 pred_steps_list = default_input_dict["outputs_params_dict"]["pred_steps_ahead"],
-                confidences_before_betting_PC = confidences_before_betting_PC
+                confidences_before_betting_PC = confidences_before_betting_PC,
+                financial_scaling=default_input_dict["fin_inputs_params_dict"]["scaler_cat"]
                 )
         design_history_dict_single = update_design_hist_dict_post_testing(design_history_dict_single, testing_scores, testing_results_dict)
         
@@ -765,7 +762,7 @@ design_space_dict = {
             8 : [("simple", 50), ("GRU", 50), ("LSTM", 50)]
             },
         "general_adjusting_square_factor" : [2, 1, 0],
-        "estimator__alpha"                : [1e-5, 1e-4, 1e-3, 1e-2, 5e-2, 1e-1, 5e-1, 9e-1], 
+        "estimator__alpha"                : [1e-8, 1e-7, 1e-6, 1e-5, 1e-4], 
         "lookbacks"                       : [8,10,15],
         "batch_ratio"                     : [0, 0.01, 0.025],
         "scaler_cat"                      : [0,1,2,3]
@@ -778,7 +775,7 @@ design_space_dict = {
 
 global_run_count = 0
 
-init_doe = 1
+init_doe = 40
 init_doe = [
     [0, 16, 7, 1, 25200, 1, 4, 3, 0, 1e-4, 15, 0, 3],
     [0, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-5, 15, 0, 3],
@@ -826,7 +823,7 @@ scenario_dict = {
         11: {"topics" : 0, "pred_steps" : 15}
     }
 
-for scenario_ID in [2,6,10]:#scenario_dict.keys():
+for scenario_ID in scenario_dict.keys():
     
     index_of_topic_qty = return_keys_within_2_level_dict(design_space_dict).index("senti_inputs_params_dict_topic_qty")
 
@@ -864,7 +861,7 @@ for scenario_ID in [2,6,10]:#scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "delta_doe"
+    scenario_name_str = scenario_name_str + "run_v1"
 
 
     if __name__ == '__main__':
@@ -874,13 +871,13 @@ for scenario_ID in [2,6,10]:#scenario_dict.keys():
             scenario_name_str,
             design_space_dict,
             initial_doe_size_or_DoE=init_doe,
-            max_iter=0,
+            max_iter=20,
             model_start_time = model_start_time,
             force_restart_run = False,
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/delta_doe.csv")
+            global_record_path=os.path.join(global_general_folder,r"outputs/run_v1.csv")
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
