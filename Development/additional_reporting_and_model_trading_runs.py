@@ -20,7 +20,7 @@ if not sys.warnoptions:
     os.environ["PyTHONWARNINGS"] = "ignore"
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import matplotlib.pyplot as plt
-global_master_folder_path = r"C:\Users\Public\fabio_uni_work\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\"
+global_master_folder_path = "placeholder"
 
 
 #%% methods
@@ -177,7 +177,7 @@ def return_results_X_min_plus_minus_accuracy(y_preds, y_test, pred_steps_list, c
 
 def return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_list, results_tables_dict, DoE_name = "", model_type_name="", model_start_time = "", outputs_folder_path = ".//outputs//tables//", timestamp = False):
     
-    outputs_folder_path = outputs_folder_path + "\\" + model_type_name + "\\"
+    outputs_folder_path = outputs_folder_path + "//" + model_type_name + "//"
     single_levelled_tables = ["results_x_min_plus_minus_PC"]
     double_levelled_tables = ["results_x_min_plus_minus_PC_confindence", "results_x_min_plus_minus_score_confidence", "results_x_min_plus_minus_score_confidence_weighted"]
     fig_i = 0
