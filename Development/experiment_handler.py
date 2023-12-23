@@ -44,12 +44,14 @@ import hashlib
 
 default_temporal_params_dict        = {
     "train_period_start"    : datetime.strptime('01/01/15 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/04/15 00:00:00', global_strptime_str), #FG_Placeholder
-    #"train_period_end"      : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
+    #"train_period_end"      : datetime.strptime('01/03/15 00:00:00', global_strptime_str), #FG_Placeholder
+    "train_period_end"      : datetime.strptime('01/06/20 00:00:00', global_strptime_str),
+    #"train_period_end"      : datetime.strptime('01/03/19 00:00:00', global_strptime_str),
     "time_step_seconds"     : 5*60, #5 mins,
-    "test_period_start"     : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
-    "test_period_end"       : datetime.strptime('01/10/19 00:00:00', global_strptime_str), #FG_Placeholder
-    #"test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str),
+    "test_period_start"     : datetime.strptime('01/06/20 00:00:00', global_strptime_str),
+    #"test_period_end"       : datetime.strptime('01/08/19 00:00:00', global_strptime_str), #FG_Placeholder
+    #"test_period_end"       : datetime.strptime('01/09/19 00:00:00', global_strptime_str)
+    "test_period_end"       : datetime.strptime('01/01/21 00:00:00', global_strptime_str),
 }
 default_fin_inputs_params_dict      = {
     "index_cols"        : "date",    
@@ -60,11 +62,11 @@ default_fin_inputs_params_dict      = {
         "macd" : [[12, 26, 9]],
         "BollingerBands" : [[20, 2]],
         "PivotPoints" : [0]}, 
-    "fin_match"         :{
-        "Doji" : True},
+    "fin_match"         : {"Doji" : True},
     "index_col_str"     : "datetime",
     #"historical_file"   : "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\data\\financial data\\tiingo\\aapl.csv",
-    "historical_file"   : os.path.join(global_general_folder,r"data\financial_data\firstratedata\AAPL_full_5min_adjsplit.txt")
+    "historical_file"   : os.path.join(global_general_folder,r"data\financial_data\firstratedata\AAPL_full_5min_adjsplit.txt"),
+    "financial_value_scaling" : None # None, "day_scaled", "delta_scaled"
 }
 default_senti_inputs_params_dict    = {
     "topic_qty"             : 7,
@@ -108,7 +110,7 @@ default_model_hyper_params          = {
     "batch_ratio" : 0.1,
     "shuffle_fit" : False,
     "K_fold_splits" : 5, #FG_placeholder,
-    "scaler_cat" : 0
+    "scaler_cat" : 0 # 0:no scaling, 1: standard scaling, 2: custom scaling, 3: individual scaling
     }
 default_reporting_dict              = {
     "confidence_thresholds" : [0, 0.01, 0.02, 0.035, 0.05, 0.1],
@@ -738,6 +740,12 @@ now = datetime.now()
 model_start_time = now.strftime(global_strptime_str_filename)
     
 design_space_dict = {
+    "fin_inputs_params_dict" : {
+        "financial_value_scaling" : {
+            0 : None,
+            1 : "day_scaled",
+            2 : "delta_scaled"}
+    },
     "senti_inputs_params_dict" : {
         "topic_qty" : [5, 9, 13, 17, 25],
         "topic_model_alpha" : [0.3, 0.7, 1, 2, 3, 5, 7, 13],
@@ -758,11 +766,10 @@ design_space_dict = {
             8 : [("simple", 50), ("GRU", 50), ("LSTM", 50)]
             },
         "general_adjusting_square_factor" : [2, 1, 0],
-        #"estimator__alpha"                : [1e-5, 1e-4, 1e-3, 1e-2, 5e-2, 1e-1, 5e-1, 9e-1], 
-        "estimator__alpha"                : [1e-5],  #fg_placeholder
+        "estimator__alpha"                : [1e-5, 1e-4, 1e-3, 1e-2, 5e-2, 1e-1, 5e-1, 9e-1], 
         "lookbacks"                       : [8,10,15],
         "batch_ratio"                     : [0, 0.01, 0.025],
-        "scaler_cat"                      : [0,1,2]
+        "scaler_cat"                      : [0,1,2,3]
 
     },
     "string_key" : {}
@@ -774,12 +781,15 @@ global_run_count = 0
 
 init_doe = 1
 init_doe = [
-    [25, 7, 1, 25200, 1, 4, 3, 0, 1e-7, 15, 0, 1],
-    [25, 7, 1, 25200, 1, 4, 3, 0, 1e-6, 15, 0, 1],
-    [25, 7, 1, 25200, 1, 4, 3, 0, 1e-5, 15, 0, 1],
-    [25, 7, 1, 25200, 1, 4, 3, 0, 1e-4, 15, 0, 1],
-    [25, 7, 1, 25200, 1, 4, 3, 0, 1e-3, 15, 0, 1]
-    
+    [0, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-4, 15, 0, 3],
+    [0, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-5, 15, 0, 3],
+    [0, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-7, 15, 0, 3],    
+    [1, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-4, 15, 0, 3],
+    [1, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-5, 15, 0, 3],
+    [1, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-7, 15, 0, 3],    
+    [2, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-4, 15, 0, 3],
+    [2, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-5, 15, 0, 3],
+    [2, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-7, 15, 0, 3],    
 ]
 
 
@@ -817,12 +827,14 @@ scenario_dict = {
         11: {"topics" : 0, "pred_steps" : 15}
     }
 
-for scenario_ID in [1,5,9]:#scenario_dict.keys():
+for scenario_ID in [2,6,10]:#scenario_dict.keys():
     
-    #editing topic quantity values for scenario, 2 lines
+    index_of_topic_qty = return_keys_within_2_level_dict(design_space_dict).index("senti_inputs_params_dict_topic_qty")
+
+    # editing topic quantity values for scenario, 2 lines
     topic_qty = scenario_dict[scenario_ID]["topics"]
     if isinstance(init_doe, list) and topic_qty != None:
-            for i in range(len(init_doe)): init_doe[i][0] = 1
+            for i in range(len(init_doe)): init_doe[i][index_of_topic_qty] = 1
             design_space_dict["senti_inputs_params_dict"]["topic_qty"] = [1]
             default_input_dict["senti_inputs_params_dict"]["topic_qty"] = 1
 
@@ -853,7 +865,7 @@ for scenario_ID in [1,5,9]:#scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "testing_val_loss_stop"
+    scenario_name_str = scenario_name_str + "delta_doe"
 
 
     if __name__ == '__main__':
@@ -869,7 +881,7 @@ for scenario_ID in [1,5,9]:#scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs\testing_val_loss_stop.csv")
+            global_record_path=os.path.join(global_general_folder,r"outputs\delta_doe.csv")
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 

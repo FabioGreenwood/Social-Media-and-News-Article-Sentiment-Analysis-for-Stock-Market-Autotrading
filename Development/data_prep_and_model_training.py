@@ -202,12 +202,13 @@ def return_predictor_name(input_dict):
     general_adjusting_square_factor   = input_dict["model_hyper_params"]["general_adjusting_square_factor"]
     lookbacks                         = input_dict["model_hyper_params"]["lookbacks"]
     batch_ratio                       = input_dict["model_hyper_params"]["batch_ratio"]
-
-
-    
+    financial_value_scaling          = input_dict["fin_inputs_params_dict"]["financial_value_scaling"]
 
     name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe)
-    predictor_hash = "_" + str(input_dict["model_hyper_params"]["n_estimators_per_time_series_blocking"]) + "_" + str(input_dict["model_hyper_params"]["testing_scoring"]) + "_" + str(input_dict["model_hyper_params"]["estimator__alpha"]) + "_" + str(input_dict["model_hyper_params"]["estimator__activation"]) + "_" + str(input_dict["model_hyper_params"]["cohort_retention_rate_dict"]) + "_" + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + "_" + str(input_dict["model_hyper_params"]["epochs"]) + "_" + str(input_dict["model_hyper_params"]["lookbacks"]) + "_" + str(input_dict["model_hyper_params"]["shuffle_fit"]) + "_" + str(input_dict["model_hyper_params"]["K_fold_splits"]) + "_" + str(pred_steps_ahead) + "_" + str(input_dict["model_hyper_params"]["estimator__alpha"]) + "_" + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + "_" + str(input_dict["model_hyper_params"]["lookbacks"]) + "_" + str(input_dict["model_hyper_params"]["batch_ratio"]) + "_" + str(input_dict["model_hyper_params"]["scaler_cat"])
+    predictor_hash = ""
+    if not financial_value_scaling == None:
+        predictor_hash += "_" + str(financial_value_scaling)
+    predictor_hash += "_" + str(input_dict["model_hyper_params"]["n_estimators_per_time_series_blocking"]) + "_" + str(input_dict["model_hyper_params"]["testing_scoring"]) + "_" + str(input_dict["model_hyper_params"]["estimator__alpha"]) + "_" + str(input_dict["model_hyper_params"]["estimator__activation"]) + "_" + str(input_dict["model_hyper_params"]["cohort_retention_rate_dict"]) + "_" + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + "_" + str(input_dict["model_hyper_params"]["epochs"]) + "_" + str(input_dict["model_hyper_params"]["lookbacks"]) + "_" + str(input_dict["model_hyper_params"]["shuffle_fit"]) + "_" + str(input_dict["model_hyper_params"]["K_fold_splits"]) + "_" + str(pred_steps_ahead) + "_" + str(input_dict["model_hyper_params"]["estimator__alpha"]) + "_" + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + "_" + str(input_dict["model_hyper_params"]["lookbacks"]) + "_" + str(input_dict["model_hyper_params"]["batch_ratio"]) + "_" + str(input_dict["model_hyper_params"]["scaler_cat"])
     name = name + predictor_hash
     return str(name)
     
@@ -339,8 +340,24 @@ def return_technical_indicators_name(df, tech_indi_dict, match_doji, target_file
     file_string = file_string + "_" + str(match_doji)
     return file_string
 
+def rescale_financial_data_if_needed(df_fin_data, format):
+    
+    if format == "day_scaled" or format == "delta_scaled":
+        #determine the distance between days
+        df_fin_data['normalizing_column'] = df_fin_data.groupby(df_fin_data.index.day)['£_open'].transform(lambda x: x.iloc[0])
+        df_fin_data['normalizing_column'] = df_fin_data['normalizing_column'].astype(float)
+        for col in df_fin_data.columns:
+            if not col == "normalizing_column" and not  col == "£_volume":
+                df_fin_data[col] = df_fin_data[col].astype(float)
+                df_fin_data[col] = df_fin_data[col] / df_fin_data["normalizing_column"]
+        df_fin_data = df_fin_data.drop('normalizing_column', axis=1)
+    if format == "delta_scaled":
+        df_fin_data = df_fin_data.diff().fillna(0)
 
-def retrieve_or_generate_then_populate_technical_indicators(df, tech_indi_dict, match_doji, target_file_path):
+    return df_fin_data
+
+
+def retrieve_or_generate_then_populate_technical_indicators(df, tech_indi_dict, match_doji, target_file_path, fin_data_scale):
     global global_strptime_str_filename
     quotes_list = [
         Quote(d,o,h,l,c,v) 
@@ -421,6 +438,7 @@ def retrieve_or_generate_then_populate_technical_indicators(df, tech_indi_dict, 
                 df.at[r.date, "match!_doji"] = val
         df.to_csv(technical_indicators_location_file)      
 
+    df = rescale_financial_data_if_needed(df, fin_data_scale)
 
     return df
 
@@ -1095,7 +1113,7 @@ class BlockingTimeSeriesSplit():
             mid = int(1.0 * (stop - start)) + start
             yield indices[start: mid], indices[mid + margin: stop]
 
-def create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list, pred_steps_ahead):
+def create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list, pred_steps_ahead, financial_value_scaling):
     #this method populates each row with the next X output results, this is done so that, each time step can be trained
     #to predict the value of the next X steps
     
@@ -1118,7 +1136,14 @@ def create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_
         
     new_col = new_col_str.format(old_col, pred_steps_ahead)
     list_of_new_columns = list_of_new_columns + [new_col]
-    data[new_col] = data[old_col].shift(-pred_steps_ahead)
+    if financial_value_scaling == "delta_scaled":
+        data[new_col] = data[old_col].rolling(window=pred_steps_ahead).sum()
+        data[new_col] = data[new_col].shift(-pred_steps_ahead)
+    elif financial_value_scaling == None or financial_value_scaling == "day_scaled":
+        data[new_col] = data[old_col].shift(-pred_steps_ahead)
+    else:
+        raise ValueError("financial_value_scaling: {}, not recognised".format(financial_value_scaling))
+    
 
     #split regressors and responses
     #Features = 6
@@ -1144,7 +1169,6 @@ def initiate_model(input_dict):
         raise ValueError("the model type: " + str(input_dict["model_hyper_params"]["name"]) + " was not found in the method")
     
     return estimator
-
 
 def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_features, dropout_cols):
     
@@ -1180,7 +1204,6 @@ def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_fea
     return ensemble_estimator
 
 
-
 class DRSLinRegRNN():
     def __init__(self, base_estimator=Sequential(),
                  input_dict=None):
@@ -1207,15 +1230,75 @@ class DRSLinRegRNN():
 
         early_stopping = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
 
-        #FG_placeholder
         # Train the model with early stopping
-        history = model.fit(X, Y, epochs=100, validation_data=(X_val, Y_val), callbacks=[early_stopping])
+        history = model.fit(X, Y, epochs=100, validation_data=(X_val, Y_val), callbacks=[early_stopping], verbose=0)
         model.train_loss = history.history['loss']
         model.val_loss   = history.history['val_loss']
         
-        #model.fit(X, Y, epochs=self.epochs, shuffle=self.shuffle_fit)
         return model, history.history['loss'][-1], history.history['val_loss'][-1]
              
+
+    def evaluate_ensemble(self, df_X, df_y, pred_steps_value, confidences_before_betting_PC):
+        count = 0
+        global global_random_state
+        global_random_state = 42
+        # variables
+        training_scores_dict_list, validation_scores_dict_list, additional_validation_dict_list = [], [], []
+        kf = KFold(n_splits=self.K_fold_splits, shuffle=False)
+
+        print(datetime.now().strftime("%H:%M:%S") + " - evaluating model")
+        if self.scaler_cat > 0:
+            scaler_X = MinMaxScaler()
+            scaler_y = MinMaxScaler()
+            col = df_X.columns
+            scaler_X.fit(df_X)
+            #scaler_y.fit(df_y.values.reshape(-1, 1))
+            scaler_y.fit(df_y)
+            if self.scaler_cat == 2:
+                scaler_X = self.adjust_scaler_to_accept_distant_pricings(scaler_X, df_X)
+                scaler_y = self.adjust_scaler_to_accept_distant_pricings(scaler_y, df_y)
+            self.scaler_X, self.scaler_y = scaler_X, scaler_y
+            del scaler_X, scaler_y
+        else:
+            self.scaler_X, self.scaler_y = None, None
+
+        for train_index, val_index in kf.split(df_X):
+            print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
+            for i_random in range(self.n_estimators_per_time_series_blocking):
+                n_features = df_X.shape[1]
+                dropout_cols = return_columns_to_remove(columns_list=df_X.columns, self=self)
+
+                # data prep
+                X_train = df_X.loc[df_X.index[train_index].values].copy()
+                X_train.loc[:, dropout_cols] = 0
+                y_train = df_y.loc[df_y.index[train_index].values].copy()
+
+                X_val = df_X.loc[df_X.index[val_index].values].copy()
+                X_val.loc[:, dropout_cols] = 0
+                y_val = df_y.loc[df_y.index[val_index].values].copy()
+
+                single_estimator = self.estimators_[count]
+                
+                # produce standard training scores
+                y_pred_train = self.custom_single_predict(X_train, single_estimator)
+                y_pred_val = self.custom_single_predict(X_val, single_estimator)
+                
+
+                # collect training, validation, and validation additional analysis scores
+                training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"])
+                validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"])
+                training_scores_dict_list += [training_scores_dict_list_new]
+                validation_scores_dict_list += [validation_scores_dict_list_new]
+                additional_validation_dict_list += [additional_validation_dict_list_new]
+                self.estimators_ = self.estimators_ + [single_estimator]
+                count += 1
+
+        training_scores_dict = average_list_of_identical_dicts(training_scores_dict_list)
+        validation_scores_dict = average_list_of_identical_dicts(validation_scores_dict_list)
+        additional_validation_dict = average_list_of_identical_dicts(additional_validation_dict_list)
+        
+
+        return self, training_scores_dict, validation_scores_dict, additional_validation_dict
 
     def fit_ensemble(self, df_X, df_y, pred_steps_value, confidences_before_betting_PC):
         count = 0
@@ -1231,7 +1314,8 @@ class DRSLinRegRNN():
             scaler_y = MinMaxScaler()
             col = df_X.columns
             scaler_X.fit(df_X)
-            scaler_y.fit(df_y.values.reshape(-1, 1))
+            #scaler_y.fit(df_y.values.reshape(-1, 1))
+            scaler_y.fit(df_y)
             if self.scaler_cat == 2:
                 scaler_X = self.adjust_scaler_to_accept_distant_pricings(scaler_X, df_X)
                 scaler_y = self.adjust_scaler_to_accept_distant_pricings(scaler_y, df_y)
@@ -1260,8 +1344,7 @@ class DRSLinRegRNN():
                 # initialising and prepping
                 single_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features, dropout_cols)
                 global_random_state += 1
-                #single_estimator = self.return_single_ensable_model_fitted(single_estimator, X_train, y_train)
-                single_estimator, train_loss, val_loss = self.return_single_ensable_model_fitted_with_early_stopping(single_estimator, X_train, y_train, X_val, y_val) #FG_placeholder
+                single_estimator, train_loss, val_loss = self.return_single_ensable_model_fitted_with_early_stopping(single_estimator, X_train, y_train, X_val, y_val)
                 
                 # produce standard training scores
                 y_pred_train = self.custom_single_predict(X_train, single_estimator)
@@ -1282,7 +1365,6 @@ class DRSLinRegRNN():
         
 
         return self, training_scores_dict, validation_scores_dict, additional_validation_dict
-
 
     def adjust_scaler_to_accept_distant_pricings(self, scaler, df):
         lowest_expected_close_price  = 2.5
@@ -1306,16 +1388,23 @@ class DRSLinRegRNN():
         return scaler
 
 
-    def custom_single_predict(self, df_X, single_estimator, return_df=False):
+    def custom_single_predict(self, df_X, single_estimator, return_df=False, independent_scaling=False, df_y=None):
         
-        cols                = df_X.columns
-        index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
+        if independent_scaling == True:
+            scaler_X=MinMaxScaler()
+            scaler_X=scaler_X.fit(df_X)
+            scaler_y=MinMaxScaler()
+            scaler_y=scaler_y.fit(df_y)
+        else:
+            scaler_X=self.scaler_X
+            scaler_y=self.scaler_y
+
+        index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=scaler_X)
         y_pred_values       = single_estimator.predict(input_data, verbose=0)
-        if not self.scaler_X == None:
-            y_pred_values       = self.scaler_y.inverse_transform(y_pred_values)
+        if not scaler_X == None:
+            y_pred_values       = scaler_y.inverse_transform(y_pred_values)
         y_pred_values = pd.DataFrame(y_pred_values, index=index)
 
-        #if return_df == True:
         return y_pred_values
         
     def evaluate(self, y_test, y_pred, outputs_params_dict, reporting_dict):
@@ -1324,6 +1413,9 @@ class DRSLinRegRNN():
         confidences_before_betting_PC = reporting_dict["confidence_thresholds"]
 
         #align indices
+        if isinstance(y_pred, pd.Series):
+            a = copy.deepcopy(y_pred)
+            y_pred = pd.DataFrame(y_pred)
         merged_df = pd.merge(y_test, y_pred, left_index=True, right_index=True, how='inner')
         y_test = y_test.loc[merged_df.index]
         y_pred = y_pred.loc[merged_df.index]
@@ -1333,7 +1425,7 @@ class DRSLinRegRNN():
         return traditional_scores_dict_list, additional_results_dict_list
         
     def save(self, general_save_dir = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["predictive_model"], Y_preds_testing=None, y_testing=None):
-        model_name = return_predictor_name(self.input_dict["outputs_params_dict"]["pred_steps_ahead"])
+        model_name = return_predictor_name(self.input_dict)
         folder_path = os.path.join(general_save_dir, custom_hash(model_name) + "\\")
         extension = ".h5"
         if not os.path.exists(folder_path):
@@ -1353,18 +1445,22 @@ class DRSLinRegRNN():
                 pickle.dump(self.input_dict, file)
         #save predictions if specified
         if isinstance(Y_preds_testing, pd.Series) or isinstance(Y_preds_testing, pd.DataFrame):
-            Y_preds_testing.shift(self.input_dict[""])
+            Y_preds_testing = Y_preds_testing.shift(self.input_dict["outputs_params_dict"]["pred_steps_ahead"])
             Y_preds_testing.to_csv(os.path.join(folder_path, 'Y_preds_testing.csv'))
         if isinstance(y_testing, pd.Series) or isinstance(y_testing, pd.DataFrame):
             y_testing.to_csv(os.path.join(folder_path, 'y_testing.csv'))
    
-    def predict_ensemble(self, X): #FG_action: This is where the new error is
+    def predict_ensemble(self, X, y): #FG_action: This is where the new error is
         
         y_ensemble = pd.DataFrame()
+        if self.model_hyper_params["scaler_cat"] == 3:
+            independent_scaling = True
+        else:
+            independent_scaling = False
         
         for i, single_estimator in enumerate(self.estimators_):
             # randomly select features to drop out
-            y_ensemble[i] = self.custom_single_predict(X, single_estimator)
+            y_ensemble[i] = self.custom_single_predict(X, single_estimator, independent_scaling=independent_scaling, df_y=y)
         
         output = y_ensemble.mean(axis=1)
 
@@ -1373,7 +1469,7 @@ class DRSLinRegRNN():
     def load(self, predictor_location_folder_path):
         folder_name = custom_hash(return_predictor_name(self.input_dict))
         folder_path = os.path.join(predictor_location_folder_path, folder_name+ "\\")
-
+        print("xxx loading predictor")
         for filename in os.listdir(predictor_location_folder_path):
             if filename.endswith(".h5"):
                 file_path = os.path.join(predictor_location_folder_path, filename)
@@ -1383,6 +1479,11 @@ class DRSLinRegRNN():
             save_input_dict = pickle.load(file)
         copy_A, copy_B = copy.deepcopy(save_input_dict), copy.deepcopy(self.input_dict)
         del copy_A["senti_inputs_params_dict"]["sentiment_method"], copy_B["senti_inputs_params_dict"]["sentiment_method"]
+        del copy_A["temporal_params_dict"]['test_period_start'], copy_A["temporal_params_dict"]['test_period_end'], copy_B["temporal_params_dict"]['test_period_start'], copy_B["temporal_params_dict"]['test_period_end']
+        if 'financial_value_scaling' in list(copy_A["fin_inputs_params_dict"].keys()) and copy_A["fin_inputs_params_dict"]['financial_value_scaling'] == None:
+            del copy_A["temporal_params_dict"]['test_period_start']
+            if 'financial_value_scaling' in list(copy_B["fin_inputs_params_dict"].keys()) and copy_B["fin_inputs_params_dict"]['financial_value_scaling'] == None:
+                del copy_B["temporal_params_dict"]['test_period_start']
         if not copy_A == copy_B:
             raise ValueError("input dicts dont match")
 
@@ -1423,7 +1524,6 @@ def return_lookback_appropriate_index_andor_data(df_x, lookbacks, return_index=F
         return output_index, output_input
     else:
         return output_single
-
 
 
 def return_filtered_batches_that_dont_cross_two_days(training_generator, datetime_generator):
@@ -1493,13 +1593,14 @@ def generate_testing_scores(predictor, input_dict, return_time_series=False):
     model_hyper_params      = input_dict["model_hyper_params"]
     reporting_dict          = input_dict["reporting_dict"]
     
+        
     # step 1a: generate testing input data (finanical)
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 1a: generate testing input data")
     df_financial_data = import_financial_data(
         target_file_path          = fin_inputs_params_dict["historical_file"], 
         input_cols_to_include_list  = fin_inputs_params_dict["cols_list"],
         temporal_params_dict = temporal_params_dict, training_or_testing="testing")
-    df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"], fin_inputs_params_dict["historical_file"])
+    df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"], fin_inputs_params_dict["historical_file"], fin_inputs_params_dict["financial_value_scaling"])
 
     # step 1b: generate testing input data (sentiment)
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 1b: generate testing input data (sentiment)")
@@ -1507,11 +1608,11 @@ def generate_testing_scores(predictor, input_dict, return_time_series=False):
 
     # step 2: generate testing output data
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 2: generate testing output data")
-    X_testing, y_testing = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
+    X_testing, y_testing = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"], financial_value_scaling=fin_inputs_params_dict["financial_value_scaling"])
         
     # step 3: generate y_pred
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 3: generate y_pred")
-    Y_preds_testing = predictor.predict_ensemble(X_testing)
+    Y_preds_testing = predictor.predict_ensemble(X_testing, y_testing) # the y testing is used only for scaling and is justified as in the real world each day would be scaled off the previous day, instead of scaling outputs on 6 month old data like a standard timeline extrapolation
     
     # step 4: generate score
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 4: generate score")
@@ -1534,11 +1635,11 @@ def retrieve_model_and_training_scores(predictor_location_folder_path, temporal_
         input_cols_to_include_list  = fin_inputs_params_dict["cols_list"],
         temporal_params_dict = temporal_params_dict, training_or_testing="training")
     #training_score = edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="load")
-    df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"], fin_inputs_params_dict["historical_file"])
+    df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"], fin_inputs_params_dict["historical_file"], fin_inputs_params_dict["financial_value_scaling"])
     df_sentiment_data = retrieve_or_generate_sentiment_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training")
     
-    X_train, y_train   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
-    model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.fit_ensemble(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"])
+    X_train, y_train   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"], financial_value_scaling=fin_inputs_params_dict["financial_value_scaling"])
+    model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.evaluate_ensemble(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"])
     
     return model, training_scores_dict, validation_scores_dict, additional_validation_dict
 
@@ -1561,7 +1662,7 @@ def generate_model_and_validation_scores(temporal_params_dict,
         input_cols_to_include_list  = fin_inputs_params_dict["cols_list"],
         temporal_params_dict = temporal_params_dict, training_or_testing="training")
     print(datetime.now().strftime("%H:%M:%S") + " - populate_technical_indicators")
-    df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"], fin_inputs_params_dict["historical_file"])
+    df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"], fin_inputs_params_dict["historical_file"], fin_inputs_params_dict["financial_value_scaling"])
 
     if senti_inputs_params_dict["topic_qty"] >= 1:
         #sentiment data prep
@@ -1571,7 +1672,7 @@ def generate_model_and_validation_scores(temporal_params_dict,
         df_sentiment_data = None
         
     #model training - create regressors
-    X_train, y_train   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"])
+    X_train, y_train   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"], financial_value_scaling=fin_inputs_params_dict["financial_value_scaling"])
     model              = initiate_model(input_dict)
     model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.fit_ensemble(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"])
     #report timings
