@@ -44,8 +44,7 @@ import hashlib
 
 default_temporal_params_dict        = {
     "train_period_start"    : datetime.strptime('01/01/16 00:00:00', global_strptime_str),
-    #"train_period_end"      : datetime.strptime('01/06/20 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/04/16 00:00:00', global_strptime_str),
+    "train_period_end"      : datetime.strptime('01/06/20 00:00:00', global_strptime_str),
     "time_step_seconds"     : 5*60, #5 mins,
     "test_period_start"     : datetime.strptime('01/06/20 00:00:00', global_strptime_str),
     "test_period_end"       : datetime.strptime('01/01/21 00:00:00', global_strptime_str),
@@ -862,7 +861,7 @@ for scenario_ID in [2]:#scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "run_v1test"
+    scenario_name_str = scenario_name_str + "run_v2"
 
 
     if __name__ == '__main__':
@@ -878,7 +877,7 @@ for scenario_ID in [2]:#scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/run_v1test.csv")
+            global_record_path=os.path.join(global_general_folder,r"outputs/run_v2.csv")
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
