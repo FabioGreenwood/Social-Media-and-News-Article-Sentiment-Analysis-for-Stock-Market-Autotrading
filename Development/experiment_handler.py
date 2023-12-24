@@ -44,7 +44,8 @@ import hashlib
 
 default_temporal_params_dict        = {
     "train_period_start"    : datetime.strptime('01/01/16 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/06/20 00:00:00', global_strptime_str),
+    #"train_period_end"      : datetime.strptime('01/06/20 00:00:00', global_strptime_str),
+    "train_period_end"      : datetime.strptime('01/04/16 00:00:00', global_strptime_str),
     "time_step_seconds"     : 5*60, #5 mins,
     "test_period_start"     : datetime.strptime('01/06/20 00:00:00', global_strptime_str),
     "test_period_end"       : datetime.strptime('01/01/21 00:00:00', global_strptime_str),
@@ -215,7 +216,7 @@ def return_cols_for_additional_reporting(input_dict):
     confidences = input_dict["reporting_dict"]["confidence_thresholds"]
     pred_steps_ahead_list = input_dict["outputs_params_dict"]["pred_steps_ahead"]
     
-    template = FG_additional_reporting.run_additional_reporting(y_testing=pd.DataFrame(), pred_steps_list=[], financial_scaling=0)
+    template = FG_additional_reporting.run_additional_reporting(y_testing=pd.DataFrame(), pred_steps_list=[], financial_value_scaling="no value needed")
     
     if type(pred_steps_ahead_list) == int:
         pred_steps_ahead_list = [pred_steps_ahead_list]
@@ -421,20 +422,21 @@ def run_experiment_and_return_updated_design_history_dict(design_history_dict_si
     if design_history_dict_single[col_testing_str] == None:
         temp_input_dict = return_edited_input_dict(design_history_dict_single["X"], design_space_dict, default_input_dict)
         testing_scores, X_testing, y_testing, Y_preds = model_testing_method(design_history_dict_single["predictor"], temp_input_dict)
-        del temp_input_dict
+        #del temp_input_dict
         testing_results_dict = FG_additional_reporting.run_additional_reporting(preds=Y_preds,
                 y_testing = y_testing, 
                 pred_steps_list = default_input_dict["outputs_params_dict"]["pred_steps_ahead"],
                 confidences_before_betting_PC = confidences_before_betting_PC,
-                financial_scaling=default_input_dict["fin_inputs_params_dict"]["financial_value_scaling"]
+                financial_value_scaling=temp_input_dict["fin_inputs_params_dict"]["financial_value_scaling"]
                 )
+        del temp_input_dict
         design_history_dict_single = update_design_hist_dict_post_testing(design_history_dict_single, testing_scores, testing_results_dict)
         
     return design_history_dict_single
 
 
 
-#%% Module - Experiment Handlerk
+#%% Module - Experiment Handler
 
 def PLACEHOLDER_objective_function(x1, x2, x3, x4, x5):
     #return (x[:, 0] - 2)**2 + (x[:, 1] - 3)**2
@@ -860,7 +862,7 @@ for scenario_ID in [2]:#scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "run_v1"
+    scenario_name_str = scenario_name_str + "run_v1test"
 
 
     if __name__ == '__main__':
@@ -876,7 +878,7 @@ for scenario_ID in [2]:#scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/run_v1.csv")
+            global_record_path=os.path.join(global_general_folder,r"outputs/run_v1test.csv")
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 

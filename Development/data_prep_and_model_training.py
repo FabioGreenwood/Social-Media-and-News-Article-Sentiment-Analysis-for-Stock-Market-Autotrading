@@ -1216,7 +1216,7 @@ class DRSLinRegRNN():
         return model, history.history['loss'][-1], history.history['val_loss'][-1]
              
 
-    def evaluate_ensemble(self, df_X, df_y, pred_steps_value, confidences_before_betting_PC):
+    def evaluate_ensemble(self, df_X, df_y, pred_steps_value, confidences_before_betting_PC, financial_value_scaling):
         count = 0
         global global_random_state
         global_random_state = 42
@@ -1263,8 +1263,8 @@ class DRSLinRegRNN():
                 
 
                 # collect training, validation, and validation additional analysis scores
-                training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"])
-                validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"])
+                training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"], self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
+                validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"], self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
                 training_scores_dict_list += [training_scores_dict_list_new]
                 validation_scores_dict_list += [validation_scores_dict_list_new]
                 additional_validation_dict_list += [additional_validation_dict_list_new]
@@ -1330,8 +1330,8 @@ class DRSLinRegRNN():
                 
 
                 # collect training, validation, and validation additional analysis scores
-                training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"])
-                validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"])
+                training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
+                validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
                 training_scores_dict_list += [training_scores_dict_list_new]
                 validation_scores_dict_list += [validation_scores_dict_list_new]
                 additional_validation_dict_list += [additional_validation_dict_list_new]
@@ -1385,7 +1385,7 @@ class DRSLinRegRNN():
 
         return y_pred_values
         
-    def evaluate(self, y_test, y_pred, outputs_params_dict, reporting_dict):
+    def evaluate(self, y_test, y_pred, outputs_params_dict, reporting_dict, financial_value_scaling):
         
         pred_steps_value              = outputs_params_dict["pred_steps_ahead"]
         confidences_before_betting_PC = reporting_dict["confidence_thresholds"]
@@ -1399,7 +1399,7 @@ class DRSLinRegRNN():
         y_pred = y_pred.loc[merged_df.index]
         
         traditional_scores_dict_list = {"r2": r2_score(y_test, y_pred), "mse": mean_squared_error(y_test, y_pred), "mae": mean_absolute_error(y_test, y_pred)}
-        additional_results_dict_list = FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred, y_test, pred_steps_value, confidences_before_betting_PC=confidences_before_betting_PC)
+        additional_results_dict_list = FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred, y_test, pred_steps_value, confidences_before_betting_PC=confidences_before_betting_PC, financial_value_scaling=financial_value_scaling)
         return traditional_scores_dict_list, additional_results_dict_list
         
     def save(self, general_save_dir = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["predictive_model"], Y_preds_testing=None, y_testing=None):
@@ -1594,7 +1594,7 @@ def generate_testing_scores(predictor, input_dict, return_time_series=False):
     
     # step 4: generate score
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 4: generate score")
-    testing_scores, additional_results_dict = predictor.evaluate(y_testing, Y_preds_testing, outputs_params_dict, reporting_dict)
+    testing_scores, additional_results_dict = predictor.evaluate(y_testing, Y_preds_testing, outputs_params_dict, reporting_dict, input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
     predictor.save(Y_preds_testing=Y_preds_testing, y_testing=y_testing)
     if return_time_series == False:
         return testing_scores
@@ -1617,7 +1617,7 @@ def retrieve_model_and_training_scores(predictor_location_folder_path, temporal_
     df_sentiment_data = retrieve_or_generate_sentiment_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training")
     
     X_train, y_train   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"], financial_value_scaling=fin_inputs_params_dict["financial_value_scaling"])
-    model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.evaluate_ensemble(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"])
+    model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.evaluate_ensemble(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"], financial_value_scaling=fin_inputs_params_dict["financial_value_scaling"])
     
     return model, training_scores_dict, validation_scores_dict, additional_validation_dict
 

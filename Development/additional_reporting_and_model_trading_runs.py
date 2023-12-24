@@ -47,12 +47,12 @@ def return_realign_plus_minus_table(preds, y_test, pred_steps_list, pred_output_
     
     return reaglined_plus_minus_dict
 
-def return_results_X_min_plus_minus_accuracy(y_preds, y_test, pred_steps_list, confidences_before_betting_PC=[0, 0.01], financial_scaling=None):
+def return_results_X_min_plus_minus_accuracy(y_preds, y_test, pred_steps_list, confidences_before_betting_PC=[0, 0.01], financial_value_scaling=None):
         
     #if len(y_test.columns) > 1:
     #    raise ValueError("y_test should only be one columns wide")
-    if financial_scaling==None:
-        raise ValueError("financial_scaling must be set")
+    if financial_value_scaling==None:
+        raise ValueError("financial_value_scaling must be set")
 
 
     df_temp = pd.DataFrame()
@@ -126,7 +126,7 @@ def return_results_X_min_plus_minus_accuracy(y_preds, y_test, pred_steps_list, c
             original_value      = x_values[time_step - steps_back]
             expected_difference = y_values[time_step] - original_value
             actual_difference   = x_values[time_step] - original_value
-            if financial_scaling <= 1:
+            if not financial_value_scaling == None:
                 relative_confidence = expected_difference / original_value
             else:
                 relative_confidence = expected_difference
@@ -255,11 +255,11 @@ def run_additional_reporting(preds=None,
                             y_testing = None, 
                             pred_steps_list = None,
                             confidences_before_betting_PC=None,
-                            financial_scaling=None
+                            financial_value_scaling=None
                             ):
     
     #df_realigned_dict                   = return_realign_plus_minus_table(preds, y_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
-    results_tables_dict                 = return_results_X_min_plus_minus_accuracy(preds, y_testing, pred_steps_list, confidences_before_betting_PC=confidences_before_betting_PC, financial_scaling=financial_scaling)
+    results_tables_dict                 = return_results_X_min_plus_minus_accuracy(preds, y_testing, pred_steps_list, confidences_before_betting_PC=confidences_before_betting_PC, financial_value_scaling=financial_value_scaling)
     #plt, df_realigned_dict              = return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_list, results_tables_dict, DoE_name = DoE_orders_dict["name"], model_type_name=model_type_name, model_start_time = model_start_time, outputs_folder_path = outputs_path, timestamp = False)
     
     return results_tables_dict#, plt, df_realigned_dict
