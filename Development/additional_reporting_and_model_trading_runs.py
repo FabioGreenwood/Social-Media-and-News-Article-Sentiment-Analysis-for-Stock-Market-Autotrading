@@ -126,7 +126,7 @@ def return_results_X_min_plus_minus_accuracy(y_preds, y_test, pred_steps_list, c
             original_value      = x_values[time_step - steps_back]
             expected_difference = y_values[time_step] - original_value
             actual_difference   = x_values[time_step] - original_value
-            if not financial_value_scaling == None:
+            if financial_value_scaling == None:
                 relative_confidence = expected_difference / original_value
             else:
                 relative_confidence = expected_difference
