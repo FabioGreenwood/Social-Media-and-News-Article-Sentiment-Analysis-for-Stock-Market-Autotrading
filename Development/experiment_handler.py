@@ -44,10 +44,9 @@ import hashlib
 
 default_temporal_params_dict        = {
     "train_period_start"    : datetime.strptime('01/01/16 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/01/17 00:00:00', global_strptime_str),
-    #"train_period_end"      : datetime.strptime('01/06/20 00:00:00', global_strptime_str),
+    "train_period_end"      : datetime.strptime('01/07/20 00:00:00', global_strptime_str),
     "time_step_seconds"     : 5*60, #5 mins,
-    "test_period_start"     : datetime.strptime('01/03/20 00:00:00', global_strptime_str),
+    "test_period_start"     : datetime.strptime('01/07/20 00:00:00', global_strptime_str),
     "test_period_end"       : datetime.strptime('01/01/21 00:00:00', global_strptime_str), 
 }
 default_fin_inputs_params_dict      = {
@@ -76,7 +75,6 @@ default_senti_inputs_params_dict    = {
     "enforced_topics_dict"  : None,
     "sentiment_method"      : SentimentIntensityAnalyzer(),
     "tweet_file_location"   : os.path.join(global_general_folder,r"data/twitter_data/apple.csv"),
-    #"cleaned_tweet_file_location"   : os.path.join(global_general_folder,r"data/twitter_data/apple_cleaned.csv"),
     "regenerate_cleaned_tweets_for_subject_discovery" : False,
     "inc_new_combined_stopwords_list" : True,
     "topic_weight_square_factor" : 1
@@ -778,9 +776,9 @@ global_run_count = 0
 
 #init_doe = 40
 init_doe = [
-    [1, 23, 7, 1, 25200, 1, 4, 3, 0, 1e-10, 15, 0, 3],
-    [1, 21, 7, 1, 25200, 1, 4, 5, 0, 1e-10, 15, 0, 3],
-    [1, 21, 7, 1, 25200, 1, 4, 1, 0, 1e-10, 15, 0, 3]
+    [1, 20, 7, 1, 25202, 1, 4, 3, 0, 1e-10, 15, 0, 3],
+    [1, 20, 7, 1, 25202, 1, 4, 5, 0, 1e-10, 15, 0, 3],
+    [1, 20, 7, 1, 25202, 1, 4, 1, 0, 1e-10, 15, 0, 3]
 ]
 
 
@@ -855,7 +853,7 @@ for scenario_ID in [2]:#scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "test12"
+    scenario_name_str = scenario_name_str + "test14speed"
 
 
     if __name__ == '__main__':
@@ -871,7 +869,7 @@ for scenario_ID in [2]:#scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/test12.csv")
+            global_record_path=os.path.join(global_general_folder,r"outputs/test14speed.csv")
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
