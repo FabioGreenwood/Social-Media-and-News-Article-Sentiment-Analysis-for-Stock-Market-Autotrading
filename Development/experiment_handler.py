@@ -69,7 +69,6 @@ default_senti_inputs_params_dict    = {
     "relative_lifetime"     : 60*60*24*7, # units are seconds
     "relative_halflife"     : 60*60*0.5, # units are seconds
     "topic_model_alpha"     : 1,
-    "weighted_topics"       : False,
     "apply_IDF"             : True,
     "enforced_topics_dict_name" : "None",
     "enforced_topics_dict"  : None,
@@ -104,7 +103,7 @@ default_model_hyper_params          = {
     "batch_ratio" : 0.1,
     "shuffle_fit" : False,
     "K_fold_splits" : 5, #FG_placeholder,
-    "scaler_cat" : 0 # 0:no scaling, 1: standard scaling (only from the MinMaxScaler object), 2: custom scaling, 3: individual scaling
+    "scaler_cat" : 3 # 0:no scaling, 1: standard scaling (only from the MinMaxScaler object), 2: custom scaling, 3: individual scaling
     }
 default_reporting_dict              = {
     "confidence_thresholds" : [0, 0.01, 0.02, 0.035, 0.05, 0.1],
@@ -744,8 +743,7 @@ design_space_dict = {
     "senti_inputs_params_dict" : {
         "topic_qty" : [5, 9, 13, 17, 25],
         "topic_model_alpha" : [0.3, 0.7, 1, 2, 3, 5, 7, 13],
-        "weighted_topics" : [False, True],
-        "relative_halflife" : [0.25 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR], 
+        "relative_halflife" : [3*60, 0.25 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR], 
         "apply_IDF" : [False, True],
         "topic_weight_square_factor" : [1, 2, 4],
     },
@@ -760,11 +758,10 @@ design_space_dict = {
             7 : [("LSTM", 50), ("GRU", 50), ("simple", 50)],
             8 : [("simple", 50), ("GRU", 50), ("LSTM", 50)]
             },
-        "general_adjusting_square_factor" : [2, 1, 0],
+        "general_adjusting_square_factor" : [3, 2, 1, 0],
         "estimator__alpha"                : [1e-11, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4], 
-        "lookbacks"                       : [8,10,15,20, 25, 30, 40],
-        "batch_ratio"                     : [0, 0.01, 0.025, 0.05],
-        "scaler_cat"                      : [3]
+        "lookbacks"                       : [8, 10, 15, 20, 25, 30, 40],
+        "batch_ratio"                     : [0, 0.01, 0.025, 0.05]
 
     },
     "string_key" : {}
@@ -815,7 +812,7 @@ scenario_dict = {
         11: {"topics" : 0, "pred_steps" : 15}
     }
 
-for scenario_ID in [2]:#scenario_dict.keys():
+for scenario_ID in scenario_dict.keys():
     
     index_of_topic_qty = return_keys_within_2_level_dict(design_space_dict).index("senti_inputs_params_dict_topic_qty")
 
