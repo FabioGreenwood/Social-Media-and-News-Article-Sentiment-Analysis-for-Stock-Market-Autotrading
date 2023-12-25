@@ -190,7 +190,6 @@ def return_predictor_name(input_dict):
     company_symbol = input_dict["outputs_params_dict"]["output_symbol_indicators_tuple"][0]
     train_period_start  = input_dict["temporal_params_dict"]["train_period_start"]
     train_period_end    = input_dict["temporal_params_dict"]["train_period_end"]
-    weighted_topics     = input_dict["senti_inputs_params_dict"]["weighted_topics"]
     topic_model_qty     = input_dict["senti_inputs_params_dict"]["topic_qty"]
     topic_model_alpha   = input_dict["senti_inputs_params_dict"]["topic_model_alpha"]
     apply_IDF           = input_dict["senti_inputs_params_dict"]["apply_IDF"]
@@ -208,7 +207,7 @@ def return_predictor_name(input_dict):
     batch_ratio                       = input_dict["model_hyper_params"]["batch_ratio"]
     financial_value_scaling          = input_dict["fin_inputs_params_dict"]["financial_value_scaling"]
 
-    name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe)
+    name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe)
     predictor_hash = ""
     if not financial_value_scaling == None:
         predictor_hash += "_" + str(financial_value_scaling)
@@ -434,7 +433,6 @@ def retrieve_or_generate_sentiment_data(index, temporal_params_dict, fin_inputs_
     topic_model_alpha   = senti_inputs_params_dict["topic_model_alpha"]
     tweet_ratio_removed = senti_inputs_params_dict["topic_training_tweet_ratio_removed"]
     apply_IDF           = senti_inputs_params_dict["apply_IDF"]
-    weighted_topics     = senti_inputs_params_dict["weighted_topics"]
     pred_steps          = outputs_params_dict["pred_steps_ahead"]
     enforced_topic_model_nested_list = senti_inputs_params_dict["enforced_topics_dict"]
     new_combined_stopwords_inc = senti_inputs_params_dict["inc_new_combined_stopwords_list"]
@@ -453,7 +451,7 @@ def retrieve_or_generate_sentiment_data(index, temporal_params_dict, fin_inputs_
     #method
     #search for predictor
     sentiment_data_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["sentiment_data"]
-    sentiment_data_name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, weighted_topics, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe)
+    sentiment_data_name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe)
     sentiment_data_location_file = sentiment_data_folder_location_string + sentiment_data_name + ".csv"
     if os.path.exists(sentiment_data_location_file):
         df_sentiment_data = pd.read_csv(sentiment_data_location_file)
@@ -477,14 +475,12 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
     #general parameters
     global global_financial_history_folder_path, global_precalculated_assets_locations_dict
     company_symbol      = outputs_params_dict["output_symbol_indicators_tuple"][0]
-    weighted_topics     = senti_inputs_params_dict["weighted_topics"]
     num_topics          = senti_inputs_params_dict["topic_qty"]
     topic_model_alpha   = senti_inputs_params_dict["topic_model_alpha"]
     tweet_ratio_removed = senti_inputs_params_dict["topic_training_tweet_ratio_removed"]
     seconds_per_time_steps  = temporal_params_dict["time_step_seconds"]
     relavance_lifetime      = senti_inputs_params_dict["relative_lifetime"]
     relavance_halflife      = senti_inputs_params_dict["relative_halflife"]
-    weighted_topics         = senti_inputs_params_dict["weighted_topics"]
     apply_IDF               = senti_inputs_params_dict["apply_IDF"]
     new_combined_stopwords_inc          = senti_inputs_params_dict["inc_new_combined_stopwords_list"]
     enforced_topic_model_nested_list    = senti_inputs_params_dict["enforced_topics_dict"]
@@ -502,7 +498,7 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
     
     #search for annotated tweets
     annotated_tweets_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["annotated_tweets"]
-    annotated_tweets_name = return_annotated_tweets_name(company_symbol, period_start, period_end, weighted_topics, num_topics, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor)
+    annotated_tweets_name = return_annotated_tweets_name(company_symbol, period_start, period_end, num_topics, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor)
     annotated_tweets_location_file = annotated_tweets_folder_location_string + annotated_tweets_name + ".csv"
     print("approaching gate")
     if isinstance(hardcode_df_annotated_tweets, pd.DataFrame):
