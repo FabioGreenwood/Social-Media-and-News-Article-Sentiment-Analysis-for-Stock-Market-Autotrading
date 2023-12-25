@@ -44,10 +44,10 @@ import hashlib
 
 default_temporal_params_dict        = {
     "train_period_start"    : datetime.strptime('01/01/16 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/07/20 00:00:00', global_strptime_str),
+    "train_period_end"      : datetime.strptime('01/07/19 00:00:00', global_strptime_str),
     "time_step_seconds"     : 5*60, #5 mins,
-    "test_period_start"     : datetime.strptime('01/07/20 00:00:00', global_strptime_str),
-    "test_period_end"       : datetime.strptime('01/01/21 00:00:00', global_strptime_str), 
+    "test_period_start"     : datetime.strptime('01/07/19 00:00:00', global_strptime_str),
+    "test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str), 
 }
 default_fin_inputs_params_dict      = {
     "index_cols"        : "date",    
