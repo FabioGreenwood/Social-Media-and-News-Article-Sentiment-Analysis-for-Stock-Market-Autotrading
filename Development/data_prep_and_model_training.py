@@ -904,7 +904,7 @@ def return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty=10, enforc
                         topic_model_alpha=0.1, apply_IDF=True, cores=2, passes=60, iterations=800, return_perplexity=False):
     output = []
 
-    data = df_prepped_tweets_company_agnostic[::40]
+    data = df_prepped_tweets_company_agnostic
     print("topic model trained from {} tweets".format(len(data)))
     data_words = list(sent_to_words(data))
     
@@ -1209,7 +1209,7 @@ class DRSLinRegRNN():
         early_stopping = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
 
         # Train the model with early stopping
-        history = model.fit(X, Y, epochs=100, validation_data=(X_val, Y_val), callbacks=[early_stopping], verbose=0)
+        history = model.fit(X, Y, epochs=100, validation_data=(X_val, Y_val), callbacks=[early_stopping], verbose=1)
         model.train_loss = history.history['loss']
         model.val_loss   = history.history['val_loss']
         

@@ -44,10 +44,10 @@ import hashlib
 
 default_temporal_params_dict        = {
     "train_period_start"    : datetime.strptime('01/01/16 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/04/16 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/06/20 00:00:00', global_strptime_str),
+    "train_period_end"      : datetime.strptime('01/01/17 00:00:00', global_strptime_str),
+    #"train_period_end"      : datetime.strptime('01/06/20 00:00:00', global_strptime_str),
     "time_step_seconds"     : 5*60, #5 mins,
-    "test_period_start"     : datetime.strptime('01/06/20 00:00:00', global_strptime_str),
+    "test_period_start"     : datetime.strptime('01/03/20 00:00:00', global_strptime_str),
     "test_period_end"       : datetime.strptime('01/01/21 00:00:00', global_strptime_str), 
 }
 default_fin_inputs_params_dict      = {
@@ -763,10 +763,10 @@ design_space_dict = {
             8 : [("simple", 50), ("GRU", 50), ("LSTM", 50)]
             },
         "general_adjusting_square_factor" : [2, 1, 0],
-        "estimator__alpha"                : [1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4], 
+        "estimator__alpha"                : [1e-11, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4], 
         "lookbacks"                       : [8,10,15,20, 25, 30, 40],
-        "batch_ratio"                     : [0, 0.01, 0.025],
-        "scaler_cat"                      : [2,3]
+        "batch_ratio"                     : [0, 0.01, 0.025, 0.05],
+        "scaler_cat"                      : [3]
 
     },
     "string_key" : {}
@@ -778,18 +778,9 @@ global_run_count = 0
 
 #init_doe = 40
 init_doe = [
-    
-    
-    [1, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-9, 15, 0, 3],
-    [2, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-9, 15, 0, 3],
-    [1, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-7, 15, 0, 3],
-    [2, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-7, 15, 0, 3],
-    [1, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-5, 15, 0, 3],
-    [2, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-5, 15, 0, 3],
-    [1, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-9, 20, 0, 3],
-    [1, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-9, 25, 0, 3],
-    [1, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-9, 30, 0, 3],
-    [1, 17, 7, 1, 25200, 1, 4, 3, 0, 1e-9, 40, 0, 3],
+    [1, 22, 7, 1, 25200, 1, 4, 3, 0, 1e-10, 15, 0, 3],
+    [1, 21, 7, 1, 25200, 1, 4, 5, 0, 1e-10, 15, 0, 3],
+    [1, 21, 7, 1, 25200, 1, 4, 1, 0, 1e-10, 15, 0, 3]
 ]
 
 
@@ -864,7 +855,7 @@ for scenario_ID in [2]:#scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "test4"
+    scenario_name_str = scenario_name_str + "test11"
 
 
     if __name__ == '__main__':
@@ -880,7 +871,7 @@ for scenario_ID in [2]:#scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/test4csv")
+            global_record_path=os.path.join(global_general_folder,r"outputs/test11.csv")
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
