@@ -691,19 +691,11 @@ def generate_and_save_topic_model(run_name, temporal_params_dict, fin_inputs_par
     df_prepped_tweets                           = import_twitter_data_period(tweet_file_location, train_period_start, train_period_end, relavance_lifetime, tweet_ratio_removed)
     print(datetime.now().strftime("%H:%M:%S"))
     print("-------------------------------- Prepping Sentiment Data --------------------------------")
-    #quick fix to reduce the amount of wasted time cleaning tweets
-    if reclean_tweets == False and os.path.exists(senti_inputs_params_dict["cleaned_tweet_file_location"]):
-        df_prepped_tweets_company_agnostic = pd.read_csv(senti_inputs_params_dict["cleaned_tweet_file_location"])
-    else:
-        df_prepped_tweets = pd.read_csv(senti_inputs_params_dict["tweet_file_location"])
-        print(len(df_prepped_tweets))
-        tweets_list = list(df_prepped_tweets["body"])
-        df_prepped_tweets_company_agnostic = prep_and_save_twitter_text_for_subject_discovery(tweets_list[::int(len(tweets_list)/5e2)], df_stocks_list_file=global_df_stocks_list_file, save_location=senti_inputs_params_dict["cleaned_tweet_file_location"], inc_new_combined_stopwords_list=inc_new_combined_stopwords_list)
-        #with open(senti_inputs_params_dict["tweet_file_location"], 'rb') as file:
-        #    df_prepped_tweets_company_agnostic = pickle.load(file)
+
+
     print(datetime.now().strftime("%H:%M:%S"))
     print("-------------------------------- Creating Subject Keys --------------------------------")
-    wordcloud, topic_model_dict, visualisation  = return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty = num_topics, topic_model_alpha=topic_model_alpha, apply_IDF=apply_IDF,
+    wordcloud, topic_model_dict, visualisation  = return_subject_keys(df_prepped_tweets, topic_qty = num_topics, topic_model_alpha=topic_model_alpha, apply_IDF=apply_IDF,
                                                                       enforced_topics_dict=enforced_topics_dict, return_LDA_model=True, return_png_visualisation=True, return_html_visualisation=False)
     save_topic_clusters(wordcloud, topic_model_dict, None, file_location_wordcloud, file_location_topic_model_dict, file_location_visualisation)
     print(datetime.now().strftime("%H:%M:%S"))
@@ -766,15 +758,15 @@ def return_time(post_date):
     return period.strftime('%d/%m/%y %H:%M:%S')
 
 
-def prep_and_save_twitter_text_for_subject_discovery(input_list, df_stocks_list_file=None, 
-                                                     save_location=None, 
-                                                     make_company_agnostic=True, inc_new_combined_stopwords_list=False):
+def prep_twitter_text_for_subject_discovery(input_list, df_stocks_list_file=None,
+                                                     make_company_agnostic=False , inc_new_combined_stopwords_list=True):
     global global_precalculated_assets_locations_dict, combined_stop_words_list_file_path, custom_stop_words_list_file_path
+    global global_df_stocks_list_file
+    
     from config import global_combined_stopwords_list_path
     #prep parameters
     death_characters    = ["$", "amazon", "apple", "goog", "tesla", "http", "@", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "compile", "www","(", ")"]
-    stocks_list         = list(df_stocks_list_file["Name"].map(lambda x: x.lower()).values)
-    tickers_list        = list(df_stocks_list_file["Ticker"].map(lambda x: x.lower()).values)
+
     stopwords_english   = stopwords.words('english')
     if inc_new_combined_stopwords_list == True:
         with open(global_combined_stopwords_list_path, 'r') as file:
@@ -794,8 +786,7 @@ def prep_and_save_twitter_text_for_subject_discovery(input_list, df_stocks_list_
     misc_stopwords      = ["iphone", "airpods", "jeff", "bezos", "#microsoft", "#amzn", "volkswagen", "microsoft", "amazon's", "tsla", "androidwear", "ipad", "amzn", "iphone", "tesla", "TSLA", "elon", "musk", "baird", "robert", "pm", "androidwear", "android", "robert", "ab", "ae", "dlvrit", "https", "iphone", "inc", "new", "dlvrit", "py", "twitter", "cityfalconcom", "aapl", "ing", "ios", "samsung", "ipad", "phones", "cityfalconcom", "us", "bitly", "utmmpaign", "etexclusivecom", "cityfalcon", "owler", "com", "stock", "stocks", "buy", "bitly", "dlvrit", "alexa", "zprio", "billion", "seekalphacom", "et", "alphet", "seekalpha", "googl", "zprio", "trad", "jt", "windows", "adw", "ifttt", "ihadvfn", "nmona", "pphppid", "st", "bza", "twits", "biness", "tim", "ba", "se", "rat", "article"]
 
     #prep stocks_list_shortened
-    stocks_list_shortened_dict  = update_shortened_company_file(global_df_stocks_list_file, corp_stopwords)
-    stocks_list_shortened       = list(stocks_list_shortened_dict.values())
+
     
     if make_company_agnostic==False:
         #death_characters        = 
@@ -804,7 +795,13 @@ def prep_and_save_twitter_text_for_subject_discovery(input_list, df_stocks_list_
         #stopwords_english       = 
         #corp_stopwords          = 
         #misc_stopwords          = 
-        #stocks_list_shortened   = 
+        stocks_list_shortened   = [] 
+    else:
+        stocks_list         = list(df_stocks_list_file["Name"].map(lambda x: x.lower()).values)
+        tickers_list        = list(df_stocks_list_file["Ticker"].map(lambda x: x.lower()).values)
+        stocks_list_shortened_dict  = update_shortened_company_file(global_df_stocks_list_file, corp_stopwords)
+        stocks_list_shortened       = list(stocks_list_shortened_dict.values())
+
     
     #prep variables
     split_tweets = []
@@ -853,7 +850,7 @@ def prep_and_save_twitter_text_for_subject_discovery(input_list, df_stocks_list_
         output = output + [recombined_tweet]
     
     df_output = pd.DataFrame(output, columns=["body"])
-    df_output.to_csv(save_location)
+    #df_output.to_csv(save_location)
     #if not save_location == None:
     #    with open(save_location, "wb") as file:
     #        pickle.dump(output, file)
@@ -899,12 +896,24 @@ def return_initial_eta(num_topics, initial_topics_dict, id2word):
 
 
 
-def return_subject_keys(df_prepped_tweets_company_agnostic, topic_qty=10, enforced_topics_dict=None, stock_names_list=None, words_to_remove=None, 
+def return_subject_keys(df_tweets, topic_qty=10, enforced_topics_dict=None, stock_names_list=None, words_to_remove=None, 
                         return_LDA_model=True, return_png_visualisation=False, return_html_visualisation=False, 
                         topic_model_alpha=0.1, apply_IDF=True, cores=2, passes=60, iterations=800, return_perplexity=False):
     output = []
 
-    data = df_prepped_tweets_company_agnostic
+    tweets_to_sample = 750
+    import re
+    def count_words(tweet):
+        words = re.findall(r'\b\w+\b', tweet)
+        return len(words)
+    long_tweets = df_tweets[df_tweets['body'].apply(lambda tweet: count_words(tweet) > 15)]
+    selected_tweets = long_tweets.sample(n=min(min(tweets_to_sample, len(long_tweets)-1), len(long_tweets)))
+    
+    selected_tweets = prep_twitter_text_for_subject_discovery(list(selected_tweets["body"]))
+
+
+    data = selected_tweets
+    
     print("topic model trained from {} tweets".format(len(data)))
     data_words = list(sent_to_words(data))
     
