@@ -776,9 +776,9 @@ global_run_count = 0
 
 #init_doe = 40
 init_doe = [
-    [1, 20, 7, 1, 25202, 1, 4, 3, 0, 1e-10, 15, 0, 3],
-    [1, 20, 7, 1, 25202, 1, 4, 5, 0, 1e-10, 15, 0, 3],
-    [1, 20, 7, 1, 25202, 1, 4, 1, 0, 1e-10, 15, 0, 3]
+    [1, 22, 7, 1, 25202, 1, 4, 3, 0, 1e-10, 15, 0, 3],
+    [1, 22, 7, 1, 25202, 1, 4, 5, 0, 1e-10, 15, 0, 3],
+    [1, 22, 7, 1, 25202, 1, 4, 1, 0, 1e-10, 15, 0, 3]
 ]
 
 
@@ -853,7 +853,7 @@ for scenario_ID in [2]:#scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "test14speed"
+    scenario_name_str = scenario_name_str + "test15speed"
 
 
     if __name__ == '__main__':
@@ -869,7 +869,7 @@ for scenario_ID in [2]:#scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/test14speed.csv")
+            global_record_path=os.path.join(global_general_folder,r"outputs/test15speed.csv")
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
