@@ -10,4 +10,4 @@
 
 module load python  # Load the Python module if needed
 
-python C:/Users/Public/fabio_uni_work/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/Development/experiment_handler_mini.py
+python /home/accounts/studenti/id110xaq/final_project/Development/log.txt /home/accounts/studenti/id110xaq/final_project/Development/experiment_handler_mini.py
