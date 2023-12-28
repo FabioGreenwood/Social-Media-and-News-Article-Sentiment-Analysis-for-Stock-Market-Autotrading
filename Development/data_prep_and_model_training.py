@@ -1171,11 +1171,21 @@ def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_fea
         kwargs["bias_regularizer"] = tf.keras.regularizers.L1(model_hyper_params["estimator__alpha"])
         kwargs["activity_regularizer"] = tf.keras.regularizers.L1(model_hyper_params["estimator__alpha"])    
         # add layer 
+
+        kwargs["activation"] = "tanh"
+        kwargs["recurrent_activation"] = "sigmoid"
+        kwargs["recurrent_dropout"]= 0
+        kwargs["unroll"] = False
+        kwargs["use_bias"] = True
+
         if layer[0] == "simple":
             ensemble_estimator.add(SimpleRNN(**kwargs))            
         elif layer[0] == "GRU":
             ensemble_estimator.add(GRU(**kwargs))
         elif layer[0] == "LSTM":
+
+
+
             ensemble_estimator.add(LSTM(**kwargs))
         
     ensemble_estimator.add(Dense(units=1, activation='linear'))
@@ -1382,7 +1392,7 @@ class DRSLinRegRNN():
             scaler_y=self.scaler_y
 
         index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=scaler_X)
-        y_pred_values       = single_estimator.predict(input_data, verbose=0)
+        y_pred_values       = single_estimator.predict(input_data, verbose=1)
         if not scaler_X == None:
             y_pred_values       = scaler_y.inverse_transform(y_pred_values)
         y_pred_values = pd.DataFrame(y_pred_values, index=index)

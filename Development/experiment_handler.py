@@ -95,7 +95,7 @@ default_model_hyper_params          = {
     "n_estimators_per_time_series_blocking" : 1,
     "testing_scoring"               : ["r2", "mse", "mae"],
     "estimator__alpha"                 : 0.05,
-    "estimator__activation"            : 'relu',
+    #"estimator__activation"            : 'tanh', #now hardcoded to ensure the use of GPU
     "cohort_retention_rate_dict"       : default_cohort_retention_rate_dict,
     "general_adjusting_square_factor" : 1,
     "epochs" : 1,
@@ -882,7 +882,7 @@ for scenario_ID in scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "parallel_run_"
+    scenario_name_str = scenario_name_str + "GPU_speed_test1"
 
 
     if __name__ == '__main__':
@@ -898,7 +898,7 @@ for scenario_ID in scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/parallel_run_.csv")
+            global_record_path=os.path.join(global_general_folder,r"outputs/GPU_speed_test1.csv")
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
