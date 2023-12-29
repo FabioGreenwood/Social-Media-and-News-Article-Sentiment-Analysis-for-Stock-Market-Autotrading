@@ -1167,25 +1167,22 @@ def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_fea
             kwargs["input_shape"] = (model_hyper_params["lookbacks"], n_features)
         if id == len(model_hyper_params["estimator__hidden_layer_sizes"]) - 1:
             kwargs["return_sequences"] = False
-        kwargs["kernel_regularizer"] = tf.keras.regularizers.L1(model_hyper_params["estimator__alpha"])
-        kwargs["bias_regularizer"] = tf.keras.regularizers.L1(model_hyper_params["estimator__alpha"])
+        kwargs["kernel_regularizer"]   = tf.keras.regularizers.L1(model_hyper_params["estimator__alpha"])
+        kwargs["bias_regularizer"]     = tf.keras.regularizers.L1(model_hyper_params["estimator__alpha"])
         kwargs["activity_regularizer"] = tf.keras.regularizers.L1(model_hyper_params["estimator__alpha"])    
         # add layer 
-
-        kwargs["activation"] = "tanh"
-        kwargs["recurrent_activation"] = "sigmoid"
-        kwargs["recurrent_dropout"]= 0
-        kwargs["unroll"] = False
-        kwargs["use_bias"] = True
+        if layer[0] != "simple":
+            kwargs["activation"] = "tanh"
+            kwargs["recurrent_activation"] = "sigmoid"
+            kwargs["recurrent_dropout"]= 0
+            kwargs["unroll"] = False
+            kwargs["use_bias"] = True
 
         if layer[0] == "simple":
             ensemble_estimator.add(SimpleRNN(**kwargs))            
         elif layer[0] == "GRU":
             ensemble_estimator.add(GRU(**kwargs))
         elif layer[0] == "LSTM":
-
-
-
             ensemble_estimator.add(LSTM(**kwargs))
         
     ensemble_estimator.add(Dense(units=1, activation='linear'))
