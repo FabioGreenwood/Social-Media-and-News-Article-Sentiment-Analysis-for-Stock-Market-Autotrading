@@ -782,7 +782,7 @@ init_doe = [
 [2,	9,	0.3,    7200,   0,	1,	1,	1,	1.00E-06,	25,	0.25],
 [1,	9,	1,      25200,  1,	4,	3,	1,	1.00E-08,	40,	0.50],
 [2,	13,	0.3,    25200,  0,	4,	0,	2,	1.00E-10,	20,	1.00],
-[2,	9,	7,      7200,   0,	4,	3,	1,	1.00E-07,	40,	1.05],
+[2,	9,	7,      7200,   0,	4,	3,	1,	1.00E-07,	40,	1.00],
 [2,	17,	5,      180,    1,	4,	4,	2,	1.00E-09,	10,	0.25],
 [2,	9,	7,      900,    1,	4,	3,	3,	1.00E-06,	8,	0.50],
 [2,	9,	1,      7200,   0,	2,	4,	3,	1.00E-10,	10,	1.00],
@@ -852,8 +852,12 @@ enable_GPU = False
 if enable_GPU == False:
     import tensorflow as tf
     tf.config.set_visible_devices([], 'GPU')
+if shard == None:
+    loop = scenario_dict.keys()
+else:
+    loop = [shard]
 
-for scenario_ID in scenario_dict.keys():
+for scenario_ID in loop:
     
     index_of_topic_qty = return_keys_within_2_level_dict(design_space_dict).index("senti_inputs_params_dict_topic_qty")
 
@@ -891,7 +895,7 @@ for scenario_ID in scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "GPU2_parallel_run{}_DOEPOP.csv".format(str(shard))
+    scenario_name_str = scenario_name_str + "parallel_run_3_{}.csv".format(str(shard))
 
     
     if __name__ == '__main__':
@@ -907,7 +911,7 @@ for scenario_ID in scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/GPU2_parallel_run{}_DOEPOP.csv".format(str(shard)))
+            global_record_path=os.path.join(global_general_folder,r"outputs/parallel_run_3_{}.csv".format(str(shard)))
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
