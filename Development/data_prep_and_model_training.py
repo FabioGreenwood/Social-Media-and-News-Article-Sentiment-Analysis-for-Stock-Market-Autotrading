@@ -1379,16 +1379,10 @@ class DRSLinRegRNN():
         return scaler
 
 
-    def custom_single_predict(self, df_X, single_estimator, return_df=False, independent_scaling=False, df_y=None):
+    def custom_single_predict(self, df_X, single_estimator):
         
-        if independent_scaling == True:
-            scaler_X=MinMaxScaler()
-            scaler_X=scaler_X.fit(df_X)
-            scaler_y=MinMaxScaler()
-            scaler_y=scaler_y.fit(df_y)
-        else:
-            scaler_X=self.scaler_X
-            scaler_y=self.scaler_y
+        scaler_X=self.scaler_X
+        scaler_y=self.scaler_y
 
         index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=scaler_X)
         y_pred_values       = single_estimator.predict(input_data, verbose=1)
