@@ -848,7 +848,12 @@ scenario_dict = {
         
     }
 shard = None
-for scenario_ID in [3]:#scenario_dict.keys():
+enable_GPU = False
+if enable_GPU == False:
+    import tensorflow as tf
+    tf.config.set_visible_devices([], 'GPU')
+
+for scenario_ID in scenario_dict.keys():
     
     index_of_topic_qty = return_keys_within_2_level_dict(design_space_dict).index("senti_inputs_params_dict_topic_qty")
 
@@ -886,9 +891,9 @@ for scenario_ID in [3]:#scenario_dict.keys():
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "GPU1_parallel_run{}_DOEPOP.csv".format(str(shard))
+    scenario_name_str = scenario_name_str + "GPU2_parallel_run{}_DOEPOP.csv".format(str(shard))
 
-
+    
     if __name__ == '__main__':
         #scenario_name_str = "test 19"
         print("running scenario " + str(scenario_ID) + ": " + scenario_name_str + " - " + datetime.now().strftime("%H:%M:%S"))
@@ -902,7 +907,7 @@ for scenario_ID in [3]:#scenario_dict.keys():
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/GPU1_parallel_run{}_DOEPOP.csv".format(str(shard)))
+            global_record_path=os.path.join(global_general_folder,r"outputs/GPU2_parallel_run{}_DOEPOP.csv".format(str(shard)))
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 

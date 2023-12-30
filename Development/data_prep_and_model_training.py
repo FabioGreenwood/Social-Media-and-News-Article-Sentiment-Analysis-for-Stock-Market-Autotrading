@@ -99,6 +99,8 @@ from tensorflow.keras.layers import Dense
 import hashlib
 from tensorflow.keras.callbacks import EarlyStopping
 
+#tf.config.set_visible_devices([], 'GPU')
+
 
 #%% EXAMPLE INPUTS FOR MAIN METHOD
 
@@ -1194,7 +1196,7 @@ def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_fea
 
 
 class DRSLinRegRNN():
-    def __init__(self, base_estimator=Sequential(),
+    def __init__(self, base_estimator=None,#Sequential(),
                  input_dict=None):
         #expected keys: training_time_splits, max_depth, max_features, random_state,        
         self.estimator_info_pack = {}
