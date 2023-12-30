@@ -895,7 +895,7 @@ for scenario_ID in loop:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "parallel_run_3_{}.csv".format(str(shard))
+    scenario_name_str = scenario_name_str + "parallel_run_4_{}.csv".format(str(shard))
 
     
     if __name__ == '__main__':
@@ -911,7 +911,7 @@ for scenario_ID in loop:
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/parallel_run_3_{}.csv".format(str(shard)))
+            global_record_path=os.path.join(global_general_folder,r"outputs/parallel_run_4_{}.csv".format(str(shard)))
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
