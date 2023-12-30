@@ -847,7 +847,7 @@ scenario_dict = {
         
         
     }
-shard = 0
+shard = 8
 enable_GPU = False
 if enable_GPU == False:
     import tensorflow as tf
