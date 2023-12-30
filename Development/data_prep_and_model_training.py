@@ -1438,14 +1438,9 @@ class DRSLinRegRNN():
     def predict_ensemble(self, X, y): #FG_action: This is where the new error is
         
         y_ensemble = pd.DataFrame()
-        if self.model_hyper_params["scaler_cat"] == 3:
-            independent_scaling = True
-        else:
-            independent_scaling = False
-        
         for i, single_estimator in enumerate(self.estimators_):
             # randomly select features to drop out
-            y_ensemble[i] = self.custom_single_predict(X, single_estimator, independent_scaling=independent_scaling, df_y=y)
+            y_ensemble[i] = self.custom_single_predict(X, single_estimator, df_y=y)
         
         output = y_ensemble.mean(axis=1)
 
