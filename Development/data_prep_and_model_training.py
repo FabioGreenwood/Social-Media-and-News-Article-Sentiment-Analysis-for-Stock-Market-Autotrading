@@ -1219,10 +1219,12 @@ class DRSLinRegRNN():
         X_indy_val, X_val = return_lookback_appropriate_index_andor_data(X_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
         Y_indy_val, Y_val = return_lookback_appropriate_index_andor_data(Y_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
 
-        early_stopping = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
+        # fg_PLACEHOLDER early_stopping = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
 
         # Train the model with early stopping
-        history = model.fit(X, Y, epochs=100, validation_data=(X_val, Y_val), callbacks=[early_stopping], verbose=1)
+        
+        history = model.fit(X, Y, epochs=1, validation_data=(X_val, Y_val), verbose=1)
+        #history = model.fit(X, Y, epochs=100, validation_data=(X_val, Y_val), callbacks=[early_stopping], verbose=1)
         model.train_loss = history.history['loss']
         model.val_loss   = history.history['val_loss']
         
@@ -1238,20 +1240,6 @@ class DRSLinRegRNN():
         kf = KFold(n_splits=self.K_fold_splits, shuffle=False)
 
         print(datetime.now().strftime("%H:%M:%S") + " - evaluating model")
-        if self.scaler_cat > 0:
-            scaler_X = MinMaxScaler()
-            scaler_y = MinMaxScaler()
-            col = df_X.columns
-            scaler_X.fit(df_X)
-            #scaler_y.fit(df_y.values.reshape(-1, 1))
-            scaler_y.fit(df_y)
-            if self.scaler_cat == 2:
-                scaler_X = self.adjust_scaler_to_accept_distant_pricings(scaler_X, df_X)
-                scaler_y = self.adjust_scaler_to_accept_distant_pricings(scaler_y, df_y)
-            self.scaler_X, self.scaler_y = scaler_X, scaler_y
-            del scaler_X, scaler_y
-        else:
-            self.scaler_X, self.scaler_y = None, None
 
         for train_index, val_index in kf.split(df_X):
             print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
@@ -1300,21 +1288,13 @@ class DRSLinRegRNN():
         kf = KFold(n_splits=self.K_fold_splits, shuffle=False)
 
         print(datetime.now().strftime("%H:%M:%S") + " - training model")
-        if self.scaler_cat > 0:
-            scaler_X = MinMaxScaler()
-            scaler_y = MinMaxScaler()
-            col = df_X.columns
-            scaler_X.fit(df_X)
-            #scaler_y.fit(df_y.values.reshape(-1, 1))
-            scaler_y.fit(df_y)
-            if self.scaler_cat == 2:
-                scaler_X = self.adjust_scaler_to_accept_distant_pricings(scaler_X, df_X)
-                scaler_y = self.adjust_scaler_to_accept_distant_pricings(scaler_y, df_y)
-            self.scaler_X, self.scaler_y = scaler_X, scaler_y
-            del scaler_X, scaler_y
-        else:
-            self.scaler_X, self.scaler_y = None, None
 
+        scaler_X = MinMaxScaler()
+        scaler_y = MinMaxScaler()
+        self.scaler_X = scaler_X.fit(df_X)
+        self.scaler_y = scaler_y.fit(df_y)
+        
+        del scaler_X, scaler_y
         for train_index, val_index in kf.split(df_X):
             count += 1
             print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
@@ -1380,14 +1360,9 @@ class DRSLinRegRNN():
 
 
     def custom_single_predict(self, df_X, single_estimator):
-        
-        scaler_X=self.scaler_X
-        scaler_y=self.scaler_y
-
-        index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=scaler_X)
+        index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
         y_pred_values       = single_estimator.predict(input_data, verbose=1)
-        if not scaler_X == None:
-            y_pred_values       = scaler_y.inverse_transform(y_pred_values)
+        y_pred_values       = self.scaler_y.inverse_transform(y_pred_values)
         y_pred_values = pd.DataFrame(y_pred_values, index=index)
 
         return y_pred_values
@@ -1434,13 +1409,20 @@ class DRSLinRegRNN():
             Y_preds_testing.to_csv(os.path.join(folder_path, 'Y_preds_testing.csv'))
         if isinstance(y_testing, pd.Series) or isinstance(y_testing, pd.DataFrame):
             y_testing.to_csv(os.path.join(folder_path, 'y_testing.csv'))
+        #save scaler and other assets
+        additional_assets_dict = {
+            "scaler_X" : self.scaler_X,
+            "scaler_y" : self.scaler_y
+        }
+        with open(os.path.join(folder_path,"additional_assets.pkl"), "wb") as file:
+                pickle.dump(additional_assets_dict, file)
    
-    def predict_ensemble(self, X, y): #FG_action: This is where the new error is
+    def predict_ensemble(self, X): #FG_action: This is where the new error is
         
         y_ensemble = pd.DataFrame()
         for i, single_estimator in enumerate(self.estimators_):
             # randomly select features to drop out
-            y_ensemble[i] = self.custom_single_predict(X, single_estimator, df_y=y)
+            y_ensemble[i] = self.custom_single_predict(X, single_estimator)
         
         output = y_ensemble.mean(axis=1)
 
@@ -1454,6 +1436,12 @@ class DRSLinRegRNN():
             if filename.endswith(".h5"):
                 file_path = os.path.join(predictor_location_folder_path, filename)
                 self.estimators_ += [load_model(file_path)]
+        # load additional factors
+        with open(os.path.join(predictor_location_folder_path,"additional_assets.pkl"), "rb") as file:
+            additional_assets_dict = pickle.load(file)
+            self.scaler_X = additional_assets_dict["scaler_X"]
+            self.scaler_y = additional_assets_dict["scaler_y"]
+
         # check that the input parameters are the same
         with open(os.path.join(predictor_location_folder_path,"input_dict.pkl"), "rb") as file:
             save_input_dict = pickle.load(file)
@@ -1592,7 +1580,7 @@ def generate_testing_scores(predictor, input_dict, return_time_series=False):
         
     # step 3: generate y_pred
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 3: generate y_pred")
-    Y_preds_testing = predictor.predict_ensemble(X_testing, y_testing) # the y testing is used only for scaling and is justified as in the real world each day would be scaled off the previous day, instead of scaling outputs on 6 month old data like a standard timeline extrapolation
+    Y_preds_testing = predictor.predict_ensemble(X_testing) 
     
     # step 4: generate score
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 4: generate score")
@@ -1610,6 +1598,7 @@ def retrieve_model_and_training_scores(predictor_location_folder_path, temporal_
     #predictor_location_file = "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\precalculated_assets\\predictive_model\\aapl_ps04_06_18_000000_pe01_09_20_000000_ts_sec300_tm_qty7_r_lt3600_r_hl3600_tm_alpha1_IDF-True_t_ratio_r100000.pred"
     input_dict = return_input_dict(temporal_params_dict = temporal_params_dict, fin_inputs_params_dict = fin_inputs_params_dict, senti_inputs_params_dict = senti_inputs_params_dict, outputs_params_dict = outputs_params_dict, model_hyper_params = model_hyper_params, reporting_dict = reporting_dict)
     model = load_RNN_predictor(input_dict, predictor_location_folder_path)
+    print("loading predictor: ", predictor_location_folder_path)
     df_financial_data = import_financial_data(
         target_file_path          = fin_inputs_params_dict["historical_file"], 
         input_cols_to_include_list  = fin_inputs_params_dict["cols_list"],

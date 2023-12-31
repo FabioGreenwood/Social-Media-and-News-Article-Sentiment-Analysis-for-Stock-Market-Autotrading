@@ -102,7 +102,8 @@ default_model_hyper_params          = {
     "lookbacks" : 10,
     "batch_ratio" : 0.1,
     "shuffle_fit" : False,
-    "K_fold_splits" : 5, #FG_placeholder,
+    "K_fold_splits" : 2, #FG_placeholder,
+    #"K_fold_splits" : 5,
     "scaler_cat" : 3 # 0:no scaling, 1: standard scaling (only from the MinMaxScaler object), 2: custom scaling, 3: individual scaling
     }
 default_reporting_dict              = {
@@ -771,10 +772,10 @@ design_space_dict = {
 
 global_run_count = 0
 
-test_num = 9
+test_num = 12
 init_doe = 35
 init_doe = [
-[1,	25,	7,      25200,  0,	4,	3,	3,	1.00E-09,	15,	0.25],#0
+[1,	25,	7,      25200,  0,	4,	3,	3,	1.02E-09,	15,	0.25],#0
 #[2,	17,	13,     900,    0,	4,	4,	2,	1.00E-10,   15,	0.50],
 #[2,	13,	0.3,    25200,  0,	1,	5,	1,	1.00E-11,	15,	1.00],
 #[2,	17,	2,      180,    0,	4,	1,	0,	1.00E-09,	15,	0.25],
@@ -896,7 +897,7 @@ for scenario_ID in loop:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "mini_test{}_{}.csv".format(str(test_num),str(shard))
+    scenario_name_str = scenario_name_str + "mini_test2{}_{}.csv".format(str(test_num),str(shard))
 
     
     if __name__ == '__main__':
@@ -912,7 +913,7 @@ for scenario_ID in loop:
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/mini_test{}_{}.csv".format(str(test_num),str(shard)))
+            global_record_path=os.path.join(global_general_folder,r"outputs/mini_test2{}_{}.csv".format(str(test_num),str(shard)))
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
