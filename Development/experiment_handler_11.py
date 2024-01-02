@@ -884,7 +884,7 @@ for scenario_ID in loop:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "parallel_run_4_{}.csv".format(str(shard))
+    scenario_name_str = scenario_name_str + "parallel_run_6_{}.csv".format(str(shard))
 
     
     if __name__ == '__main__':
