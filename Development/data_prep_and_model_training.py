@@ -1219,12 +1219,11 @@ class DRSLinRegRNN():
         X_indy_val, X_val = return_lookback_appropriate_index_andor_data(X_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
         Y_indy_val, Y_val = return_lookback_appropriate_index_andor_data(Y_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
 
-        # fg_PLACEHOLDER early_stopping = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
+        early_stopping = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
 
         # Train the model with early stopping
         
-        history = model.fit(X, Y, epochs=1, validation_data=(X_val, Y_val), verbose=1)
-        #history = model.fit(X, Y, epochs=100, validation_data=(X_val, Y_val), callbacks=[early_stopping], verbose=1)
+        history = model.fit(X, Y, epochs=100, validation_data=(X_val, Y_val), callbacks=[early_stopping], verbose=1)
         model.train_loss = history.history['loss']
         model.val_loss   = history.history['val_loss']
         
