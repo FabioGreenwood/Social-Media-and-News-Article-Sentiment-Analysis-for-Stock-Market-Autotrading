@@ -894,7 +894,7 @@ for scenario_ID in loop:
             scenario_name_str,
             design_space_dict,
             initial_doe_size_or_DoE=init_doe,
-            max_iter=0,
+            max_iter=5,
             model_start_time = model_start_time,
             force_restart_run = False,
             inverse_for_minimise_vec = inverse_for_minimise_vec,
