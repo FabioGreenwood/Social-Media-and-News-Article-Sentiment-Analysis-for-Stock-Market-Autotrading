@@ -95,15 +95,17 @@ default_model_hyper_params          = {
     "n_estimators_per_time_series_blocking" : 1,
     "testing_scoring"               : ["r2", "mse", "mae"],
     "estimator__alpha"                 : 0.05,
-    "estimator__activation"            : 'tanh', #now hardcoded to ensure the use of GPU
+    "estimator__activation"            : 'relu',
     "cohort_retention_rate_dict"       : default_cohort_retention_rate_dict,
     "general_adjusting_square_factor" : 1,
-    "epochs" : 1,
+    "epochs" : 60,
     "lookbacks" : 10,
     "batch_ratio" : 1,
     "shuffle_fit" : False,
     "K_fold_splits" : 5, #FG_placeholder,
-    "scaler_cat" : 3 # 0:no scaling, 1: standard scaling (only from the MinMaxScaler object), 2: custom scaling, 3: individual scaling
+    "scaler_cat" : 3,  # 0:no scaling, 1: standard scaling (only from the MinMaxScaler object), 2: custom scaling, 3: individual scaling
+    "early_stopping" : 3, #this marks the patience value, if zero, feature is off
+    "learning_rate" : 0.001
     }
 default_reporting_dict              = {
     "confidence_thresholds" : [0, 0.01, 0.02, 0.035, 0.05, 0.1],
@@ -758,9 +760,22 @@ design_space_dict = {
             },
         "general_adjusting_square_factor" : [3, 2, 1, 0],
         "estimator__alpha"                : [1e-11, 1e-10, 1e-9, 1e-8, 1e-7], 
-        "lookbacks"                       : [8, 10, 15, 20, 25, 30, 40]
-
-    },
+        "lookbacks"                       : [8, 10, 15, 20, 25, 30, 40],
+        "early_stopping" : [0, 3, 5, 7], 
+        "epochs" : [10, 20, 30, 50],
+        "n_estimators_per_time_series_blocking" : [1, 3],
+        "testing_scoring" : {
+            0 : "r2",
+            1 : "mse",
+            2 : "mae"
+            },
+        "learning_rate" : [0.001, 0.0005],
+        "estimator__activation" : {
+            0 : "relu",
+            1 : "softmax"
+            },
+        },
+        
     "string_key" : {}
 }
 
@@ -772,26 +787,13 @@ global_run_count = 0
 
 init_doe = 35
 init_doe = [
-[1,	25,	7,      25200,  0,	4,	3,	3,	1.00E-11,	15],
-[2,	17,	13,     900,    0,	4,	4,	2,	1.00E-10,   15],
-[2,	13,	0.3,    25200,  0,	1,	5,	1,	1.00E-09,	15],
-[2,	17,	2,      180,    0,	4,	1,	0,	1.00E-08,	15],
-[1,	25,	7,      900,    1,	1,	4,	0,	1.00E-07,   25],
-[2,	13,	3,      180,    1,	2,	5,	0,	1.00E-11,	40], # ID: 5
-[2,	9,	0.3,    7200,   0,	1,	1,	1,	1.00E-10,	25], 
-[1,	9,	1,      25200,  1,	4,	3,	1,	1.00E-09,	40],
-[2,	13,	0.3,    25200,  0,	4,	0,	2,	1.00E-08,	20],
-[2,	9,	7,      7200,   0,	4,	3,	1,	1.00E-07,	40],
-[2,	17,	5,      180,    1,	4,	4,	2,	1.00E-11,	10], # ID: 10
-[2,	9,	7,      900,    1,	4,	3,	3,	1.00E-10,	8],
-[2,	9,	1,      7200,   0,	2,	4,	3,	1.00E-09,	10],
-[2,	5,	0.3,    180,    1,	4,	1,	0,	1.00E-08,	10],
-[1,	9,	1,      180,    0,	4,	1,	2,	1.00E-07,	40],
-[2,	9,	3,      25200,  1,	1,	2,	1,	1.00E-11,	40], # ID: 15
-[2,	5,	7,      7200,   0,	4,	3,	3,	1.00E-10,	20],
-[2,	13,	5,      25200,  0,	4,	2,	3,	1.00E-09,	10],
-[2,	5,	7,      25200,  1,	4,	2,	0,	1.00E-08,	10],
-[1,	17,	7,      180,    1,	1,	2,	2,	1.00E-07,	20] # ID: 19 (20th design)
+[2,	9,	1,      7200,   0,	2,	4,	3,	1.00E-09,	10, 3, 20, 1, 2, 0.001, 0], #baseline old activiation back
+[2,	9,	1,      7200,   0,	2,	4,	3,	1.00E-09,	10, 0, 50, 1, 2, 0.001, 0], #more epochs
+[2,	9,	1,      7200,   0,	2,	4,	3,	1.00E-09,	10, 3, 20, 3, 2, 0.001, 0], #more ensamble models
+[2,	9,	1,      7200,   0,	2,	4,	3,	1.00E-09,	10, 3, 20, 1, 1, 0.001, 0], #train with MSE loss function
+[2,	9,	1,      7200,   0,	2,	4,	3,	1.00E-09,	10, 3, 20, 1, 1, 0.0005, 0], #decreased learning rate
+[2,	9,	1,      7200,   0,	2,	4,	3,	1.00E-09,	10, 3, 20, 1, 1, 0.001, 1], #softmax activation
+
 ]
 
 

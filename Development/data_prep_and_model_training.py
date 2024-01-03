@@ -214,6 +214,8 @@ def return_predictor_name(input_dict):
     if not financial_value_scaling == None:
         predictor_hash += "_" + str(financial_value_scaling)
     predictor_hash += "_" + str(input_dict["model_hyper_params"]["n_estimators_per_time_series_blocking"]) + "_" + str(input_dict["model_hyper_params"]["testing_scoring"]) + "_" + str(input_dict["model_hyper_params"]["estimator__alpha"]) + "_" + str(input_dict["model_hyper_params"]["estimator__activation"]) + "_" + str(input_dict["model_hyper_params"]["cohort_retention_rate_dict"]) + "_" + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + "_" + str(input_dict["model_hyper_params"]["epochs"]) + "_" + str(input_dict["model_hyper_params"]["lookbacks"]) + "_" + str(input_dict["model_hyper_params"]["shuffle_fit"]) + "_" + str(input_dict["model_hyper_params"]["K_fold_splits"]) + "_" + str(pred_steps_ahead) + "_" + str(input_dict["model_hyper_params"]["estimator__alpha"]) + "_" + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + "_" + str(input_dict["model_hyper_params"]["lookbacks"]) + "_" + str(input_dict["model_hyper_params"]["batch_ratio"]) + "_" + str(input_dict["model_hyper_params"]["scaler_cat"]) + "_" + str(input_dict["model_hyper_params"]["estimator__hidden_layer_sizes"])
+    if input_dict["model_hyper_params"]["early_stopping"] != 3 or input_dict["model_hyper_params"]["learning_rate"] != 0.001 or input_dict["model_hyper_params"]["testing_scoring"] != "mae" or input_dict["model_hyper_params"]["epochs"] != 1:
+        predictor_hash += "_" + str(input_dict["model_hyper_params"]["early_stopping"]) + "_" + str(input_dict["model_hyper_params"]["learning_rate"]) + "_" + str(input_dict["model_hyper_params"]["testing_scoring"])  + "_" + str(input_dict["model_hyper_params"]["epochs"])
     name = name + predictor_hash
     return str(name)
     
@@ -1174,7 +1176,6 @@ def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_fea
         kwargs["activity_regularizer"] = tf.keras.regularizers.L1(model_hyper_params["estimator__alpha"])    
         # add layer 
         if layer[0] != "simple":
-            kwargs["activation"] = "tanh"
             kwargs["recurrent_activation"] = "sigmoid"
             kwargs["recurrent_dropout"]= 0
             kwargs["unroll"] = False
@@ -1188,7 +1189,8 @@ def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_fea
             ensemble_estimator.add(LSTM(**kwargs))
         
     ensemble_estimator.add(Dense(units=1, activation='linear'))
-    ensemble_estimator.compile(optimizer='adam', loss='mae')
+    opt = keras.optimizers.Adam(learning_rate=model_hyper_params["testing_scoring"])
+    ensemble_estimator.compile(optimizer=opt, loss=model_hyper_params["testing_scoring"])
     ensemble_estimator.random_state = global_random_state
     ensemble_estimator.dropout_cols_ = dropout_cols
     
@@ -1208,22 +1210,29 @@ class DRSLinRegRNN():
         self.estimators_          = []
 
     def return_single_ensable_model_fitted(self, model, X, Y):
+        raise SystemError("this logic shouldn't be being used")
         X_indy, X = return_lookback_appropriate_index_andor_data(X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
         Y_indy, Y = return_lookback_appropriate_index_andor_data(Y, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
         model.fit(X, Y, epochs=self.epochs, shuffle=self.shuffle_fit)
         return model
 
     def return_single_ensable_model_fitted_with_early_stopping(self, model, X, Y, X_val, Y_val):
+        verbose = 1
         X_indy, X = return_lookback_appropriate_index_andor_data(X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
         Y_indy, Y = return_lookback_appropriate_index_andor_data(Y, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
         X_indy_val, X_val = return_lookback_appropriate_index_andor_data(X_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
         Y_indy_val, Y_val = return_lookback_appropriate_index_andor_data(Y_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
 
-        early_stopping = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
+        if model.model_hyper_params["early_stopping"] != 0:
+            early_stopping = EarlyStopping(monitor='val_loss', patience=model.model_hyper_params["early_stopping"], restore_best_weights=True)
+            #history = model.fit(X, Y, epochs=model.model_hyper_params["epochs"], validation_data=(X_val, Y_val), callbacks=[early_stopping], verbose=verbose)
+            history = model.fit(X, Y, epochs=model.model_hyper_params["epochs"], callbacks=[early_stopping], verbose=verbose)
+        else:
+            history = model.fit(X, Y, epochs=model.model_hyper_params["epochs"], verbose=verbose)
 
         # Train the model with early stopping
         
-        history = model.fit(X, Y, epochs=100, validation_data=(X_val, Y_val), callbacks=[early_stopping], verbose=1)
+        
         model.train_loss = history.history['loss']
         model.val_loss   = history.history['val_loss']
         
@@ -1471,6 +1480,8 @@ def return_lookback_appropriate_index_andor_data(df_x, lookbacks, return_index=F
     ori_index = df_x.index
     if not scaler == None:
         df_x = pd.DataFrame(scaler.transform(df_x), index=df_x.index, columns=df_x.columns)
+    else:
+        raise ValueError("there should be a scaler used")
 
     if return_index==True:
         for ts0, ts1 in zip(ori_index[:-trim_from_indexes], ori_index[trim_from_indexes:]):
