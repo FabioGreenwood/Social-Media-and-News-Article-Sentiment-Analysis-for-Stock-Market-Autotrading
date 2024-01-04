@@ -548,12 +548,14 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
         tweet_cohort_end_post = row["tweet_cohort_end_post"]
         tweet_cohort = return_tweet_cohort_from_scratch(df_annotated_tweets, tweet_cohort_start_post, tweet_cohort_end_post)
 
-        pre_calc_time_overall = np.exp((-3 / relavance_halflife) * (tweet_cohort["post_date"] - tweet_cohort_start_post)) * tweet_cohort["~sent_overall"]
-
+        #pre_calc_time_overall = np.exp((-3 / relavance_halflife) * (tweet_cohort["post_date"] - tweet_cohort_start_post)) * tweet_cohort["~sent_overall"]
+        time_weight = (0.5 ** ((tweet_cohort["post_date"] - tweet_cohort_start_post) / relavance_halflife))
+        
         senti_scores = []
         for topic_num in range(num_topics):
-            score_numer = np.sum(pre_calc_time_overall * tweet_cohort[f"~sent_topic_W{topic_num}"])
-            score_denom = np.sum(np.exp((-3 / relavance_halflife) * (tweet_cohort["post_date"] -  tweet_cohort_start_post)) * tweet_cohort[f"~sent_topic_W{topic_num}"])
+            times_weight_multipled_topic_weight = time_weight * tweet_cohort[f"~sent_topic_W{topic_num}"]
+            score_numer = np.sum(times_weight_multipled_topic_weight * tweet_cohort["~sent_overall"])
+            score_denom = np.sum(times_weight_multipled_topic_weight)
             if score_denom > 0:
                 senti_scores = senti_scores + [score_numer / score_denom]
             elif score_denom == 0:
@@ -1189,7 +1191,7 @@ def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_fea
             ensemble_estimator.add(LSTM(**kwargs))
         
     ensemble_estimator.add(Dense(units=1, activation='linear'))
-    opt = keras.optimizers.Adam(learning_rate=model_hyper_params["testing_scoring"])
+    opt = keras.optimizers.Adam(learning_rate=model_hyper_params["learning_rate"])
     ensemble_estimator.compile(optimizer=opt, loss=model_hyper_params["testing_scoring"])
     ensemble_estimator.random_state = global_random_state
     ensemble_estimator.dropout_cols_ = dropout_cols
@@ -1223,20 +1225,19 @@ class DRSLinRegRNN():
         X_indy_val, X_val = return_lookback_appropriate_index_andor_data(X_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
         Y_indy_val, Y_val = return_lookback_appropriate_index_andor_data(Y_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
 
-        if model.model_hyper_params["early_stopping"] != 0:
-            early_stopping = EarlyStopping(monitor='val_loss', patience=model.model_hyper_params["early_stopping"], restore_best_weights=True)
-            #history = model.fit(X, Y, epochs=model.model_hyper_params["epochs"], validation_data=(X_val, Y_val), callbacks=[early_stopping], verbose=verbose)
-            history = model.fit(X, Y, epochs=model.model_hyper_params["epochs"], callbacks=[early_stopping], verbose=verbose)
+        if self.model_hyper_params["early_stopping"] != 0:
+            early_stopping = EarlyStopping(monitor='val_loss', patience=self.model_hyper_params["early_stopping"], restore_best_weights=True)
+            history = model.fit(X, Y, epochs=self.model_hyper_params["epochs"], validation_data=(X_val, Y_val), callbacks=[early_stopping], verbose=verbose)
         else:
-            history = model.fit(X, Y, epochs=model.model_hyper_params["epochs"], verbose=verbose)
+            history = model.fit(X, Y, epochs=self.model_hyper_params["epochs"], validation_data=(X_val, Y_val), verbose=verbose)
 
         # Train the model with early stopping
         
         
-        model.train_loss = history.history['loss']
-        model.val_loss   = history.history['val_loss']
+        #model.train_loss = history.history['loss']
+        #model.val_loss   = history.history['val_loss']
         
-        return model, history.history['loss'][-1], history.history['val_loss'][-1]
+        return model#, history.history['loss'][-1], history.history['val_loss'][-1]
              
 
     def evaluate_ensemble(self, df_X, df_y, pred_steps_value, confidences_before_betting_PC, financial_value_scaling):
@@ -1301,6 +1302,8 @@ class DRSLinRegRNN():
         scaler_y = MinMaxScaler()
         self.scaler_X = scaler_X.fit(df_X)
         self.scaler_y = scaler_y.fit(df_y)
+        self.X_train_list = []
+        self.y_train_list = []
         
         del scaler_X, scaler_y
         for train_index, val_index in kf.split(df_X):
@@ -1323,7 +1326,9 @@ class DRSLinRegRNN():
                 # initialising and prepping
                 single_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features, dropout_cols)
                 global_random_state += 1
-                single_estimator, train_loss, val_loss = self.return_single_ensable_model_fitted_with_early_stopping(single_estimator, X_train, y_train, X_val, y_val)
+                single_estimator = self.return_single_ensable_model_fitted_with_early_stopping(single_estimator, X_train, y_train, X_val, y_val)
+                self.X_train_list = [X_train]
+                self.y_train_list = [y_train]
                 
                 # produce standard training scores
                 y_pred_train = self.custom_single_predict(X_train, single_estimator)
@@ -1420,7 +1425,9 @@ class DRSLinRegRNN():
         #save scaler and other assets
         additional_assets_dict = {
             "scaler_X" : self.scaler_X,
-            "scaler_y" : self.scaler_y
+            "scaler_y" : self.scaler_y,
+            "X_train_list" : self.X_train_list,
+            "y_train_list" : self.y_train_list
         }
         with open(os.path.join(folder_path,"additional_assets.pkl"), "wb") as file:
                 pickle.dump(additional_assets_dict, file)
@@ -1447,8 +1454,10 @@ class DRSLinRegRNN():
         # load additional factors
         with open(os.path.join(predictor_location_folder_path,"additional_assets.pkl"), "rb") as file:
             additional_assets_dict = pickle.load(file)
-            self.scaler_X = additional_assets_dict["scaler_X"]
-            self.scaler_y = additional_assets_dict["scaler_y"]
+            self.scaler_X       = additional_assets_dict["scaler_X"]
+            self.scaler_y       = additional_assets_dict["scaler_y"]
+            self.X_train_list   = additional_assets_dict["X_train_list"]
+            self.y_train_list   = additional_assets_dict["y_train_list"]
 
         # check that the input parameters are the same
         with open(os.path.join(predictor_location_folder_path,"input_dict.pkl"), "rb") as file:
