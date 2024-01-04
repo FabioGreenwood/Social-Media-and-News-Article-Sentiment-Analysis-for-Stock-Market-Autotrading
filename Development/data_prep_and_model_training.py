@@ -1304,7 +1304,8 @@ class DRSLinRegRNN():
         self.scaler_y = scaler_y.fit(df_y)
         self.X_train_list = []
         self.y_train_list = []
-        
+        self.y_pred_list = []
+        self.y_val_list = []
         del scaler_X, scaler_y
         for train_index, val_index in kf.split(df_X):
             count += 1
@@ -1333,7 +1334,8 @@ class DRSLinRegRNN():
                 # produce standard training scores
                 y_pred_train = self.custom_single_predict(X_train, single_estimator)
                 y_pred_val = self.custom_single_predict(X_val, single_estimator)
-                
+                self.y_pred_list = [y_pred_val]
+                self.y_val_list = [y_val]
 
                 # collect training, validation, and validation additional analysis scores
                 training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
@@ -1433,12 +1435,10 @@ class DRSLinRegRNN():
         
    
     def save_training_data(self, folder_path):
-        if hasattr(self, "X_train_list"):
-            for i, X_train in enumerate(self.X_train_list):
-                X_train.to_csv(os.path.join(folder_path,"X_train{}.csv".format(i)))
-        if hasattr(self, "y_train_list"):
-            for i, y_train in enumerate(self.y_train_list):
-                y_train.to_csv(os.path.join(folder_path,"y_train{}.csv".format(i)))
+        for target_str in ["X_train_list", "y_train_list", "y_pred_list", "y_val_list"]:
+            if hasattr(self, target_str):
+                for i, target_list_single in enumerate(getattr(self, target_str)):
+                    target_list_single.to_csv(os.path.join(folder_path,"{}_{}.csv".format(target_str, i)))
 
 
     def predict_ensemble(self, X): #FG_action: This is where the new error is
