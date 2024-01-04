@@ -632,7 +632,7 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     print("annotating {} tweets/news articles".format(len(df_annotated_tweets.index)))
     start_time          = datetime.now()
     
-    # Calculate sentiment scores for all tweets
+    """# Calculate sentiment scores for all tweets
     sentiment_scores = df_annotated_tweets['body'].apply(lambda text: sentiment_method.polarity_scores(text)['compound'])
     sentiment_scores.name = "~sent_overall"
 
@@ -647,12 +647,21 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     temp_list = []
     for indy in topic_weights.index: temp_list = temp_list + [topic_weights[indy]]
     topic_weights_prepped = pd.DataFrame(temp_list, index=sentiment_scores.index, columns=sentiment_col_strs)
+    sentiment_analysis = pd.concat([sentiment_scores, topic_weights_prepped], axis=1, ignore_index=False)"""
+    sentiment_scores = df_annotated_tweets['body'].apply(lambda text: sentiment_method.polarity_scores(text)['compound'])
+    # Calculate topic weights for all tweets
+    topic_weights = df_annotated_tweets['body'].apply(lambda text: return_topic_weight(text, topic_model_dict, num_topics))
+    topic_weights = topic_weights.apply(lambda topic_tuples: [t[1] for t in topic_tuples] if len(topic_tuples) == num_topics else list(np.zeros(num_topics)))
+    if topic_weight_square_factor != 1:
+        topic_weights = topic_weights.apply(lambda x: adjust_topic_weights(x, topic_weight_square_factor))
+
+    # Combine sentiment and topic weights
+    topic_weights_prepped = pd.DataFrame(topic_weights.tolist(), index=sentiment_scores.index, columns=sentiment_col_strs)
+    sentiment_scores.name = "~sent_overall"
     sentiment_analysis = pd.concat([sentiment_scores, topic_weights_prepped], axis=1, ignore_index=False)
-    
 
     # Add the sentiment and topic weight columns to the DataFrame
     df_annotated_tweets[sentiment_analysis.columns] = sentiment_analysis
-    
     
     return df_annotated_tweets
 

@@ -117,60 +117,47 @@ def return_results_X_min_plus_minus_accuracy(y_preds, y_test, pred_steps_list, c
         y_test = y_test.loc[merged_df.index]
         y_preds = y_preds.loc[merged_df.index]
         
-        x_values = list(y_test.iloc[:,0].values)
-        y_values = list(y_preds.iloc[:,0].values)
-        for time_step in range(max(pred_steps_list), len(y_test.index)):
-            
-            #basic values
-            
-            original_value      = x_values[time_step - steps_back]
-            expected_difference = y_values[time_step] - original_value
-            actual_difference   = x_values[time_step] - original_value
-            if financial_value_scaling == None:
-                relative_confidence = expected_difference / original_value
-            else:
-                relative_confidence = expected_difference
-            if not actual_difference * expected_difference == 0:
-                count += 1
-            
-            
-            #basic count scoring 
-            if abs(actual_difference * expected_difference) > 0:
-                count_correct += 1
-            
-            #bets with confidence scoring
-            for confidence_threshold in confidences_before_betting_PC:
-                if   abs(relative_confidence) > confidence_threshold and actual_difference * expected_difference > 0:
-                    count_bets_with_confidence              [steps_back][confidence_threshold] += 1
-                    count_correct_bets_with_confidence      [steps_back][confidence_threshold] += 1
-                    count_correct_bets_with_confidence_score[steps_back][confidence_threshold] += abs(actual_difference)
-                    count_correct_bets_with_confidence_score_weight[steps_back][confidence_threshold] += abs(actual_difference) * (abs(relative_confidence) - confidence_threshold)
-                    count_correct_bets_with_confidence_score_weight_total[steps_back][confidence_threshold] += (abs(relative_confidence) - confidence_threshold)
-                    
-                elif abs(relative_confidence) > confidence_threshold and actual_difference * expected_difference < 0:
-                    count_bets_with_confidence              [steps_back][confidence_threshold] += 1
-                    count_correct_bets_with_confidence      [steps_back][confidence_threshold] += 0
-                    count_correct_bets_with_confidence_score[steps_back][confidence_threshold] -= abs(actual_difference)
-                    count_correct_bets_with_confidence_score_weight[steps_back][confidence_threshold] -= abs(actual_difference) * (abs(relative_confidence) - confidence_threshold)
-                    count_correct_bets_with_confidence_score_weight_total[steps_back][confidence_threshold] += (abs(relative_confidence) - confidence_threshold)
-                
-                
-                    
+        x_values = y_test.iloc[:,0].values
+        y_values = y_preds.iloc[:,0].values
 
-        #Total scores for ticker steps_back conbination
-        results_x_min_plus_minus_PC[steps_back] = count_correct / count
+        results_bets_with_confidence_proportion     = {steps_back: dict()}
+        results_x_min_plus_minus_PC_confindence     = {steps_back: dict()}
+        results_x_min_plus_minus_score_confidence   = {steps_back: dict()}
+        results_x_min_plus_minus_score_confidence   = {steps_back: dict()}
+
         for confidence_threshold in confidences_before_betting_PC:
-            results_bets_with_confidence_proportion           [steps_back][confidence_threshold] = count_bets_with_confidence[steps_back][confidence_threshold] / count
-            if count_bets_with_confidence                           [steps_back][confidence_threshold] > 0:
-                results_x_min_plus_minus_PC_confindence           [steps_back][confidence_threshold] = count_correct_bets_with_confidence             [steps_back][confidence_threshold] / count_bets_with_confidence                           [steps_back][confidence_threshold]
-                results_x_min_plus_minus_score_confidence         [steps_back][confidence_threshold] = count_correct_bets_with_confidence_score       [steps_back][confidence_threshold] / count_bets_with_confidence                           [steps_back][confidence_threshold]
-                results_x_min_plus_minus_score_confidence_weighted[steps_back][confidence_threshold] = count_correct_bets_with_confidence_score_weight[steps_back][confidence_threshold] / count_correct_bets_with_confidence_score_weight_total[steps_back][confidence_threshold]
-            else:
-                results_x_min_plus_minus_PC_confindence           [steps_back][confidence_threshold] = 0
-                results_x_min_plus_minus_score_confidence         [steps_back][confidence_threshold] = 0
-                results_x_min_plus_minus_score_confidence_weighted[steps_back][confidence_threshold] = 0
-                
-                
+            
+            
+            # proportion of correct bets
+            x = pd.DataFrame(x_values)
+            y = pd.DataFrame(y_values)
+            
+            # filter out bets not confident to make
+            x[0] = x[0].apply(lambda x: x if abs(x) > confidence_threshold else 0)
+
+            ## proportion of bets taken
+            results_bets_with_confidence_proportion[steps_back][confidence_threshold] = (abs(x[0]) > 0).sum() / len(x[0])
+
+            ## proportion up/down correctly bet
+            z = x * y
+            results_x_min_plus_minus_PC_confindence[steps_back][confidence_threshold] = (z[0] > 0).sum() / (abs(z[0]) > 0).sum()
+
+            ## first scoring method
+            # give one weighting to all accepted bets
+            stake_a = pd.DataFrame()
+            stake_a[0] = x[0].apply(lambda x: 1 if abs(x) > confidence_threshold else 0)
+            score_correct = (stake_a*y).sum()
+            score_both = abs(stake_a*y).sum()
+            results_x_min_plus_minus_score_confidence[steps_back][confidence_threshold] = score_correct.values[0] / score_both.values[0]
+
+            ## second scoring method FG_action: replace
+            # calc stake in all accepted bets
+            stake_b = pd.DataFrame()
+            stake_b[0] = x[0].apply(lambda x: x - 0.5 * confidence_threshold if x > confidence_threshold else (x + 0.5 * confidence_threshold if -x > confidence_threshold else 0))
+            score_correct = (stake_b*y).sum()
+            score_both = abs(stake_b*y).sum()
+            results_x_min_plus_minus_score_confidence[steps_back][confidence_threshold] = score_correct.values[0] / score_both.values[0]
+           
     
     #xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     results_dict = dict()
