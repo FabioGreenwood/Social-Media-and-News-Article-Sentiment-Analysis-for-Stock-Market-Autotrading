@@ -1426,12 +1426,21 @@ class DRSLinRegRNN():
         additional_assets_dict = {
             "scaler_X" : self.scaler_X,
             "scaler_y" : self.scaler_y,
-            "X_train_list" : self.X_train_list,
-            "y_train_list" : self.y_train_list
         }
         with open(os.path.join(folder_path,"additional_assets.pkl"), "wb") as file:
                 pickle.dump(additional_assets_dict, file)
+        self.save_training_data(self, folder_path)
+        
    
+    def save_training_data(self, folder_path):
+        if hasattr(self, "X_train_list"):
+            for i, X_train in enumerate(self.X_train_list):
+                X_train.to_csv(os.path.join(folder_path,"X_train{}.csv".format(i)))
+        if hasattr(self, "y_train_list"):
+            for i, y_train in enumerate(self.y_train_list):
+                y_train.to_csv(os.path.join(folder_path,"y_train{}.csv".format(i)))
+
+
     def predict_ensemble(self, X): #FG_action: This is where the new error is
         
         y_ensemble = pd.DataFrame()
@@ -1456,8 +1465,6 @@ class DRSLinRegRNN():
             additional_assets_dict = pickle.load(file)
             self.scaler_X       = additional_assets_dict["scaler_X"]
             self.scaler_y       = additional_assets_dict["scaler_y"]
-            self.X_train_list   = additional_assets_dict["X_train_list"]
-            self.y_train_list   = additional_assets_dict["y_train_list"]
 
         # check that the input parameters are the same
         with open(os.path.join(predictor_location_folder_path,"input_dict.pkl"), "rb") as file:
