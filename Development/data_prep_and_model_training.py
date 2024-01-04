@@ -1328,14 +1328,14 @@ class DRSLinRegRNN():
                 single_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features, dropout_cols)
                 global_random_state += 1
                 single_estimator = self.return_single_ensable_model_fitted_with_early_stopping(single_estimator, X_train, y_train, X_val, y_val)
-                self.X_train_list = [X_train]
-                self.y_train_list = [y_train]
+                self.X_train_list += [X_train]
+                self.y_train_list += [y_train]
                 
                 # produce standard training scores
                 y_pred_train = self.custom_single_predict(X_train, single_estimator)
                 y_pred_val = self.custom_single_predict(X_val, single_estimator)
-                self.y_pred_list = [y_pred_val]
-                self.y_val_list = [y_val]
+                self.y_pred_list += [y_pred_val]
+                self.y_val_list += [y_val]
 
                 # collect training, validation, and validation additional analysis scores
                 training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
@@ -1431,7 +1431,7 @@ class DRSLinRegRNN():
         }
         with open(os.path.join(folder_path,"additional_assets.pkl"), "wb") as file:
                 pickle.dump(additional_assets_dict, file)
-        self.save_training_data(self, folder_path)
+        self.save_training_data(folder_path)
         
    
     def save_training_data(self, folder_path):
