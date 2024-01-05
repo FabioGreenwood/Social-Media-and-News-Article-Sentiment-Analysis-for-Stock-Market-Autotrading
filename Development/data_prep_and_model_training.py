@@ -1287,7 +1287,6 @@ class DRSLinRegRNN():
                 training_scores_dict_list += [training_scores_dict_list_new]
                 validation_scores_dict_list += [validation_scores_dict_list_new]
                 additional_validation_dict_list += [additional_validation_dict_list_new]
-                self.estimators_ = self.estimators_ + [single_estimator]
                 count += 1
 
         training_scores_dict = average_list_of_identical_dicts(training_scores_dict_list)
