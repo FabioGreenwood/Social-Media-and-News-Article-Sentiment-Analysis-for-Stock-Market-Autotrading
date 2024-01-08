@@ -44,7 +44,7 @@ import hashlib
 
 default_temporal_params_dict        = {
     "train_period_start"    : datetime.strptime('01/01/16 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/07/19 00:00:00', global_strptime_str),
+    "train_period_end"      : datetime.strptime('01/07/19 00:00:00', global_strptime_str), 
     "time_step_seconds"     : 5*60, #5 mins,
     "test_period_start"     : datetime.strptime('01/07/19 00:00:00', global_strptime_str),
     "test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str)
@@ -93,26 +93,27 @@ default_model_hyper_params          = {
     "name" : "RandomSubspace_RNN_Regressor", #Multi-layer Perceptron regressor
         #general hyperparameters
     "n_estimators_per_time_series_blocking" : 1,
-    "testing_scoring"               : ["r2", "mse", "mae"],
+    "testing_scoring"               : "mse", #["r2", "mse", "mae"],
     "estimator__alpha"                 : 0.05,
-    "estimator__activation"            : 'relu',
+    "estimator__activation"            : 'softmax',
     "cohort_retention_rate_dict"       : default_cohort_retention_rate_dict,
     "general_adjusting_square_factor" : 1,
-    "epochs" : 60,
+    "epochs" : 40,
     "lookbacks" : 10,
     "batch_ratio" : 1,
     "shuffle_fit" : False,
-    "K_fold_splits" : 5, #FG_placeholder,
+    "K_fold_splits" : 5,
     "scaler_cat" : 3,  # 0:no scaling, 1: standard scaling (only from the MinMaxScaler object), 2: custom scaling, 3: individual scaling
     "early_stopping" : 3, #this marks the patience value, if zero, feature is off
     "learning_rate" : 0.001
     }
 default_reporting_dict              = {
-    "confidence_thresholds" : [0, 0.01, 0.02, 0.035, 0.05, 0.1],
-    "confidence_thresholds_inserted_to_df" : {
-        "PC_confindence" : [0.02],
-        "score_confidence" : [0.02],
-        "score_confidence_weighted" : [0.02]}}
+    "confidence_thresholds" : [0, 0.2, 0.50, 0.70, 0.90],
+#    "confidence_thresholds_inserted_to_df" : {
+#        "PC_confindence" : [0.02],
+#        "score_confidence" : [0.02],
+#        "score_confidence_weighted" : [0.02]}
+        }
 
 default_input_dict = {
     "temporal_params_dict"      : default_temporal_params_dict,
@@ -170,9 +171,11 @@ def save_designs_record_csv_and_dict(records_path_list, df_designs_record=None, 
         file_path = os.path.join(path, optim_run_name)
         
         if type(df_designs_record) == pd.core.frame.DataFrame:
+            df_designs_record_T = df_designs_record.T
             try:
                 df_designs_record.to_csv(file_path + ".csv", index=False)
                 df_designs_record.to_csv(file_path + ".csvBACKUP", index=False)
+                df_designs_record_T.to_csv(file_path + "_T" + ".csv", index=False)
             except:
                 df_designs_record.to_csv(file_path + ".csvBACKUP", index=False)
                 print("please close the csv")
@@ -585,8 +588,10 @@ def update_global_record(pred_steps, df_designs_record, experi_params_list, run_
     try:
         df_global_record.to_csv(global_record_path)
         df_global_record.to_csv(global_record_path + "DONTTOUCH")
+        df_global_record_t = df_global_record.T
+        df_global_record_t.to_csv(global_record_path[:-4] + "T")
     except:
-        df_global_record.to_csv(global_record_path + "DONTTOUCH")    
+        df_global_record.to_csv(global_record_path + "DONTTOUCH")
     
 def experiment_manager(
     optim_run_name,
@@ -760,20 +765,8 @@ design_space_dict = {
             },
         "general_adjusting_square_factor" : [3, 2, 1, 0],
         "estimator__alpha"                : [1e-11, 1e-10, 1e-9, 1e-8, 1e-7], 
-        "lookbacks"                       : [8, 10, 15, 20, 25, 30, 40],
-        "early_stopping" : [0, 3, 5, 7], 
-        "epochs" : [10, 20, 30, 50],
-        "n_estimators_per_time_series_blocking" : [1, 3],
-        "testing_scoring" : {
-            0 : "r2",
-            1 : "mse",
-            2 : "mae"
-            },
-        "learning_rate" : [0.001, 0.0005],
-        "estimator__activation" : {
-            0 : "relu",
-            1 : "softmax"
-            },
+        "lookbacks"                       : [8, 10, 15, 20, 25],
+        "early_stopping" : [5, 7, 9, 12]
         },
         
     "string_key" : {}
@@ -783,19 +776,38 @@ design_space_dict = {
 
 
 
+
 global_run_count = 0
 
-init_doe = 35
 init_doe = [
-[2,	9,	1,      7200,   0,	2,	4,	3,	1.00E-09,	10, 3, 20, 1, 2, 0.001, 0], #baseline old activiation back
-[2,	9,	1,      7200,   0,	2,	4,	3,	1.00E-09,	10, 0, 50, 1, 2, 0.001, 0], #more epochs
-[2,	9,	1,      7200,   0,	2,	4,	3,	1.00E-09,	10, 3, 20, 3, 2, 0.001, 0], #more ensamble models
-[2,	9,	1,      7200,   0,	2,	4,	3,	1.00E-09,	10, 3, 20, 1, 1, 0.001, 0], #train with MSE loss function
-[2,	9,	1,      7200,   0,	2,	4,	3,	1.00E-09,	10, 3, 20, 1, 1, 0.0005, 0], #decreased learning rate
-[2,	9,	1,      7200,   0,	2,	4,	3,	1.00E-09,	10, 3, 20, 1, 1, 0.001, 1], #softmax activation
-
-]
-
+    [2,	   9,  1,   720,    0,	2,	4,	3,	1e-09,   10,  7],
+    [2,   25,  13,  25200,  1,  4,  3,  3,  1e-08,   25,   5], # 0
+    [2,   25,  13,  180,    0,  2,  2,  2,  1e-11,   30,   12], # 1
+    [2,   25,  3,   25200,  0,  2,  3,  0,  1e-08,   8,    12], # 2
+    [2,   25,  5,   7200,   0,  4,  4,  0,  1e-07,   20,   7], # 3
+    [2,   25,  2,   25200,  0,  4,  4,  3,  1e-08,   15,   7], # 4
+    [2,   25,  13,  900,    1,  2,  4,  1,  1e-07,   10,   7], # 5
+    [2,   25,  13,  25200,  1,  2,  4,  1,  1e-07,   10,   7], # 6
+    #[2,   25,  3,   7200,   1,  2,  2,  0,  1e-11,   10,   7], # 7
+    #[2,   25,  13,  900,    0,  2,  0,  0,  1e-08,   8,    12], # 8
+    #[2,   25,  2,   7200,   0,  4,  4,  1,  1e-09,   10,   5], # 9
+    #[2,   25,  2,   7200,   0,  4,  4,  1,  1e-09,   10,   5], # 10
+    #[2,   25,  2,   25200,  0,  4,  2,  3,  1e-11,   30,   5], # 11
+    #[2,   25,  13,  25200,  1,  2,  2,  0,  1e-11,   10,   7], # 12
+    #[2,   25,  3,   7200,   1,  2,  2,  0,  1e-11,   10,   7], # 13
+    #[2,   25,  2,   7200,   0,  4,  4,  1,  1e-09,   10,   5], # 14
+    #[2,   25,  13,  7200,   1,  2,  2,  0,  1e-11,   20,   7], # 15
+    #[2,   25,  2,   25200,  0,  4,  2,  3,  1e-11,   30,   5], # 16
+    #[2,   25,  13,  7200,   1,  2,  2,  0,  1e-11,   20,   7], # 17
+    #[2,   25,  2,   7200,   0,  4,  4,  1,  1e-09,   10,   5], # 18
+    #[2,   17,  13,  7200,   1,  2,  2,  0,  1e-11,   20,   7], # 19
+    #[1,   25,  1,   180,    1,  4,  1,  1,  1e-09,   25,   5], # 20
+    #[1,   25,  5,   25200,  1,  2,  3,  1,  1e-10,   30,   7], # 
+    #[1,   17,  0.7, 7200,   0,  1,  2,  3,  1e-08,   10,   12], # 
+    #[1,   5,   0.7, 7200,   1,  4,  0,  2,  1e-10,   40,   5], # 
+    #[2,   25,  2,   7200,   0,  4,  4,  1,  1e-09,   10,   5], # 
+    #[2,   17,  13,  7200,   1,  2,  2,  0,  1e-11,   20,   7]  # 
+    ]
 
 
 """ experiment checklist:
@@ -815,7 +827,7 @@ checklist for restarting the experiment
 # scenario parameters: topic_qty, pred_steps
 
 
-removal_ratio = int(4.5e0)
+removal_ratio = int(1e0)
 scenario_dict = {
         0 : {"topics" : None, "pred_steps" : 15},
         1 : {"topics" : 1, "pred_steps" : 15},
@@ -829,19 +841,22 @@ scenario_dict = {
         9 : {"topics" : None, "pred_steps" : 1},
         10: {"topics" : 1, "pred_steps" : 1},
         11: {"topics" : 0, "pred_steps" : 1},
-        
-        
-        
     }
-shard = 0
+shard = None
+print("shard: {}".format(str(shard)))
 enable_GPU = False
 if enable_GPU == False:
     import tensorflow as tf
     tf.config.set_visible_devices([], 'GPU')
 if shard == None:
     loop = scenario_dict.keys()
+    init_doe = [init_doe[0]]
 else:
-    loop = [shard]
+    if (shard % 2) == 0:
+        init_doe = init_doe.reverse()
+    loop = [shard, shard + 1, shard + 2]
+
+
 
 for scenario_ID in loop:
     
@@ -861,9 +876,9 @@ for scenario_ID in loop:
     default_input_dict["senti_inputs_params_dict"]["topic_training_tweet_ratio_removed"] = removal_ratio
 
     # setting the optimisation objective functions
-    confidence_scoring_measure_tuple_1 = ("validation","results_x_mins_weighted",pred_steps,0.02)
-    confidence_scoring_measure_tuple_2 = ("validation","results_x_mins_PC",pred_steps,0.02)
-    confidence_scoring_measure_tuple_3 = ("validation","results_x_mins_score",pred_steps,0.02)
+    confidence_scoring_measure_tuple_1 = ("validation","results_x_mins_weighted",pred_steps,0.5)
+    confidence_scoring_measure_tuple_2 = ("validation","results_x_mins_PC",pred_steps,0.5)
+    confidence_scoring_measure_tuple_3 = ("validation","results_x_mins_score",pred_steps,0.5)
     
     
     optim_scores_vec = ["validation_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2, confidence_scoring_measure_tuple_3]
@@ -881,7 +896,7 @@ for scenario_ID in loop:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "parallel_run_7_{}.csv".format(str(shard))
+    scenario_name_str = scenario_name_str + "run3_{}.csv".format(str(shard))
 
     
     if __name__ == '__main__':
@@ -891,13 +906,13 @@ for scenario_ID in loop:
             scenario_name_str,
             design_space_dict,
             initial_doe_size_or_DoE=init_doe,
-            max_iter=5,
+            max_iter=0,
             model_start_time = model_start_time,
             force_restart_run = False,
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/parallel_run_7_{}.csv".format(str(shard)))
+            global_record_path=os.path.join(global_general_folder,r"outputs/run3_{}.csv".format(str(shard)))
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
