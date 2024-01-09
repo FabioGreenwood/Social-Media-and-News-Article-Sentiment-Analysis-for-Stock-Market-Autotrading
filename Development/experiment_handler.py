@@ -589,7 +589,7 @@ def update_global_record(pred_steps, df_designs_record, experi_params_list, run_
         df_global_record.to_csv(global_record_path)
         df_global_record.to_csv(global_record_path + "DONTTOUCH")
         df_global_record_t = df_global_record.T
-        df_global_record_t.to_csv(global_record_path[:-4] + "T")
+        df_global_record_t.to_csv(global_record_path[:-4] + "T.csv")
     except:
         df_global_record.to_csv(global_record_path + "DONTTOUCH")
     
@@ -787,7 +787,7 @@ init_doe = [
     [2,   25,  5,   7200,   0,  4,  4,  0,  1e-07,   20,   7], # 3
     [2,   25,  2,   25200,  0,  4,  4,  3,  1e-08,   15,   7], # 4
     [2,   25,  13,  900,    1,  2,  4,  1,  1e-07,   10,   7], # 5
-    [2,   25,  13,  25200,  1,  2,  4,  1,  1e-07,   10,   7], # 6
+    #[2,   25,  13,  25200,  1,  2,  4,  1,  1e-07,   10,   7], # 6
     #[2,   25,  3,   7200,   1,  2,  2,  0,  1e-11,   10,   7], # 7
     #[2,   25,  13,  900,    0,  2,  0,  0,  1e-08,   8,    12], # 8
     #[2,   25,  2,   7200,   0,  4,  4,  1,  1e-09,   10,   5], # 9
@@ -842,7 +842,7 @@ scenario_dict = {
         10: {"topics" : 1, "pred_steps" : 1},
         11: {"topics" : 0, "pred_steps" : 1},
     }
-shard = None
+shard = 9
 print("shard: {}".format(str(shard)))
 enable_GPU = False
 if enable_GPU == False:
@@ -857,9 +857,8 @@ else:
     loop = [shard, shard + 1, shard + 2]
 
 
-
 for scenario_ID in loop:
-    
+
     index_of_topic_qty = return_keys_within_2_level_dict(design_space_dict).index("senti_inputs_params_dict_topic_qty")
 
     # editing topic quantity values for scenario, 2 lines
@@ -879,15 +878,15 @@ for scenario_ID in loop:
     confidence_scoring_measure_tuple_1 = ("validation","results_x_mins_weighted",pred_steps,0.5)
     confidence_scoring_measure_tuple_2 = ("validation","results_x_mins_PC",pred_steps,0.5)
     confidence_scoring_measure_tuple_3 = ("validation","results_x_mins_score",pred_steps,0.5)
-    
-    
+
+
     optim_scores_vec = ["validation_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2, confidence_scoring_measure_tuple_3]
-    
+
     inverse_for_minimise_vec = [True, False, False, False]
-    
+
     optim_scores_vec = ["validation_" + testing_measure]
     inverse_for_minimise_vec = [True]
-    
+
 
     #what around to ensure that single topic sentiment data in more used in the model
     if default_senti_inputs_params_dict["topic_qty"] == 1:
@@ -896,9 +895,9 @@ for scenario_ID in loop:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "run3_{}.csv".format(str(shard))
+    scenario_name_str = scenario_name_str + "run5_{}.csv".format(str(shard))
 
-    
+
     if __name__ == '__main__':
         #scenario_name_str = "test 19"
         print("running scenario " + str(scenario_ID) + ": " + scenario_name_str + " - " + datetime.now().strftime("%H:%M:%S"))
@@ -912,7 +911,7 @@ for scenario_ID in loop:
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/run3_{}.csv".format(str(shard)))
+            global_record_path=os.path.join(global_general_folder,r"outputs/run5_{}.csv".format(str(shard)))
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 

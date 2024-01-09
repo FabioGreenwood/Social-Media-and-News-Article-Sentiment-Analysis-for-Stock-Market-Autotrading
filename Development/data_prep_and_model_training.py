@@ -1120,7 +1120,8 @@ def create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_
     train_test_split = 1
     if isinstance(df_sentiment_data, pd.DataFrame):
         df_sentiment_data.index = pd.to_datetime(df_sentiment_data.index)
-        df_sentiment_data = df_sentiment_data.loc[list(df_financial_data.index)]
+        common_indices = df_financial_data.index.intersection(df_sentiment_data.index)
+        df_sentiment_data = df_sentiment_data.loc[common_indices]
     data = pd.concat([df_financial_data, df_sentiment_data], axis=1, ignore_index=False)
 
     
