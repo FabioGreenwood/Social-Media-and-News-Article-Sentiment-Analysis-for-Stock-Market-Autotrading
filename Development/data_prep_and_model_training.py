@@ -269,6 +269,27 @@ def reshape_list_of_dicts(dict_list, key):
         output_list += [x[key]]
     return output_list
 
+def compare_dicts(dict1, dict2):
+    # Find keys that are common to both dictionaries
+    common_keys = set(dict1.keys()) & set(dict2.keys())
+
+    # Find keys that are unique to each dictionary
+    unique_keys_dict1 = set(dict1.keys()) - set(dict2.keys())
+    unique_keys_dict2 = set(dict2.keys()) - set(dict1.keys())
+
+    # Find key-value pairs with different values
+    different_values = {key: (dict1[key], dict2[key]) for key in common_keys if dict1[key] != dict2[key]}
+
+    # Combine all differences into a summary dictionary
+    differences = {
+        'common_keys': common_keys,
+        'unique_keys_dict1': unique_keys_dict1,
+        'unique_keys_dict2': unique_keys_dict2,
+        'different_values': different_values
+    }
+
+    return differences
+
 
 
 #%% SubModule – Stock Market Data Prep 
@@ -1229,7 +1250,7 @@ class DRSLinRegRNN():
         return model
 
     def return_single_ensable_model_fitted_with_early_stopping(self, model, X, Y, X_val, Y_val):
-        verbose = 1
+        verbose = 2
         X_indy, X = return_lookback_appropriate_index_andor_data(X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
         Y_indy, Y = return_lookback_appropriate_index_andor_data(Y, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
         X_indy_val, X_val = return_lookback_appropriate_index_andor_data(X_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
@@ -1461,10 +1482,31 @@ class DRSLinRegRNN():
 
         return output
     
-    def load(self, predictor_location_folder_path):
+    def load(self, predictor_location_folder_path, only_return_viability=False):
         folder_name = custom_hash(return_predictor_name(self.input_dict))
         folder_path = os.path.join(predictor_location_folder_path, folder_name+ "\\")
-        print("xxx loading predictor")
+        
+        with open(os.path.join(predictor_location_folder_path,"input_dict.pkl"), "rb") as file:
+            save_input_dict = pickle.load(file)
+        
+        # check that the input parameters are the same
+        if only_return_viability==True:
+            copy_A, copy_B = copy.deepcopy(save_input_dict), copy.deepcopy(self.input_dict)
+            # delete values that dont matter in comparition
+            del copy_A["senti_inputs_params_dict"]["sentiment_method"], copy_B["senti_inputs_params_dict"]["sentiment_method"]
+            del copy_A["temporal_params_dict"]['test_period_start'], copy_A["temporal_params_dict"]['test_period_end'], copy_B["temporal_params_dict"]['test_period_start'], copy_B["temporal_params_dict"]['test_period_end']
+            del copy_A["fin_inputs_params_dict"]["historical_file"], copy_B["fin_inputs_params_dict"]["historical_file"]
+            del copy_A["senti_inputs_params_dict"]["tweet_file_location"], copy_B["senti_inputs_params_dict"]["tweet_file_location"]
+
+            if not copy_A == copy_B:
+                print("ZZZZZZZZZZ differences in input dicts with identical hashcodes:{} found {}".format(str(folder_name), compare_dicts(copy_A, copy_B)))
+                return False
+            else:
+                print("predictor match OK")
+                return True
+        
+        # otherwise load the file
+        print("xxx loading predictor{}".format(folder_name))
         for filename in os.listdir(predictor_location_folder_path):
             if filename.endswith(".h5"):
                 file_path = os.path.join(predictor_location_folder_path, filename)
@@ -1475,22 +1517,13 @@ class DRSLinRegRNN():
             self.scaler_X       = additional_assets_dict["scaler_X"]
             self.scaler_y       = additional_assets_dict["scaler_y"]
 
-        # check that the input parameters are the same
-        with open(os.path.join(predictor_location_folder_path,"input_dict.pkl"), "rb") as file:
-            save_input_dict = pickle.load(file)
-        copy_A, copy_B = copy.deepcopy(save_input_dict), copy.deepcopy(self.input_dict)
-        del copy_A["senti_inputs_params_dict"]["sentiment_method"], copy_B["senti_inputs_params_dict"]["sentiment_method"]
-        del copy_A["temporal_params_dict"]['test_period_start'], copy_A["temporal_params_dict"]['test_period_end'], copy_B["temporal_params_dict"]['test_period_start'], copy_B["temporal_params_dict"]['test_period_end']
-        if 'financial_value_scaling' in list(copy_A["fin_inputs_params_dict"].keys()) and copy_A["fin_inputs_params_dict"]['financial_value_scaling'] == None:
-            del copy_A["temporal_params_dict"]['test_period_start']
-            if 'financial_value_scaling' in list(copy_B["fin_inputs_params_dict"].keys()) and copy_B["fin_inputs_params_dict"]['financial_value_scaling'] == None:
-                del copy_B["temporal_params_dict"]['test_period_start']
-        if not copy_A == copy_B:
-            raise ValueError("input dicts dont match")
+        
 
 
-def load_RNN_predictor(input_dict, predictor_location_folder_path):
+def load_RNN_predictor(input_dict, predictor_location_folder_path, only_return_viability=False):
         predictor = initiate_model(input_dict)
+        if only_return_viability == True:
+            return predictor.load(predictor_location_folder_path, only_return_viability=only_return_viability)
         predictor.load(predictor_location_folder_path)
         return predictor
 
@@ -1629,10 +1662,15 @@ def generate_testing_scores(predictor, input_dict, return_time_series=False):
 
 #%% main support methods
 
-def retrieve_model_and_training_scores(predictor_location_folder_path, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict):
+def retrieve_model_and_training_scores(predictor_location_folder_path, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict, only_return_viability=False):
     #predictor_location_file = "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\precalculated_assets\\predictive_model\\aapl_ps04_06_18_000000_pe01_09_20_000000_ts_sec300_tm_qty7_r_lt3600_r_hl3600_tm_alpha1_IDF-True_t_ratio_r100000.pred"
     input_dict = return_input_dict(temporal_params_dict = temporal_params_dict, fin_inputs_params_dict = fin_inputs_params_dict, senti_inputs_params_dict = senti_inputs_params_dict, outputs_params_dict = outputs_params_dict, model_hyper_params = model_hyper_params, reporting_dict = reporting_dict)
+    if only_return_viability == True:
+        return load_RNN_predictor(input_dict, predictor_location_folder_path, only_return_viability=only_return_viability)
+    
     model = load_RNN_predictor(input_dict, predictor_location_folder_path)
+    
+
     print("loading predictor: ", predictor_location_folder_path)
     df_financial_data = import_financial_data(
         target_file_path          = fin_inputs_params_dict["historical_file"], 
@@ -1723,8 +1761,11 @@ def retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inp
     predictor_name_entry = company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed
     predictor_name = return_predictor_name(return_input_dict(temporal_params_dict = temporal_params_dict, fin_inputs_params_dict = fin_inputs_params_dict, senti_inputs_params_dict = senti_inputs_params_dict, outputs_params_dict = outputs_params_dict, model_hyper_params = model_hyper_params, reporting_dict = reporting_dict))
     predictor_location_folder_path = predictor_folder_location_string + custom_hash(predictor_name) + "//"
+    
     if os.path.exists(predictor_location_folder_path):
-        predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = retrieve_model_and_training_scores(predictor_location_folder_path, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict)
+        model_matches = retrieve_model_and_training_scores(predictor_location_folder_path, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict, only_return_viability=True)    
+        if model_matches == True:
+            predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = retrieve_model_and_training_scores(predictor_location_folder_path, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict)
     else:
         print(datetime.now().strftime("%H:%M:%S") + " - generating model and testing scores")
         predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = generate_model_and_validation_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict)
