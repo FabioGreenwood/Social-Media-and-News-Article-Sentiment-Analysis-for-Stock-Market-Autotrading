@@ -1250,7 +1250,7 @@ class DRSLinRegRNN():
         return model
 
     def return_single_ensable_model_fitted_with_early_stopping(self, model, X, Y, X_val, Y_val):
-        verbose = 2
+        verbose = 0
         X_indy, X = return_lookback_appropriate_index_andor_data(X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
         Y_indy, Y = return_lookback_appropriate_index_andor_data(Y, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
         X_indy_val, X_val = return_lookback_appropriate_index_andor_data(X_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
@@ -1261,7 +1261,7 @@ class DRSLinRegRNN():
             history = model.fit(X, Y, epochs=self.model_hyper_params["epochs"], validation_data=(X_val, Y_val), callbacks=[early_stopping], verbose=verbose)
         else:
             history = model.fit(X, Y, epochs=self.model_hyper_params["epochs"], validation_data=(X_val, Y_val), verbose=verbose)
-
+        print(datetime.now().strftime("%H:%M:%S") + " - fit complete")
         # Train the model with early stopping
         
         
@@ -1406,7 +1406,7 @@ class DRSLinRegRNN():
 
     def custom_single_predict(self, df_X, single_estimator):
         index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
-        y_pred_values       = single_estimator.predict(input_data, verbose=1)
+        y_pred_values       = single_estimator.predict(input_data, verbose=0)
         y_pred_values       = self.scaler_y.inverse_transform(y_pred_values)
         y_pred_values = pd.DataFrame(y_pred_values, index=index)
 
