@@ -76,7 +76,8 @@ default_senti_inputs_params_dict    = {
     "tweet_file_location"   : os.path.join(global_general_folder,r"data/twitter_data/apple.csv"),
     "regenerate_cleaned_tweets_for_subject_discovery" : False,
     "inc_new_combined_stopwords_list" : True,
-    "topic_weight_square_factor" : 1
+    "topic_weight_square_factor" : 1,
+    "factor_tweet_attention" : False
 }
 default_outputs_params_dict         = {
     "output_symbol_indicators_tuple"    : ("aapl", "close"), 
@@ -791,8 +792,8 @@ init_doe = [
     [1,   25,  13,  25200,  1,  2,  4,  1,  1e-07,   10,   7], # 8
     [1,   25,  3,   7200,   1,  2,  2,  0,  1e-06,   10,   12], # 9
     [1,   25,  13,  900,    0,  2,  0,  0,  1e-05,   8,    12], # 10
-    [1,   25,  2,   7200,   0,  4,  4,  1,  1e-05,   10,   5], # 9
-    #[1,   25,  2,   7200,   0,  4,  4,  1,  1e-09,   10,   5], # 10
+    [1,   25,  2,   7200,   0,  4,  4,  1,  1e-05,   10,   5], # 11
+    [1,   13,  2,   7200,   1,  1,  2,  1,  1e-05,   25,   9], # 12
     #[1,   25,  2,   25200,  0,  4,  2,  3,  1e-11,   30,   5], # 11
     #[1,   25,  13,  25200,  1,  2,  2,  0,  1e-11,   10,   7], # 12
     #[1,   25,  3,   7200,   1,  2,  2,  0,  1e-11,   10,   7], # 13
@@ -844,7 +845,7 @@ scenario_dict = {
         11: {"topics" : 0, "pred_steps" : 1},
     }
 
-loop = [3, 4, 5]#[9, 10, 11]#
+loop = [9, 10, 11]#[3, 4, 5]#
 print("shard: {}".format(str(loop)))
 enable_GPU = False
 if enable_GPU == False:
@@ -894,7 +895,7 @@ for scenario_ID in loop:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "run6_{}.csv".format(str(scenario_ID))
+    scenario_name_str = scenario_name_str + "run7_{}.csv".format(str(scenario_ID))
 
 
     if __name__ == '__main__':
@@ -910,7 +911,7 @@ for scenario_ID in loop:
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/run6_{}.csv".format(str(scenario_ID)))
+            global_record_path=os.path.join(global_general_folder,r"outputs/run7_{}.csv".format(str(scenario_ID)))
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 

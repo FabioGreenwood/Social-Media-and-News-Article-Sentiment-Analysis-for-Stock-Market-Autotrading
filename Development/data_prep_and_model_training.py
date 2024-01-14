@@ -181,10 +181,12 @@ def return_annotated_tweets_name(company_symbol, train_period_start, train_perio
     name = name + return_topic_model_name(topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc)
     return name
 
-def return_sentiment_data_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe):
+def return_sentiment_data_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe, factor_tweet_attention):
     global global_strptime_str, global_strptime_str_filename
     name = return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor)
     name = name + "_ts_sec" + str(time_step_seconds) + "_r_lt" + str(rel_lifetime) + "_r_hl" + str(rel_hlflfe)
+    if factor_tweet_attention == True:
+        name = name + "_factor_tweet_attentionTRUE"
     return name
 
 def return_predictor_name(input_dict):
@@ -207,9 +209,10 @@ def return_predictor_name(input_dict):
     general_adjusting_square_factor   = input_dict["model_hyper_params"]["general_adjusting_square_factor"]
     lookbacks                         = input_dict["model_hyper_params"]["lookbacks"]
     batch_ratio                       = input_dict["model_hyper_params"]["batch_ratio"]
-    financial_value_scaling          = input_dict["fin_inputs_params_dict"]["financial_value_scaling"]
+    financial_value_scaling           = input_dict["fin_inputs_params_dict"]["financial_value_scaling"]
+    factor_tweet_attention            = input_dict["senti_inputs_params_dict"]["factor_tweet_attention"]
 
-    name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe)
+    name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe, factor_tweet_attention)
     predictor_hash = ""
     if not financial_value_scaling == None:
         predictor_hash += "_" + str(financial_value_scaling)
@@ -462,6 +465,7 @@ def retrieve_or_generate_sentiment_data(index, temporal_params_dict, fin_inputs_
     enforced_topic_model_nested_list = senti_inputs_params_dict["enforced_topics_dict"]
     new_combined_stopwords_inc = senti_inputs_params_dict["inc_new_combined_stopwords_list"]
     topic_weight_square_factor       = senti_inputs_params_dict["topic_weight_square_factor"]
+    factor_tweet_attention             = senti_inputs_params_dict["factor_tweet_attention"]
     
     #set period start/ends
     if training_or_testing == "training" or training_or_testing == "train":
@@ -476,7 +480,7 @@ def retrieve_or_generate_sentiment_data(index, temporal_params_dict, fin_inputs_
     #method
     #search for predictor
     sentiment_data_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["sentiment_data"]
-    sentiment_data_name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe)
+    sentiment_data_name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe, factor_tweet_attention)
     sentiment_data_location_file = sentiment_data_folder_location_string + sentiment_data_name + ".csv"
     if os.path.exists(sentiment_data_location_file):
         df_sentiment_data = pd.read_csv(sentiment_data_location_file)
@@ -510,6 +514,7 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
     new_combined_stopwords_inc          = senti_inputs_params_dict["inc_new_combined_stopwords_list"]
     enforced_topic_model_nested_list    = senti_inputs_params_dict["enforced_topics_dict"]
     topic_weight_square_factor          = senti_inputs_params_dict["topic_weight_square_factor"]
+    factor_tweet_attention             = senti_inputs_params_dict["factor_tweet_attention"]
 
     if training_or_testing == "training" or training_or_testing == "train":
         period_start  = temporal_params_dict["train_period_start"]
@@ -563,8 +568,19 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
     tweet_cohort_t1["tweet_cohort_start_post"]  = tweet_cohort_t1.index
     tweet_cohort_t1["tweet_cohort_end_post"]    = tweet_cohort_t1["tweet_cohort_start_post"].apply(lambda datetime: ((datetime - epoch_time)).total_seconds())
     tweet_cohort_t1["tweet_cohort_start_post"]  = tweet_cohort_t1["tweet_cohort_start_post"].apply(lambda datetime: ((datetime - epoch_time) - timedelta(seconds=relavance_lifetime)).total_seconds())
+    if factor_tweet_attention == False:
+        df_annotated_tweets["tweet_attention_score"] = 1
+    elif factor_tweet_attention == True:
+        df_annotated_tweets["tweet_attention_score"] = (0.2 + (df_annotated_tweets["comment_num"] + 0.2) * (df_annotated_tweets["retweet_num"] + 0.2) * (df_annotated_tweets["like_num"] + 0.2))
+    else:
+        raise ValueError("this value must be included")
+
+
+
+
+
     
-    def process_row_2(row, df_annotated_tweets=df_annotated_tweets, topic_num=num_topics, relavance_halflife=relavance_halflife):
+    def process_row_with_factor_tweet_attention(row, df_annotated_tweets=df_annotated_tweets, topic_num=num_topics, relavance_halflife=relavance_halflife):
         tweet_cohort_start_post = row["tweet_cohort_start_post"]
         tweet_cohort_end_post = row["tweet_cohort_end_post"]
         tweet_cohort = return_tweet_cohort_from_scratch(df_annotated_tweets, tweet_cohort_start_post, tweet_cohort_end_post)
@@ -575,18 +591,13 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
         senti_scores = []
         for topic_num in range(num_topics):
             times_weight_multipled_topic_weight = time_weight * tweet_cohort[f"~sent_topic_W{topic_num}"]
-            score_numer = np.sum(times_weight_multipled_topic_weight * tweet_cohort["~sent_overall"])
-            score_denom = np.sum(times_weight_multipled_topic_weight)
-            if score_denom > 0:
-                senti_scores = senti_scores + [score_numer / score_denom]
-            elif score_denom == 0:
-                senti_scores = senti_scores + [0]
-            else:
-                senti_scores = senti_scores + [2]
-        
+            score_numer = np.sum(times_weight_multipled_topic_weight * tweet_cohort["~sent_overall"] *  tweet_cohort["tweet_attention_score"])
+            score_denom = np.sum(times_weight_multipled_topic_weight *                                  tweet_cohort["tweet_attention_score"])
+            senti_scores = senti_scores + [score_numer / score_denom]
         return senti_scores
-        
-    data = tweet_cohort_t1.apply(process_row_2, axis=1)
+
+    data = tweet_cohort_t1.apply(process_row_with_factor_tweet_attention, axis=1)
+
     for indy in tweet_cohort_t1.index:
         df_sentiment_scores.loc[indy, :] = data[indy]
 
@@ -1275,46 +1286,55 @@ class DRSLinRegRNN():
         count = 0
         global global_random_state
         global_random_state = 42
-        # variables
-        training_scores_dict_list, validation_scores_dict_list, additional_validation_dict_list = [], [], []
-        kf = KFold(n_splits=self.K_fold_splits, shuffle=False)
 
-        print(datetime.now().strftime("%H:%M:%S") + " - evaluating model")
+        if hasattr(self,"training_scores_dict") and hasattr(self,"validation_scores_dict") and hasattr(self,"additional_validation_dict"):
+            training_scores_dict        = self.training_scores_dict
+            validation_scores_dict      = self.validation_scores_dict
+            additional_validation_dict  = self.additional_validation_dict
+        else:
+            # variables
+            training_scores_dict_list, validation_scores_dict_list, additional_validation_dict_list = [], [], []
+            kf = KFold(n_splits=self.K_fold_splits, shuffle=False)
 
-        for train_index, val_index in kf.split(df_X):
-            print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
-            for i_random in range(self.n_estimators_per_time_series_blocking):
-                n_features = df_X.shape[1]
-                dropout_cols = return_columns_to_remove(columns_list=df_X.columns, self=self)
+            print(datetime.now().strftime("%H:%M:%S") + " - evaluating model")
 
-                # data prep
-                X_train = df_X.loc[df_X.index[train_index].values].copy()
-                X_train.loc[:, dropout_cols] = 0
-                y_train = df_y.loc[df_y.index[train_index].values].copy()
+            for train_index, val_index in kf.split(df_X):
+                print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
+                for i_random in range(self.n_estimators_per_time_series_blocking):
+                    n_features = df_X.shape[1]
+                    dropout_cols = return_columns_to_remove(columns_list=df_X.columns, self=self)
 
-                X_val = df_X.loc[df_X.index[val_index].values].copy()
-                X_val.loc[:, dropout_cols] = 0
-                y_val = df_y.loc[df_y.index[val_index].values].copy()
+                    # data prep
+                    X_train = df_X.loc[df_X.index[train_index].values].copy()
+                    X_train.loc[:, dropout_cols] = 0
+                    y_train = df_y.loc[df_y.index[train_index].values].copy()
 
-                single_estimator = self.estimators_[count]
-                
-                # produce standard training scores
-                y_pred_train = self.custom_single_predict(X_train, single_estimator)
-                y_pred_val = self.custom_single_predict(X_val, single_estimator)
-                
+                    X_val = df_X.loc[df_X.index[val_index].values].copy()
+                    X_val.loc[:, dropout_cols] = 0
+                    y_val = df_y.loc[df_y.index[val_index].values].copy()
 
-                # collect training, validation, and validation additional analysis scores
-                training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"], self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
-                validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"], self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
-                training_scores_dict_list += [training_scores_dict_list_new]
-                validation_scores_dict_list += [validation_scores_dict_list_new]
-                additional_validation_dict_list += [additional_validation_dict_list_new]
-                count += 1
+                    single_estimator = self.estimators_[count]
 
-        training_scores_dict = average_list_of_identical_dicts(training_scores_dict_list)
-        validation_scores_dict = average_list_of_identical_dicts(validation_scores_dict_list)
-        additional_validation_dict = average_list_of_identical_dicts(additional_validation_dict_list)
-        
+                    # produce standard training scores
+                    y_pred_train = self.custom_single_predict(X_train, single_estimator)
+                    y_pred_val = self.custom_single_predict(X_val, single_estimator)
+
+
+                    # collect training, validation, and validation additional analysis scores
+                    training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"], self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
+                    validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"], self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
+                    training_scores_dict_list += [training_scores_dict_list_new]
+                    validation_scores_dict_list += [validation_scores_dict_list_new]
+                    additional_validation_dict_list += [additional_validation_dict_list_new]
+                    count += 1
+
+            training_scores_dict = average_list_of_identical_dicts(training_scores_dict_list)
+            validation_scores_dict = average_list_of_identical_dicts(validation_scores_dict_list)
+            additional_validation_dict = average_list_of_identical_dicts(additional_validation_dict_list)
+
+            self.training_scores_dict = training_scores_dict
+            self.validation_scores_dict = validation_scores_dict
+            self.additional_validation_dict = additional_validation_dict
 
         return self, training_scores_dict, validation_scores_dict, additional_validation_dict
 
@@ -1378,7 +1398,9 @@ class DRSLinRegRNN():
         training_scores_dict = average_list_of_identical_dicts(training_scores_dict_list)
         validation_scores_dict = average_list_of_identical_dicts(validation_scores_dict_list)
         additional_validation_dict = average_list_of_identical_dicts(additional_validation_dict_list)
-        
+        self.training_scores_dict       = training_scores_dict
+        self.validation_scores_dict     = validation_scores_dict
+        self.additional_validation_dict = additional_validation_dict
 
         return self, training_scores_dict, validation_scores_dict, additional_validation_dict
 
@@ -1458,7 +1480,10 @@ class DRSLinRegRNN():
         additional_assets_dict = {
             "scaler_X" : self.scaler_X,
             "scaler_y" : self.scaler_y,
-        }
+            "training_scores_dict"        : self.training_scores_dict,
+            "validation_scores_dict"      : self.validation_scores_dict,
+            "additional_validation_dict"  : self.additional_validation_dict
+            }
         with open(os.path.join(folder_path,"additional_assets.pkl"), "wb") as file:
                 pickle.dump(additional_assets_dict, file)
         self.save_training_data(folder_path)
@@ -1497,6 +1522,13 @@ class DRSLinRegRNN():
             del copy_A["temporal_params_dict"]['test_period_start'], copy_A["temporal_params_dict"]['test_period_end'], copy_B["temporal_params_dict"]['test_period_start'], copy_B["temporal_params_dict"]['test_period_end']
             del copy_A["fin_inputs_params_dict"]["historical_file"], copy_B["fin_inputs_params_dict"]["historical_file"]
             del copy_A["senti_inputs_params_dict"]["tweet_file_location"], copy_B["senti_inputs_params_dict"]["tweet_file_location"]
+            
+            # new consideration for consider tweet attention, if the order doesnt ask for the new system, and the loaded order doesn't state if it has the old or new system. Assume it has the old system and 
+            # insert it ready for comparison
+            if "factor_tweet_attention" in copy_A["senti_inputs_params_dict"].keys() and copy_A["senti_inputs_params_dict"]["factor_tweet_attention"] == False:
+                if not "factor_tweet_attention" in copy_B["senti_inputs_params_dict"].keys():
+                    copy_B["senti_inputs_params_dict"]["factor_tweet_attention"] = False
+
 
             if not copy_A == copy_B:
                 print("ZZZZZZZZZZ differences in input dicts with identical hashcodes:{} found {}".format(str(folder_name), compare_dicts(copy_A, copy_B)))
@@ -1514,10 +1546,9 @@ class DRSLinRegRNN():
         # load additional factors
         with open(os.path.join(predictor_location_folder_path,"additional_assets.pkl"), "rb") as file:
             additional_assets_dict = pickle.load(file)
-            self.scaler_X       = additional_assets_dict["scaler_X"]
-            self.scaler_y       = additional_assets_dict["scaler_y"]
-
-        
+            for attr in ["scaler_X", "scaler_y", "training_scores_dict", "validation_scores_dict", "additional_validation_dict"]:
+                if attr in additional_assets_dict.keys():
+                    setattr(self, attr, additional_assets_dict[attr])
 
 
 def load_RNN_predictor(input_dict, predictor_location_folder_path, only_return_viability=False):
