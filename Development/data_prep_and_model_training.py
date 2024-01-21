@@ -181,12 +181,15 @@ def return_annotated_tweets_name(company_symbol, train_period_start, train_perio
     name = name + return_topic_model_name(topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc)
     return name
 
-def return_sentiment_data_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe, factor_tweet_attention):
+def return_sentiment_data_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe, factor_tweet_attention, factor_topic_volume):
     global global_strptime_str, global_strptime_str_filename
     name = return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor)
     name = name + "_ts_sec" + str(time_step_seconds) + "_r_lt" + str(rel_lifetime) + "_r_hl" + str(rel_hlflfe)
     if factor_tweet_attention == True:
         name = name + "_factor_tweet_attentionTRUE"
+    if factor_topic_volume == True:
+        name = name + "_topicVolTRUE"
+
     return name
 
 def return_predictor_name(input_dict):
@@ -211,8 +214,9 @@ def return_predictor_name(input_dict):
     batch_ratio                       = input_dict["model_hyper_params"]["batch_ratio"]
     financial_value_scaling           = input_dict["fin_inputs_params_dict"]["financial_value_scaling"]
     factor_tweet_attention            = input_dict["senti_inputs_params_dict"]["factor_tweet_attention"]
+    factor_topic_volume               = input_dict["senti_inputs_params_dict"]["factor_topic_volume"]
 
-    name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe, factor_tweet_attention)
+    name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe, factor_tweet_attention, factor_topic_volume)
     predictor_hash = ""
     if not financial_value_scaling == None:
         predictor_hash += "_" + str(financial_value_scaling)
@@ -464,8 +468,9 @@ def retrieve_or_generate_sentiment_data(index, temporal_params_dict, fin_inputs_
     pred_steps          = outputs_params_dict["pred_steps_ahead"]
     enforced_topic_model_nested_list = senti_inputs_params_dict["enforced_topics_dict"]
     new_combined_stopwords_inc = senti_inputs_params_dict["inc_new_combined_stopwords_list"]
-    topic_weight_square_factor       = senti_inputs_params_dict["topic_weight_square_factor"]
-    factor_tweet_attention             = senti_inputs_params_dict["factor_tweet_attention"]
+    topic_weight_square_factor = senti_inputs_params_dict["topic_weight_square_factor"]
+    factor_tweet_attention     = senti_inputs_params_dict["factor_tweet_attention"]
+    factor_topic_volume        = senti_inputs_params_dict["factor_topic_volume"]
     
     #set period start/ends
     if training_or_testing == "training" or training_or_testing == "train":
@@ -480,7 +485,7 @@ def retrieve_or_generate_sentiment_data(index, temporal_params_dict, fin_inputs_
     #method
     #search for predictor
     sentiment_data_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["sentiment_data"]
-    sentiment_data_name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe, factor_tweet_attention)
+    sentiment_data_name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe, factor_tweet_attention, factor_topic_volume)
     sentiment_data_location_file = sentiment_data_folder_location_string + sentiment_data_name + ".csv"
     if os.path.exists(sentiment_data_location_file):
         df_sentiment_data = pd.read_csv(sentiment_data_location_file)
@@ -554,16 +559,6 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
     
     #create the initial cohort of tweets to be looked at in a time window
     epoch_time          = datetime(1970, 1, 1)
-    #tweet_cohort_start  = (train_period_start - epoch_time) - timedelta(seconds=relavance_lifetime)
-    #tweet_cohort_end    = (train_period_start - epoch_time)
-    #tweet_cohort_start  = tweet_cohort_start.total_seconds()
-    #tweet_cohort_end    = tweet_cohort_end.total_seconds()
-    #tweet_cohort        = return_tweet_cohort_from_scratch(df_annotated_tweets, df_annotated_tweets, tweet_cohort_start, tweet_cohort_end)
-    
-    #index_list = list(index)
-    #print(type(index_list))
-    #rep_num = int(len(index_list) / 10)
-    
     tweet_cohort_t1 = pd.DataFrame(index=index, columns=["tweet_cohort_start_post", "tweet_cohort_end_post", "tweet_cohort_t1", "tweet_cohort"])
     tweet_cohort_t1["tweet_cohort_start_post"]  = tweet_cohort_t1.index
     tweet_cohort_t1["tweet_cohort_end_post"]    = tweet_cohort_t1["tweet_cohort_start_post"].apply(lambda datetime: ((datetime - epoch_time)).total_seconds())
@@ -574,18 +569,12 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
         df_annotated_tweets["tweet_attention_score"] = (0.2 + (df_annotated_tweets["comment_num"] + 0.2) * (df_annotated_tweets["retweet_num"] + 0.2) * (df_annotated_tweets["like_num"] + 0.2))
     else:
         raise ValueError("this value must be included")
-
-
-
-
-
     
     def process_row_with_factor_tweet_attention(row, df_annotated_tweets=df_annotated_tweets, topic_num=num_topics, relavance_halflife=relavance_halflife):
         tweet_cohort_start_post = row["tweet_cohort_start_post"]
         tweet_cohort_end_post = row["tweet_cohort_end_post"]
         tweet_cohort = return_tweet_cohort_from_scratch(df_annotated_tweets, tweet_cohort_start_post, tweet_cohort_end_post)
 
-        #pre_calc_time_overall = np.exp((-3 / relavance_halflife) * (tweet_cohort["post_date"] - tweet_cohort_start_post)) * tweet_cohort["~sent_overall"]
         time_weight = (0.5 ** ((tweet_cohort["post_date"] - tweet_cohort_start_post) / relavance_halflife))
         
         senti_scores = []
@@ -596,12 +585,31 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
             senti_scores = senti_scores + [score_numer / score_denom]
         return senti_scores
 
+    def process_row_with_topic_vol(row, df_annotated_tweets=df_annotated_tweets, topic_num=num_topics, relavance_halflife=relavance_halflife):
+        tweet_cohort_start_post = row["tweet_cohort_start_post"]
+        tweet_cohort_end_post = row["tweet_cohort_end_post"]
+        tweet_cohort = return_tweet_cohort_from_scratch(df_annotated_tweets, tweet_cohort_start_post, tweet_cohort_end_post)
+        senti_col_name = "~sent_topic_W{}"
+        time_weight = (0.5 ** ((tweet_cohort["post_date"] - tweet_cohort_start_post) / relavance_halflife))
+        
+        weights = tweet_cohort.loc[:,senti_col_name.format(0):"~sent_topic_W{}".format(num_topics-1)]
+        weights.mul(time_weight, axis = 0)
+        weights = weights.sum() / sum(weights.sum())
+        
+        return weights
+
+
     data = tweet_cohort_t1.apply(process_row_with_factor_tweet_attention, axis=1)
+
+    
 
     for indy in tweet_cohort_t1.index:
         df_sentiment_scores.loc[indy, :] = data[indy]
 
-            
+    if senti_inputs_params_dict["factor_topic_volume"] == True:
+        volume_data = tweet_cohort_t1.apply(process_row_with_topic_vol, axis=1)
+        df_sentiment_scores[volume_data.columns] = volume_data
+    
     
     return df_sentiment_scores
 
@@ -1523,12 +1531,12 @@ class DRSLinRegRNN():
             del copy_A["fin_inputs_params_dict"]["historical_file"], copy_B["fin_inputs_params_dict"]["historical_file"]
             del copy_A["senti_inputs_params_dict"]["tweet_file_location"], copy_B["senti_inputs_params_dict"]["tweet_file_location"]
             
-            # new consideration for consider tweet attention, if the order doesnt ask for the new system, and the loaded order doesn't state if it has the old or new system. Assume it has the old system and 
+            # new consideration for: consider tweet attention & include_subject_vol, if the order doesnt ask for the new system, and the loaded order doesn't state if it has the old or new system. Assume it has the old system and 
             # insert it ready for comparison
-            if "factor_tweet_attention" in copy_A["senti_inputs_params_dict"].keys() and copy_A["senti_inputs_params_dict"]["factor_tweet_attention"] == False:
-                if not "factor_tweet_attention" in copy_B["senti_inputs_params_dict"].keys():
-                    copy_B["senti_inputs_params_dict"]["factor_tweet_attention"] = False
-
+            for sentiment_variable_str in ["factor_tweet_attention", "factor_topic_volume"]:
+                if sentiment_variable_str in copy_A["senti_inputs_params_dict"].keys() and copy_A["senti_inputs_params_dict"][sentiment_variable_str] == False:
+                    if not sentiment_variable_str in copy_B["senti_inputs_params_dict"].keys():
+                        copy_B["senti_inputs_params_dict"][sentiment_variable_str] = False
 
             if not copy_A == copy_B:
                 print("ZZZZZZZZZZ differences in input dicts with identical hashcodes:{} found {}".format(str(folder_name), compare_dicts(copy_A, copy_B)))
@@ -1614,7 +1622,7 @@ def return_filtered_batches_that_dont_cross_two_days(training_generator, datetim
     return training_generator
 
 def return_columns_to_remove(columns_list, self):
-    
+    columns_list_original = columns_list
     columns_to_remove = list(copy.deepcopy(columns_list))
     retain_cols = []
     
@@ -1634,16 +1642,28 @@ def return_columns_to_remove(columns_list, self):
         #        target_string = target_string.replace("STOCK_NAME", stock)
         #        cohort = cohort + fnmatch.filter(columns_list, target_string)
         #else:
+        if "~senti_*" == target_string:
+            target_string = "~sent*"
         cohort = cohort + fnmatch.filter(columns_list, target_string)
-        if len(cohort) > 0:
-            for col in cohort:
+        for col in cohort:
                 columns_list.remove(col)
+        if '~sent_topic_W0' in cohort and target_string != "*":
+            num_lim = int(0.5 * len(cohort))
+            retain_nums = list(np.random.choice(range(num_lim), math.ceil(num_lim * (retain_dict[key] ** general_adjusting_square_factor)), replace=False))
+            for x in retain_nums:
+                cohort_temp = cohort
+                retain_cols = retain_cols + [(col_str) for col_str in cohort_temp if ("W{}".format(x) in col_str or "t{}".format(x) in col_str)]
+        elif len(cohort) > 0:
             retain_cols = retain_cols + list(np.random.choice(cohort, math.ceil(len(cohort) * (retain_dict[key] ** general_adjusting_square_factor)), replace=False))
 
     for value in retain_cols:
-        columns_to_remove.remove(value)
+        try:
+            columns_to_remove.remove(value)
+        except:
+            a=1
     
     return columns_to_remove
+
 
 #%% Module - Model Testing and Standard Reporting
 
