@@ -44,7 +44,7 @@ import hashlib
 
 default_temporal_params_dict        = {
     "train_period_start"    : datetime.strptime('01/01/16 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/07/19 00:00:00', global_strptime_str), 
+    "train_period_end"      : datetime.strptime('20/07/19 00:00:00', global_strptime_str), 
     "time_step_seconds"     : 5*60, #5 mins,
     "test_period_start"     : datetime.strptime('01/07/19 00:00:00', global_strptime_str),
     "test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str)
@@ -77,8 +77,8 @@ default_senti_inputs_params_dict    = {
     "regenerate_cleaned_tweets_for_subject_discovery" : False,
     "inc_new_combined_stopwords_list" : True,
     "topic_weight_square_factor" : 1,
-    "factor_tweet_attention" : True,
-    "factor_topic_volume" : True
+    "factor_tweet_attention" : False,
+    "factor_topic_volume" : False
 }
 default_outputs_params_dict         = {
     "output_symbol_indicators_tuple"    : ("aapl", "close"), 
@@ -747,14 +747,16 @@ design_space_dict = {
         "financial_value_scaling" : {
             #0 : None,
             1 : "day_scaled",
-            2: "delta_scaled"}
+            2 : "delta_scaled"}
     },
     "senti_inputs_params_dict" : {
         "topic_qty" : [5, 9, 13, 17, 25],
         "topic_model_alpha" : [0.3, 0.7, 1, 2, 3, 5, 7, 13],
         "relative_halflife" : [3*60, 0.25 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR], 
-        "apply_IDF" : [False, True],
+        "apply_IDF"                  : [False, True],
         "topic_weight_square_factor" : [1, 2, 4],
+        "factor_tweet_attention"     : [False, True],
+        "factor_topic_volume"        : [False, True],
     },
     "model_hyper_params" : {
         "estimator__hidden_layer_sizes" : {
@@ -766,7 +768,7 @@ design_space_dict = {
             5 : [("LSTM", 60), ("GRU", 30), ("LSTM", 8)]
             },
         "general_adjusting_square_factor" : [3, 2, 1, 0],
-        "estimator__alpha"                : [1e-11, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-4], 
+        "estimator__alpha"                : [1e-11, 1e-10, 1e-9, 1e-8, 1e-7], 
         "lookbacks"                       : [8, 10, 15, 20, 25],
         "early_stopping" : [5, 7, 9, 12]
         },
@@ -782,31 +784,26 @@ design_space_dict = {
 global_run_count = 0
 
 init_doe = [
-
-    [2,	9,	1,	720, 	0,	2,	4,	3,	1e-09,	10,	7],  # 0
-    [2,	25,	13,	25200, 	1,	4,	3,	3,	1e-08,	25,	5],  # 1
-    [2,	25,	13,	180, 	0,	2,	2,	2,	1e-11,	30,	12], # 2
-    [2,	25,	3,	25200, 	0,	2,	3,	0,	1e-08,	8,	12], # 3
-    [2,	25,	5,	7200, 	0,	4,	4,	0,	1e-07,	20,	7],  # 4
-    [1,	9,	1,	720, 	0,	2,	4,	3,	1e-09,	10,	7],  # 5
-    [1,	25,	2,	25200, 	0,	4,	4,	3,	1e-08,	15,	7],  # 6
-    [1,	25,	13,	900, 	1,	2,	4,	1,	1e-07,	10,	7],  # 7
-    [1,	25,	13,	25200, 	1,	2,	4,	1,	1e-07,	10,	7],  # 8
-    [1,	25,	3,	7200, 	1,	2,	2,	0,	1e-06,	10,	12], # 9
-    [1,	25,	13,	900, 	0,	2,	0,	0,	1e-05,	8,	12], # 10
-    [1,	25,	2,	7200, 	0,	4,	4,	1,	1e-05,	10,	5],  # 11
-    [1,	13,	2,	7200, 	1,	1,	2,	1,	1e-05,	25,	9],  # 12
-    [1,	25,	2,	25200, 	0,	4,	2,	3,	1e-11,	30,	5],  # 13
-    [1,	17,	7,	900, 	1,	2,	5,	2,	1e-06,	20,	5],  # 14
-    [1,	17,	3,	720, 	0,	4,	0,	0,	1e-08,	8,	9],  # 15
-    [1,	25,	13,	25200, 	1,	2,	2,	0,	1e-04,	10,	7],  # 16
-    [1,	25,	2,	7200, 	0,	4,	4,	1,	1e-04,	10,	5],  # 17
-    [1,	9,	13,	7200, 	1,	2,	2,	0,	1e-04,	20,	7],  # 18
-    [1, 17,  0.7, 180,  0,  1,  2,  3,  1e-04,   8,   12], # 19
-    [1, 5,   0.7, 7200, 1,  4,  0,  2,  1e-10,   40,   5], # 20
-    [1, 25,  2,   7200, 0,  4,  4,  1,  1e-09,   10,   5], # 21
-    [1, 17,  13,  7200, 1,  2,  2,  0,  1e-11,   20,   7]  # 22
+    [2, 9,  1, 720,  0, 2, 0, 0, 4, 3, 1e-09,  10, 7], # id: 5  
+    [2, 9,  1, 720,  0, 2, 1, 0, 4, 3, 1e-09,  10, 7], 
+    [2, 9,  1, 720,  0, 2, 0, 1, 4, 3, 1e-09,  10, 7], 
+    [2, 9,  1, 720,  0, 2, 1, 1, 4, 3, 1e-09,  10, 7], 
+    [1, 17, 7, 900,  1, 2, 0, 0, 5, 2, 1.E-06,	20, 5], # id: 14
+    [1, 17, 7, 900,  1, 2, 1, 0, 5, 2, 1.E-06,	20, 5], 
+    [1, 17, 7, 900,  1, 2, 0, 1, 5, 2, 1.E-06,	20, 5], 
+    [1, 17, 7, 900,  1, 2, 1, 1, 5, 2, 1.E-06,	20, 5], 
+    [1, 25, 2, 7200, 0, 4, 0, 0, 4, 1, 0.E-04,	10, 5], # id: 17
+    [1, 25, 2, 7200, 0, 4, 1, 0, 4, 1, 0.E-04,	10, 5], 
+    [1, 25, 2, 7200, 0, 4, 0, 1, 4, 1, 0.E-04,	10, 5], 
+    [1, 25, 2, 7200, 0, 4, 1, 1, 4, 1, 0.E-04,	10, 5], 
     ]
+
+test_name_list = ["default", "with vol", "with tweet_importance", "with tweet_importance and vol"]
+
+
+
+print("hello")
+
 
 
 """ experiment checklist:
@@ -842,7 +839,11 @@ scenario_dict = {
         11: {"topics" : 0, "pred_steps" : 1},
     }
 
-loop = [10, 9]#[5,11]#[3, 4]#
+loop = [3]#, 10, 11]
+
+if loop == [3]:
+    init_doe.reverse()
+
 print("shard: {}".format(str(loop)))
 enable_GPU = False
 if enable_GPU == False:
@@ -852,10 +853,9 @@ if loop == None:
     loop = scenario_dict.keys()
     init_doe = [init_doe[0]]
     
-
-
 for scenario_ID in loop:
-
+    
+    
     index_of_topic_qty = return_keys_within_2_level_dict(design_space_dict).index("senti_inputs_params_dict_topic_qty")
 
     # editing topic quantity values for scenario, 2 lines
@@ -872,9 +872,9 @@ for scenario_ID in loop:
     default_input_dict["senti_inputs_params_dict"]["topic_training_tweet_ratio_removed"] = removal_ratio
 
     # setting the optimisation objective functions
-    confidence_scoring_measure_tuple_1 = ("validation","results_x_mins_weighted",pred_steps,0.9)
-    confidence_scoring_measure_tuple_2 = ("validation","results_x_mins_PC",pred_steps,0.9)
-    confidence_scoring_measure_tuple_3 = ("validation","results_x_mins_score",pred_steps,0.9)
+    confidence_scoring_measure_tuple_1 = ("validation","results_x_mins_weighted",pred_steps,0.5)
+    confidence_scoring_measure_tuple_2 = ("validation","results_x_mins_PC",pred_steps,0.5)
+    confidence_scoring_measure_tuple_3 = ("validation","results_x_mins_score",pred_steps,0.5)
 
 
     optim_scores_vec = ["validation_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2, confidence_scoring_measure_tuple_3]
@@ -883,9 +883,7 @@ for scenario_ID in loop:
 
     optim_scores_vec = ["validation_" + testing_measure]
     inverse_for_minimise_vec = [True]
-    optim_scores_vec = [confidence_scoring_measure_tuple_1]
 
-    inverse_for_minimise_vec = [False]
 
     #what around to ensure that single topic sentiment data in more used in the model
     if default_senti_inputs_params_dict["topic_qty"] == 1:
@@ -894,7 +892,7 @@ for scenario_ID in loop:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "run6_{}.csv".format(str(scenario_ID))
+    scenario_name_str = scenario_name_str + "perm_test_{}.csv".format(str(scenario_ID))
 
 
     if __name__ == '__main__':
@@ -904,13 +902,13 @@ for scenario_ID in loop:
             scenario_name_str,
             design_space_dict,
             initial_doe_size_or_DoE=init_doe,
-            max_iter=7,
+            max_iter=0,
             model_start_time = model_start_time,
             force_restart_run = False,
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/run6_{}.csv".format(str(scenario_ID)))
+            global_record_path=os.path.join(global_general_folder,r"outputs/perm_test_{}.csv".format(str(scenario_ID)))
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
