@@ -1300,6 +1300,7 @@ class DRSLinRegRNN():
 
             for train_index, val_index in kf.split(df_X):
                 print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
+                
                 for i_random in range(self.n_estimators_per_time_series_blocking):
                     n_features = df_X.shape[1]
                     dropout_cols = return_columns_to_remove(columns_list=df_X.columns, self=self)
@@ -1525,10 +1526,10 @@ class DRSLinRegRNN():
             
             # new consideration for consider tweet attention, if the order doesnt ask for the new system, and the loaded order doesn't state if it has the old or new system. Assume it has the old system and 
             # insert it ready for comparison
-            if "factor_tweet_attention" in copy_A["senti_inputs_params_dict"].keys() and copy_A["senti_inputs_params_dict"]["factor_tweet_attention"] == False:
-                if not "factor_tweet_attention" in copy_B["senti_inputs_params_dict"].keys():
-                    copy_B["senti_inputs_params_dict"]["factor_tweet_attention"] = False
-
+            if not "factor_tweet_attention" in copy_A["senti_inputs_params_dict"].keys():
+                copy_A["senti_inputs_params_dict"]["factor_tweet_attention"] = False
+            if not "factor_tweet_attention" in copy_B["senti_inputs_params_dict"].keys():
+                copy_B["senti_inputs_params_dict"]["factor_tweet_attention"] = False
 
             if not copy_A == copy_B:
                 print("ZZZZZZZZZZ differences in input dicts with identical hashcodes:{} found {}".format(str(folder_name), compare_dicts(copy_A, copy_B)))
@@ -1792,7 +1793,7 @@ def retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inp
     predictor_name_entry = company_symbol, train_period_start, train_period_end, time_step_seconds, topic_model_qty, rel_lifetime, rel_hlflfe, topic_model_alpha, apply_IDF, tweet_ratio_removed
     predictor_name = return_predictor_name(return_input_dict(temporal_params_dict = temporal_params_dict, fin_inputs_params_dict = fin_inputs_params_dict, senti_inputs_params_dict = senti_inputs_params_dict, outputs_params_dict = outputs_params_dict, model_hyper_params = model_hyper_params, reporting_dict = reporting_dict))
     predictor_location_folder_path = predictor_folder_location_string + custom_hash(predictor_name) + "//"
-    
+    print(str(temporal_params_dict["train_period_end"]) + "_____" + str(temporal_params_dict["test_period_start"])+ "_____" + str(temporal_params_dict["test_period_end"]))
     if os.path.exists(predictor_location_folder_path):
         model_matches = retrieve_model_and_training_scores(predictor_location_folder_path, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict, only_return_viability=True)    
         if model_matches == True:

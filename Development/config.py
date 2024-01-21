@@ -4,8 +4,8 @@ import os
 
 
 
-global_general_folder = "C:/Users/Shadow/project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/"
-global_outputs_folder = "C:/Users/Shadow/project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/outputs/"
+global_general_folder = "D:/project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/"
+global_outputs_folder = "D:/project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/outputs/"
 #global_general_folder = "/home/accounts/studenti/id110xaq/final_project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/"
 #global_outputs_folder = "/home/accounts/studenti/id110xaq/final_project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/outputs/"
 #'/home/accounts/studenti/id110xaq/final_project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/data/support_data/stock_info.csv'
