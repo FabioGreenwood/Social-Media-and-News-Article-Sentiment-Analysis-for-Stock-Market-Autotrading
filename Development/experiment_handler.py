@@ -77,8 +77,8 @@ default_senti_inputs_params_dict    = {
     "regenerate_cleaned_tweets_for_subject_discovery" : False,
     "inc_new_combined_stopwords_list" : True,
     "topic_weight_square_factor" : 1,
-    "factor_tweet_attention" : True,
-    "factor_topic_volume" : True
+    "factor_tweet_attention" : False,
+    "factor_topic_volume" : False
 }
 default_outputs_params_dict         = {
     "output_symbol_indicators_tuple"    : ("aapl", "close"), 
@@ -782,7 +782,6 @@ design_space_dict = {
 global_run_count = 0
 
 init_doe = [
-
     [2,	9,	1,	720, 	0,	2,	4,	3,	1e-09,	10,	7],  # 0
     [2,	25,	13,	25200, 	1,	4,	3,	3,	1e-08,	25,	5],  # 1
     [2,	25,	13,	180, 	0,	2,	2,	2,	1e-11,	30,	12], # 2
@@ -802,10 +801,10 @@ init_doe = [
     [1,	25,	13,	25200, 	1,	2,	2,	0,	1e-04,	10,	7],  # 16
     [1,	25,	2,	7200, 	0,	4,	4,	1,	1e-04,	10,	5],  # 17
     [1,	9,	13,	7200, 	1,	2,	2,	0,	1e-04,	20,	7],  # 18
-    [1, 17,  0.7, 180,  0,  1,  2,  3,  1e-04,   8,   12], # 19
-    [1, 5,   0.7, 7200, 1,  4,  0,  2,  1e-10,   40,   5], # 20
-    [1, 25,  2,   7200, 0,  4,  4,  1,  1e-09,   10,   5], # 21
-    [1, 17,  13,  7200, 1,  2,  2,  0,  1e-11,   20,   7]  # 22
+    [1, 17,  0.7, 180,  0,  1,  2,  3,  1e-04,   8,  12], # 19
+    [1, 5,   0.7, 7200, 1,  4,  0,  2,  1e-10,   40,  5], # 20
+    [1, 25,  2,   7200, 0,  4,  4,  1,  1e-09,   10,  5], # 21
+    [1, 17,  13,  7200, 1,  2,  2,  0,  1e-11,   20,  7]  # 22
     ]
 
 
@@ -842,7 +841,7 @@ scenario_dict = {
         11: {"topics" : 0, "pred_steps" : 1},
     }
 
-loop = [10, 9]#[5,11]#[3, 4]#
+loop = [9]#[5,11]#[3, 4]#
 print("shard: {}".format(str(loop)))
 enable_GPU = False
 if enable_GPU == False:

@@ -1251,7 +1251,7 @@ def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_fea
 
 class DRSLinRegRNN():
     def __init__(self, base_estimator=None,#Sequential(),
-                 input_dict=None):
+                 input_dict=None, name=None):
         #expected keys: training_time_splits, max_depth, max_features, random_state,        
         self.estimator_info_pack = {}
         for key in input_dict["model_hyper_params"]: #FG_action: ensure this is aligned
@@ -1260,6 +1260,10 @@ class DRSLinRegRNN():
         self.input_dict           = input_dict
         self.base_estimator       = base_estimator
         self.estimators_          = []
+        if name == None:
+            raise ValueError("models must be named during creation now")
+        else:
+            self.name = name
 
     def return_single_ensable_model_fitted(self, model, X, Y):
         raise SystemError("this logic shouldn't be being used")
@@ -1461,7 +1465,10 @@ class DRSLinRegRNN():
         return traditional_scores_dict_list, additional_results_dict_list
         
     def save(self, general_save_dir = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["predictive_model"], Y_preds_testing=None, y_testing=None):
-        model_name = return_predictor_name(self.input_dict)
+        if hasattr(self, "name") and self.name != None:
+            model_name = self.name
+        else:
+            model_name = return_predictor_name(self.input_dict)
         folder_path = os.path.join(general_save_dir, custom_hash(model_name) + "\\")
         extension = ".h5"
         if not os.path.exists(folder_path):
