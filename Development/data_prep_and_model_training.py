@@ -93,7 +93,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.utils import timeseries_dataset_from_array
-from config import global_strptime_str, global_strptime_str_filename, global_precalculated_assets_locations_dict, global_financial_history_folder_path, global_error_str_1, global_financial_history_folder_path, global_df_stocks_list_file, global_random_state, global_strptime_str_2, global_index_cols_list, global_input_cols_to_include_list, global_start_time, global_financial_history_folder_path
+from config import global_strptime_str, global_strptime_str_filename, global_exclusively_str, global_precalculated_assets_locations_dict, global_financial_history_folder_path, global_error_str_1, global_financial_history_folder_path, global_df_stocks_list_file, global_random_state, global_strptime_str_2, global_index_cols_list, global_input_cols_to_include_list, global_start_time, global_financial_history_folder_path
 from tensorflow.keras.models import Sequential, clone_model, load_model
 from tensorflow.keras.layers import Dense
 import hashlib
@@ -187,8 +187,8 @@ def return_sentiment_data_name(company_symbol, train_period_start, train_period_
     name = name + "_ts_sec" + str(time_step_seconds) + "_r_lt" + str(rel_lifetime) + "_r_hl" + str(rel_hlflfe)
     if factor_tweet_attention == True:
         name = name + "_factor_tweet_attentionTRUE"
-    if factor_topic_volume == True:
-        name = name + "_topicVolTRUE"
+    if factor_topic_volume != False:
+        name = name + "_topicVol" + str(factor_topic_volume)
 
     return name
 
@@ -555,7 +555,7 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
     columns = []
     for i in range(num_topics):
         columns = columns + ["~senti_score_t" + str(i)]
-    df_sentiment_scores = pd.DataFrame(index=index, columns=columns)
+    df_sentiment_scores = pd.DataFrame(index=index)#, columns=columns)
     
     #create the initial cohort of tweets to be looked at in a time window
     epoch_time          = datetime(1970, 1, 1)
@@ -598,15 +598,13 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
         
         return weights
 
+    if senti_inputs_params_dict["factor_topic_volume"] != global_exclusively_str:
+        data = tweet_cohort_t1.apply(process_row_with_factor_tweet_attention, axis=1)
+        
+        for indy in tweet_cohort_t1.index:
+            df_sentiment_scores.loc[indy, columns] = data[indy]
 
-    data = tweet_cohort_t1.apply(process_row_with_factor_tweet_attention, axis=1)
-
-    
-
-    for indy in tweet_cohort_t1.index:
-        df_sentiment_scores.loc[indy, :] = data[indy]
-
-    if senti_inputs_params_dict["factor_topic_volume"] == True:
+    if senti_inputs_params_dict["factor_topic_volume"] != False:
         volume_data = tweet_cohort_t1.apply(process_row_with_topic_vol, axis=1)
         df_sentiment_scores[volume_data.columns] = volume_data
     
@@ -1199,10 +1197,10 @@ def create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_
 
 #create model
 
-def initiate_model(input_dict):
+def initiate_model(input_dict, hash_name=None):
     if input_dict["model_hyper_params"]["name"] == "RandomSubspace_RNN_Regressor":
         estimator = DRSLinRegRNN(base_estimator=Sequential(),
-            input_dict = input_dict)
+            input_dict = input_dict, hash_name=hash_name)
     else:
         raise ValueError("the model type: " + str(input_dict["model_hyper_params"]["name"]) + " was not found in the method")
     
@@ -1251,7 +1249,7 @@ def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_fea
 
 class DRSLinRegRNN():
     def __init__(self, base_estimator=None,#Sequential(),
-                 input_dict=None, name=None):
+                 input_dict=None, hash_name=None):
         #expected keys: training_time_splits, max_depth, max_features, random_state,        
         self.estimator_info_pack = {}
         for key in input_dict["model_hyper_params"]: #FG_action: ensure this is aligned
@@ -1260,10 +1258,10 @@ class DRSLinRegRNN():
         self.input_dict           = input_dict
         self.base_estimator       = base_estimator
         self.estimators_          = []
-        if name == None:
+        if hash_name == None:
             raise ValueError("models must be named during creation now")
         else:
-            self.name = name
+            self.name = hash_name
 
     def return_single_ensable_model_fitted(self, model, X, Y):
         raise SystemError("this logic shouldn't be being used")
@@ -1468,8 +1466,8 @@ class DRSLinRegRNN():
         if hasattr(self, "name") and self.name != None:
             model_name = self.name
         else:
-            model_name = return_predictor_name(self.input_dict)
-        folder_path = os.path.join(general_save_dir, custom_hash(model_name) + "\\")
+            model_name = custom_hash(return_predictor_name(self.input_dict))
+        folder_path = os.path.join(general_save_dir, model_name + "\\")
         extension = ".h5"
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
@@ -1538,13 +1536,14 @@ class DRSLinRegRNN():
             del copy_A["temporal_params_dict"]['test_period_start'], copy_A["temporal_params_dict"]['test_period_end'], copy_B["temporal_params_dict"]['test_period_start'], copy_B["temporal_params_dict"]['test_period_end']
             del copy_A["fin_inputs_params_dict"]["historical_file"], copy_B["fin_inputs_params_dict"]["historical_file"]
             del copy_A["senti_inputs_params_dict"]["tweet_file_location"], copy_B["senti_inputs_params_dict"]["tweet_file_location"]
-            
+                        
             # new consideration for: consider tweet attention & include_subject_vol, if the order doesnt ask for the new system, and the loaded order doesn't state if it has the old or new system. Assume it has the old system and 
             # insert it ready for comparison
             for sentiment_variable_str in ["factor_tweet_attention", "factor_topic_volume"]:
                 if sentiment_variable_str in copy_A["senti_inputs_params_dict"].keys() and copy_A["senti_inputs_params_dict"][sentiment_variable_str] == False:
                     if not sentiment_variable_str in copy_B["senti_inputs_params_dict"].keys():
                         copy_B["senti_inputs_params_dict"][sentiment_variable_str] = False
+
 
             if not copy_A == copy_B:
                 print("ZZZZZZZZZZ differences in input dicts with identical hashcodes:{} found {}".format(str(folder_name), compare_dicts(copy_A, copy_B)))
@@ -1568,7 +1567,7 @@ class DRSLinRegRNN():
 
 
 def load_RNN_predictor(input_dict, predictor_location_folder_path, only_return_viability=False):
-        predictor = initiate_model(input_dict)
+        predictor = initiate_model(input_dict, hash_name=os.path.split(os.path.split(predictor_location_folder_path)[0])[-1])
         if only_return_viability == True:
             return predictor.load(predictor_location_folder_path, only_return_viability=only_return_viability)
         predictor.load(predictor_location_folder_path)
@@ -1749,7 +1748,8 @@ def generate_model_and_validation_scores(temporal_params_dict,
     senti_inputs_params_dict,
     outputs_params_dict,
     model_hyper_params,
-    reporting_dict):
+    reporting_dict,
+    hash_name=None):
     #desc
     
     
@@ -1774,7 +1774,7 @@ def generate_model_and_validation_scores(temporal_params_dict,
         
     #model training - create regressors
     X_train, y_train   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"], financial_value_scaling=fin_inputs_params_dict["financial_value_scaling"])
-    model              = initiate_model(input_dict)
+    model              = initiate_model(input_dict, hash_name = hash_name)
     model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.fit_ensemble(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"])
     #report timings
     print(datetime.now().strftime("%H:%M:%S") + " - complete generating model")
@@ -1827,7 +1827,7 @@ def retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inp
             predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = retrieve_model_and_training_scores(predictor_location_folder_path, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict)
     else:
         print(datetime.now().strftime("%H:%M:%S") + " - generating model and testing scores")
-        predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = generate_model_and_validation_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict)
+        predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = generate_model_and_validation_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict, hash_name=custom_hash(predictor_name))
         predictor.save()
     return predictor, training_scores_dict, validation_scores_dict, additional_validation_dict
 
