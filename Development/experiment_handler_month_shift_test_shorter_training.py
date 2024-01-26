@@ -979,8 +979,6 @@ checklist for restarting the experiment
 # definition of different scenarios is set by this dict, to access a different scenario, please change the scenario variable
 
 # scenario parameters: topic_qty, pred_steps
-
-
 removal_ratio = int(1e0)
 scenario_dict = {
         #0 : {"topics" : None, "pred_steps" : 15},

@@ -78,7 +78,7 @@ default_senti_inputs_params_dict    = {
     "inc_new_combined_stopwords_list" : True,
     "topic_weight_square_factor" : 1,
     "factor_tweet_attention" : False,
-    "factor_topic_volume" : global_exclusively_str, 
+    "factor_topic_volume" : False, 
 }
 default_outputs_params_dict         = {
     "output_symbol_indicators_tuple"    : ("aapl", "close"), 
@@ -781,11 +781,7 @@ design_space_dict = {
 
 global_run_count = 0
 
-init_doe = [
-    [2,	9,	1,	726, 	0,	2,	0, 4,	3,	1e-09,	10,	7],  # 0
-    [2,	9,	1,	726, 	0,	2,	1, 4,	3,	1e-09,	10,	7],  # 0
-    [2,	9,	1,	726, 	0,	2,	2, 4,	3,	1e-09,	10,	7],  # 0
-    ]
+init_doe = []
 
 
 """ experiment checklist:
