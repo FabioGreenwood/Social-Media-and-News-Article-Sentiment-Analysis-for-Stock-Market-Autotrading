@@ -590,7 +590,7 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
         tweet_cohort_end_post = row["tweet_cohort_end_post"]
         tweet_cohort = return_tweet_cohort_from_scratch(df_annotated_tweets, tweet_cohort_start_post, tweet_cohort_end_post)
         senti_col_name = "~sent_topic_W{}"
-        time_weight = (0.5 ** ((tweet_cohort["post_date"] - tweet_cohort_start_post) / relavance_halflife))
+        time_weight = (0.5 ** ((tweet_cohort["post_date"] - tweet_cohort_start_post) / relavance_halflife)) * tweet_cohort["tweet_attention_score"]
         
         weights = tweet_cohort.loc[:,senti_col_name.format(0):"~sent_topic_W{}".format(num_topics-1)]
         weights.mul(time_weight, axis = 0)
@@ -1210,8 +1210,6 @@ def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_fea
     
     ensemble_estimator = Sequential()
     
-
-    
     for id, layer in enumerate(model_hyper_params["estimator__hidden_layer_sizes"]):
         # prep key word arguments
         kwargs = {
@@ -1291,7 +1289,6 @@ class DRSLinRegRNN():
         
         return model#, history.history['loss'][-1], history.history['val_loss'][-1]
              
-
     def evaluate_ensemble(self, df_X, df_y, pred_steps_value, confidences_before_betting_PC, financial_value_scaling):
         count = 0
         global global_random_state
@@ -1436,7 +1433,6 @@ class DRSLinRegRNN():
 
         return scaler
 
-
     def custom_single_predict(self, df_X, single_estimator):
         index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
         y_pred_values       = single_estimator.predict(input_data, verbose=0)
@@ -1502,13 +1498,11 @@ class DRSLinRegRNN():
                 pickle.dump(additional_assets_dict, file)
         self.save_training_data(folder_path)
         
-   
     def save_training_data(self, folder_path):
         for target_str in ["X_train_list", "y_train_list", "y_pred_list", "y_val_list"]:
             if hasattr(self, target_str):
                 for i, target_list_single in enumerate(getattr(self, target_str)):
                     target_list_single.to_csv(os.path.join(folder_path,"{}_{}.csv".format(target_str, i)))
-
 
     def predict_ensemble(self, X): #FG_action: This is where the new error is
         
@@ -1540,11 +1534,29 @@ class DRSLinRegRNN():
             # new consideration for: consider tweet attention & include_subject_vol, if the order doesnt ask for the new system, and the loaded order doesn't state if it has the old or new system. Assume it has the old system and 
             # insert it ready for comparison
             for sentiment_variable_str in ["factor_tweet_attention", "factor_topic_volume"]:
-                if sentiment_variable_str in copy_A["senti_inputs_params_dict"].keys() and copy_A["senti_inputs_params_dict"][sentiment_variable_str] == False:
-                    if not sentiment_variable_str in copy_B["senti_inputs_params_dict"].keys():
-                        copy_B["senti_inputs_params_dict"][sentiment_variable_str] = False
-
-
+                for item in [copy_A, copy_B]:
+                    if not sentiment_variable_str in item["senti_inputs_params_dict"].keys():
+                        item["senti_inputs_params_dict"][sentiment_variable_str] = False
+                    elif item["senti_inputs_params_dict"][sentiment_variable_str] == 0:
+                        item["senti_inputs_params_dict"][sentiment_variable_str] = False
+            #cancel out unneeded variable for comparition of single and no topic models
+            for item in [copy_A, copy_B]:
+                if item["senti_inputs_params_dict"]['topic_qty'] <= 1:
+                    item["senti_inputs_params_dict"]['topic_model_alpha']    = None
+                    item["senti_inputs_params_dict"]['apply_IDF']            = None
+                    item["senti_inputs_params_dict"]['enforced_topics_dict_name'] = None
+                    item["senti_inputs_params_dict"]['enforced_topics_dict'] = None
+                    item["senti_inputs_params_dict"]['topic_weight_square_factor'] = None
+                    item["senti_inputs_params_dict"]['factor_topic_volume'] = None
+                if item["senti_inputs_params_dict"]['topic_qty'] <= 0:
+                    item["senti_inputs_params_dict"]['topic_training_tweet_ratio_removed'] = None
+                    item["senti_inputs_params_dict"]['relative_lifetime'] = None
+                    item["senti_inputs_params_dict"]['relative_halflife'] = None
+                    item["senti_inputs_params_dict"]['regenerate_cleaned_tweets_for_subject_discovery'] = None
+                    item["senti_inputs_params_dict"]['inc_new_combined_stopwords_list'] = None
+                    item["senti_inputs_params_dict"]['factor_tweet_attention'] = None
+                    
+                           
             if not copy_A == copy_B:
                 print("ZZZZZZZZZZ differences in input dicts with identical hashcodes:{} found {}".format(str(folder_name), compare_dicts(copy_A, copy_B)))
                 return False

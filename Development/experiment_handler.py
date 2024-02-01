@@ -757,6 +757,7 @@ design_space_dict = {
         "relative_halflife" : [3*60, 0.25 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR], 
         "apply_IDF" : [False, True],
         "topic_weight_square_factor" : [1, 2, 4],
+        "factor_tweet_attention" : [False, True],
         "factor_topic_volume" : {0 : False, 1 : True, 2 : global_exclusively_str}
     },
     "model_hyper_params" : {
@@ -770,7 +771,7 @@ design_space_dict = {
             },
         "general_adjusting_square_factor" : [3, 2, 1, 0],
         "estimator__alpha"                : [1e-11, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-4], 
-        "lookbacks"                       : [8, 10, 15, 20, 25],
+        "lookbacks"                       : [8, 10, 15, 20, 25, 50],
         "early_stopping" : [5, 7, 9, 12]
         },
         
@@ -781,7 +782,39 @@ design_space_dict = {
 
 global_run_count = 0
 
-init_doe = []
+init_doe = [
+    [1, 9,  1,   720,   0, 2, 0, 0, 4, 3, 1.00E-09, 10, 7],   # 0
+    [1, 25, 2,   25200, 0, 4, 0, 0, 4, 3, 1.00E-08, 15, 7],   # 1
+    [1, 25, 13,  900,   1, 2, 0, 0, 4, 1, 1.00E-07, 10, 7],   # 2
+    [1, 25, 13,  25200, 1, 2, 0, 0, 4, 1, 1.00E-07, 10, 7],   # 3
+    [1, 25, 3,   7200,  1, 2, 0, 0, 2, 0, 1.00E-06, 10, 12],  # 4
+    [1, 25, 13,  900,   0, 2, 0, 0, 0, 0, 1.00E-05, 8,  12],  # 5
+    [1, 25, 2,   7200,  0, 4, 0, 0, 4, 1, 1.00E-05, 10, 5],   # 6
+    [1, 13, 2,   7200,  1, 1, 0, 0, 2, 1, 1.00E-05, 25, 9],   # 7
+    [1, 25, 2,   25200, 0, 4, 0, 0, 2, 3, 1.00E-11, 30, 5],   # 8
+    [1, 17, 7,   900,   1, 2, 0, 0, 5, 2, 1.00E-06, 20, 5],   # 9
+    [1, 17, 3,   720,   0, 4, 0, 0, 0, 0, 1.00E-08, 8,  9],   # 10
+    [1, 25, 0.3, 25200, 1, 2, 0, 0, 2, 0, 1.00E-04, 40, 7],   # 11
+    [1, 25, 2,   7200,  0, 4, 0, 0, 4, 1, 1.00E-04, 10, 5],   # 12
+    [1, 9,  13,  7200,  1, 2, 0, 0, 2, 0, 1.00E-04, 20, 7],   # 13
+    [1, 17, 0.7, 180,   0, 1, 0, 0, 2, 3, 1.00E-04, 8,  12],  # 14
+    [1, 5,  0.7, 7200,  1, 4, 0, 2, 0, 2, 1.00E-10, 40, 5],   # 15
+    [1, 9,  0.3, 25200, 0, 1, 1, 2, 3, 3, 1.00E-04, 20, 7],   # 16
+    [1, 5,  7,   900,   1, 4, 1, 2, 5, 2, 1.00E-09, 10, 7],   # 17
+    [1, 9,  7,   180,   1, 2, 1, 2, 5, 1, 1.00E-04, 8,  5],   # 18
+    [1, 5,  0.3, 25200, 0, 1, 0, 1, 1, 2, 1.00E-07, 10, 9],   # 19
+    [1, 17, 7,   180,   0, 1, 1, 2, 3, 2, 1.00E-10, 10, 5],   # 20
+    [1, 5,  5,   900,   1, 4, 1, 1, 3, 0, 1.00E-09, 25, 5],   # 21
+    [1, 9,  5,   180,   0, 4, 0, 1, 1, 2, 1.00E-06, 8,  7],   # 22
+    [1, 9,  7,   180,   0, 4, 1, 2, 0, 2, 1.00E-04, 10, 9],   # 23
+    [1, 5,  2,   25200, 1, 4, 0, 1, 2, 1, 1.00E-05, 25, 9],   # 24
+    [1, 25, 0.3, 25200, 1, 2, 1, 2, 4, 3, 1.00E-10, 15, 7],   # 25
+    [1, 9,  13,  900,   0, 2, 1, 1, 5, 3, 1.00E-10, 15, 12]   # 26
+    ]
+
+
+
+
 
 
 """ experiment checklist:
@@ -817,7 +850,7 @@ scenario_dict = {
         11: {"topics" : 0, "pred_steps" : 1},
     }
 
-loop = [3]#[5,11]#[3, 4]#
+loop = [5]#[5,11]#[3, 4]#
 print("shard: {}".format(str(loop)))
 enable_GPU = False
 if enable_GPU == False:
@@ -832,13 +865,17 @@ if loop == None:
 for scenario_ID in loop:
 
     index_of_topic_qty = return_keys_within_2_level_dict(design_space_dict).index("senti_inputs_params_dict_topic_qty")
+    index_of_factor_topic_volume = return_keys_within_2_level_dict(design_space_dict).index("senti_inputs_params_dict_factor_topic_volume")
 
     # editing topic quantity values for scenario, 2 lines
     topic_qty = scenario_dict[scenario_ID]["topics"]
     if isinstance(init_doe, list) and topic_qty != None:
-            for i in range(len(init_doe)): init_doe[i][index_of_topic_qty] = 1
-            design_space_dict["senti_inputs_params_dict"]["topic_qty"] = [1]
-            default_input_dict["senti_inputs_params_dict"]["topic_qty"] = 1
+            for i in range(len(init_doe)): init_doe[i][index_of_topic_qty] = topic_qty; init_doe[i][index_of_factor_topic_volume] = 0
+            design_space_dict["senti_inputs_params_dict"]["topic_qty"] = [topic_qty]
+            default_input_dict["senti_inputs_params_dict"]["topic_qty"] = topic_qty
+            design_space_dict["senti_inputs_params_dict"]["factor_topic_volume"] = [0]
+            default_input_dict["senti_inputs_params_dict"]["factor_topic_volume"] = 0
+            
 
     # setting various optimisation variabls
     pred_steps = scenario_dict[scenario_ID]["pred_steps"]
@@ -869,7 +906,7 @@ for scenario_ID in loop:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "model_change_work11_{}.csv".format(str(scenario_ID))
+    scenario_name_str = scenario_name_str + "run20_{}.csv".format(str(scenario_ID))
 
 
     if __name__ == '__main__':
@@ -885,7 +922,7 @@ for scenario_ID in loop:
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/model_change_work11_{}.csv".format(str(scenario_ID)))
+            global_record_path=os.path.join(global_general_folder,r"outputs/run20_{}.csv".format(str(scenario_ID)))
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
