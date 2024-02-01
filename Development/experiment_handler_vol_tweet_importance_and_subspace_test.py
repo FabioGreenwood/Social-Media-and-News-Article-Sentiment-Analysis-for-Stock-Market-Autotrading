@@ -36,7 +36,7 @@ if not sys.warnoptions:
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import matplotlib.pyplot as plt
 import random
-from config import global_general_folder, global_outputs_folder, global_input_cols_to_include_list, global_index_cols_list, global_index_col_str, global_target_file_folder_path, global_feature_qty, global_outputs_folder_path, global_financial_history_folder_path, global_df_stocks_list_file          , global_start_time, global_error_str_1, global_random_state, global_scores_database, global_strptime_str, global_strptime_str_2, global_strptime_str_filename, global_precalculated_assets_locations_dict, global_designs_record_final_columns_list, SECS_IN_A_DAY, SECS_IN_AN_HOUR, FIVE_MIN_TIME_STEPS_IN_A_DAY
+from config import global_general_folder, global_outputs_folder, global_input_cols_to_include_list, global_index_cols_list, global_index_col_str, global_target_file_folder_path, global_feature_qty, global_outputs_folder_path, global_financial_history_folder_path, global_df_stocks_list_file, global_start_time, global_error_str_1, global_random_state, global_scores_database, global_strptime_str, global_strptime_str_2, global_strptime_str_filename, global_precalculated_assets_locations_dict, global_designs_record_final_columns_list, SECS_IN_A_DAY, SECS_IN_AN_HOUR, FIVE_MIN_TIME_STEPS_IN_A_DAY, global_exclusively_str
 import hashlib
 
 
@@ -756,7 +756,7 @@ design_space_dict = {
         "apply_IDF"                  : [False, True],
         "topic_weight_square_factor" : [1, 2, 4],
         "factor_tweet_attention"     : [False, True],
-        "factor_topic_volume"        : [False, True],
+        "factor_topic_volume" : {0 : False, 1 : True, 2 : global_exclusively_str},
     },
     "model_hyper_params" : {
         "estimator__hidden_layer_sizes" : {
@@ -768,7 +768,7 @@ design_space_dict = {
             5 : [("LSTM", 60), ("GRU", 30), ("LSTM", 8)]
             },
         "general_adjusting_square_factor" : [3, 2, 1, 0],
-        "estimator__alpha"                : [1e-11, 1e-10, 1e-9, 1e-8, 1e-7], 
+        "estimator__alpha"                : [1e-11, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4], 
         "lookbacks"                       : [8, 10, 15, 20, 25],
         "early_stopping" : [5, 7, 9, 12]
         },
@@ -784,19 +784,36 @@ design_space_dict = {
 global_run_count = 0
 
 init_doe = [
-    [2, 9,  1, 720,  0, 2, 0, 0, 4, 3, 1e-09,  10, 7], # id: 5  
-    [2, 9,  1, 720,  0, 2, 1, 0, 4, 3, 1e-09,  10, 7], 
-    [2, 9,  1, 720,  0, 2, 0, 1, 4, 3, 1e-09,  10, 7], 
-    [2, 9,  1, 720,  0, 2, 1, 1, 4, 3, 1e-09,  10, 7], 
-    [1, 17, 7, 900,  1, 2, 0, 0, 5, 2, 1.E-06,	20, 5], # id: 14
-    [1, 17, 7, 900,  1, 2, 1, 0, 5, 2, 1.E-06,	20, 5], 
-    [1, 17, 7, 900,  1, 2, 0, 1, 5, 2, 1.E-06,	20, 5], 
-    [1, 17, 7, 900,  1, 2, 1, 1, 5, 2, 1.E-06,	20, 5], 
-    [1, 25, 2, 7200, 0, 4, 0, 0, 4, 1, 0.E-04,	10, 5], # id: 17
-    [1, 25, 2, 7200, 0, 4, 1, 0, 4, 1, 0.E-04,	10, 5], 
-    [1, 25, 2, 7200, 0, 4, 0, 1, 4, 1, 0.E-04,	10, 5], 
-    [1, 25, 2, 7200, 0, 4, 1, 1, 4, 1, 0.E-04,	10, 5], 
+    [1, 9,  1, 720,  0, 2, 0, 0, 4, 3, 1e-09, 10, 7], # id: 5  
+    [1, 9,  1, 720,  0, 2, 1, 0, 4, 3, 1e-09, 10, 7], 
+    [1, 9,  1, 720,  0, 2, 0, 1, 4, 3, 1e-09, 10, 7], 
+    [1, 9,  1, 720,  0, 2, 1, 1, 4, 3, 1e-09, 10, 7], 
+    [1, 9,  1, 720,  0, 2, 1, 2, 4, 3, 1e-09, 10, 7], 
+
+    [1, 17, 7, 900,  1, 2, 0, 0, 5, 2, 1e-06, 20, 5], # id: 14
+    [1, 17, 7, 900,  1, 2, 1, 0, 5, 2, 1e-06, 20, 5], 
+    [1, 17, 7, 900,  1, 2, 0, 1, 5, 2, 1e-06, 20, 5], 
+    [1, 17, 7, 900,  1, 2, 1, 1, 5, 2, 1e-06, 20, 5], 
+    [1, 17, 7, 900,  1, 2, 1, 2, 5, 2, 1e-06, 20, 5], 
+
+    [1, 25, 2, 7200, 0, 4, 0, 0, 4, 1, 1e-04, 10, 5], 
+    [1, 25, 2, 7200, 0, 4, 1, 0, 4, 1, 1e-04, 10, 5], 
+    [1, 25, 2, 7200, 0, 4, 0, 1, 4, 1, 1e-04, 10, 5], 
+    [1, 25, 2, 7200, 0, 4, 1, 1, 4, 1, 1e-04, 10, 5], 
+    [1, 25, 2, 7200, 0, 4, 1, 2, 4, 1, 1e-04, 10, 5], 
+
+    [1, 9, 13, 7200, 1, 2, 0, 0, 2, 0, 0.0001, 20, 7], #id: 18
+    [1, 9, 13, 7200, 1, 2, 1, 0, 2, 0, 0.0001, 20, 7], 
+    [1, 9, 13, 7200, 1, 2, 0, 1, 2, 0, 0.0001, 20, 7], 
+    [1, 9, 13, 7200, 1, 2, 1, 1, 2, 0, 0.0001, 20, 7],
+    [1, 9, 13, 7200, 1, 2, 1, 2, 2, 0, 0.0001, 20, 7]
     ]
+
+init_doe = [
+    [1, 9, 13, 7200, 1, 2, 0, 2, 2, 0, 0.0001, 20, 7]
+]
+
+
 
 test_name_list = ["default", "with vol", "with tweet_importance", "with tweet_importance and vol"]
 
@@ -841,9 +858,7 @@ scenario_dict = {
 
 loop = [3]#, 10, 11]
 
-if loop == [3]:
-    init_doe.reverse()
-
+#init_doe.reverse()
 print("shard: {}".format(str(loop)))
 enable_GPU = False
 if enable_GPU == False:
@@ -854,7 +869,6 @@ if loop == None:
     init_doe = [init_doe[0]]
     
 for scenario_ID in loop:
-    
     
     index_of_topic_qty = return_keys_within_2_level_dict(design_space_dict).index("senti_inputs_params_dict_topic_qty")
 
@@ -892,7 +906,7 @@ for scenario_ID in loop:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "perm_test_{}.csv".format(str(scenario_ID))
+    scenario_name_str = scenario_name_str + "perm_test2d_{}.csv".format(str(scenario_ID))
 
 
     if __name__ == '__main__':
@@ -908,7 +922,7 @@ for scenario_ID in loop:
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/perm_test_{}.csv".format(str(scenario_ID)))
+            global_record_path=os.path.join(global_general_folder,r"outputs/perm_test2d_{}.csv".format(str(scenario_ID)))
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 

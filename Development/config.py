@@ -2,10 +2,8 @@ import pandas as pd
 from datetime import datetime
 import os
 
-
-
-global_general_folder = "C:/Users/Shadow/project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/"
-global_outputs_folder = "C:/Users/Shadow/project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/outputs/"
+global_general_folder = "D:/project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/"
+global_outputs_folder = "D:/project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/outputs/"
 #global_general_folder = "/home/accounts/studenti/id110xaq/final_project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/"
 #global_outputs_folder = "/home/accounts/studenti/id110xaq/final_project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/outputs/"
 #'/home/accounts/studenti/id110xaq/final_project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/data/support_data/stock_info.csv'
@@ -21,6 +19,7 @@ global_df_stocks_list_file           = pd.read_csv(os.path.join(global_general_f
 global_start_time = datetime.now()
 global_error_str_1 = "the input {} is wrong for the input training_or_testing"
 global_random_state = 1
+global_exclusively_str = "exclusively"
 global_scores_database = os.path.join(global_general_folder, r"outputs/scores_database.csv")
 global_strptime_str = '%d/%m/%y %H:%M:%S'
 global_strptime_str_2 = '%d/%m/%y %H:%M'

@@ -5,12 +5,6 @@ Created: 1st August 2023
 Description: 
 
 
-Required actions:
- - 
- - 
-Dev notes:
- - 
- - 
 
 """
 
@@ -44,7 +38,7 @@ import hashlib
 
 default_temporal_params_dict        = {
     "train_period_start"    : datetime.strptime('01/01/16 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/07/19 00:00:00', global_strptime_str),
+    "train_period_end"      : datetime.strptime('01/07/19 00:00:00', global_strptime_str), 
     "time_step_seconds"     : 5*60, #5 mins,
     "test_period_start"     : datetime.strptime('01/07/19 00:00:00', global_strptime_str),
     "test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str)
@@ -76,7 +70,8 @@ default_senti_inputs_params_dict    = {
     "tweet_file_location"   : os.path.join(global_general_folder,r"data/twitter_data/apple.csv"),
     "regenerate_cleaned_tweets_for_subject_discovery" : False,
     "inc_new_combined_stopwords_list" : True,
-    "topic_weight_square_factor" : 1
+    "topic_weight_square_factor" : 1,
+    "factor_tweet_attention" : False
 }
 default_outputs_params_dict         = {
     "output_symbol_indicators_tuple"    : ("aapl", "close"), 
@@ -93,24 +88,27 @@ default_model_hyper_params          = {
     "name" : "RandomSubspace_RNN_Regressor", #Multi-layer Perceptron regressor
         #general hyperparameters
     "n_estimators_per_time_series_blocking" : 1,
-    "testing_scoring"               : ["r2", "mse", "mae"],
+    "testing_scoring"               : "mse", #["r2", "mse", "mae"],
     "estimator__alpha"                 : 0.05,
-    "estimator__activation"            : 'tanh', #now hardcoded to ensure the use of GPU
+    "estimator__activation"            : 'softmax',
     "cohort_retention_rate_dict"       : default_cohort_retention_rate_dict,
     "general_adjusting_square_factor" : 1,
-    "epochs" : 1,
+    "epochs" : 40,
     "lookbacks" : 10,
-    "batch_ratio" : 0.1,
+    "batch_ratio" : 1,
     "shuffle_fit" : False,
-    "K_fold_splits" : 5, #FG_placeholder,
-    "scaler_cat" : 3 # 0:no scaling, 1: standard scaling (only from the MinMaxScaler object), 2: custom scaling, 3: individual scaling
+    "K_fold_splits" : 5,
+    "scaler_cat" : 3,  # 0:no scaling, 1: standard scaling (only from the MinMaxScaler object), 2: custom scaling, 3: individual scaling
+    "early_stopping" : 3, #this marks the patience value, if zero, feature is off
+    "learning_rate" : 0.001
     }
 default_reporting_dict              = {
-    "confidence_thresholds" : [0, 0.01, 0.02, 0.035, 0.05, 0.1],
-    "confidence_thresholds_inserted_to_df" : {
-        "PC_confindence" : [0.02],
-        "score_confidence" : [0.02],
-        "score_confidence_weighted" : [0.02]}}
+    "confidence_thresholds" : [0, 0.2, 0.50, 0.70, 0.90],
+#    "confidence_thresholds_inserted_to_df" : {
+#        "PC_confindence" : [0.02],
+#        "score_confidence" : [0.02],
+#        "score_confidence_weighted" : [0.02]}
+        }
 
 default_input_dict = {
     "temporal_params_dict"      : default_temporal_params_dict,
@@ -168,9 +166,11 @@ def save_designs_record_csv_and_dict(records_path_list, df_designs_record=None, 
         file_path = os.path.join(path, optim_run_name)
         
         if type(df_designs_record) == pd.core.frame.DataFrame:
+            df_designs_record_T = df_designs_record.T
             try:
                 df_designs_record.to_csv(file_path + ".csv", index=False)
                 df_designs_record.to_csv(file_path + ".csvBACKUP", index=False)
+                df_designs_record_T.to_csv(file_path + "_T" + ".csv", index=False)
             except:
                 df_designs_record.to_csv(file_path + ".csvBACKUP", index=False)
                 print("please close the csv")
@@ -583,8 +583,10 @@ def update_global_record(pred_steps, df_designs_record, experi_params_list, run_
     try:
         df_global_record.to_csv(global_record_path)
         df_global_record.to_csv(global_record_path + "DONTTOUCH")
+        df_global_record_t = df_global_record.T
+        df_global_record_t.to_csv(global_record_path[:-4] + "T.csv")
     except:
-        df_global_record.to_csv(global_record_path + "DONTTOUCH")    
+        df_global_record.to_csv(global_record_path + "DONTTOUCH")
     
 def experiment_manager(
     optim_run_name,
@@ -732,8 +734,28 @@ def experiment_manager(
 
 now = datetime.now()
 model_start_time = now.strftime(global_strptime_str_filename)
-    
+
+## special additions for time shift study
+def dateshift(datetime_index=0, multiples=0, length_of_single_shift_months=1):
+    list_of_datetimes = [default_temporal_params_dict["train_period_end"], default_temporal_params_dict["test_period_start"], default_temporal_params_dict["test_period_end"]]
+    return list_of_datetimes[datetime_index] + timedelta(days=30*length_of_single_shift_months*multiples)
+train_period_end_study_dict   = {0 : dateshift(0, 0)}
+#test_period_start_study_dict  = {0 : dateshift(1, -3), 1 : dateshift(1, -2), 2 : dateshift(1, -1), 3 : dateshift(1, -0)}
+#test_period_end_study_dict    = {0 : dateshift(2, -3), 1 : dateshift(2, -2), 2 : dateshift(2, -1), 3 : dateshift(2, -0)}
+
+test_period_start_study_dict  = {
+0 : dateshift(1, 0), 1  : dateshift(1, 1), 2 : dateshift(1, 2),
+3 : dateshift(1, 3), 4  : dateshift(1, 4), 5 : dateshift(1, 5)}
+test_period_end_study_dict    = {
+0 : dateshift(2, -5), 1  : dateshift(2, -4), 2  : dateshift(2, -3),
+3 : dateshift(2, -2), 4  : dateshift(2, -1), 5  : dateshift(2, 0)}
+
 design_space_dict = {
+    "temporal_params_dict" : {
+        "train_period_end"  : train_period_end_study_dict,
+        "test_period_start" : test_period_start_study_dict,
+        "test_period_end"   : test_period_end_study_dict
+    },
     "fin_inputs_params_dict" : {
         "financial_value_scaling" : {
             #0 : None,
@@ -757,11 +779,11 @@ design_space_dict = {
             5 : [("LSTM", 60), ("GRU", 30), ("LSTM", 8)]
             },
         "general_adjusting_square_factor" : [3, 2, 1, 0],
-        "estimator__alpha"                : [1e-11, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2], 
-        "lookbacks"                       : [8, 10, 15, 20, 25, 30, 40],
-        "batch_ratio"                     : [0.25, 0.5, 1]
-
-    },
+        "estimator__alpha"                : [1e-11, 1e-10, 1e-9, 1e-8, 1e-7], 
+        "lookbacks"                       : [8, 10, 15, 20, 25],
+        "early_stopping" : [5, 7, 9, 12]
+        },
+        
     "string_key" : {}
 }
 
@@ -771,45 +793,104 @@ design_space_dict = {
 
 global_run_count = 0
 
-init_doe = 35
 init_doe = [
-[1,	25,	7,      25200,  0,	4,	3,	3,	1.00E-11,	15,	0.25],
-[2,	17,	13,     900,    0,	4,	4,	2,	1.00E-10,   15,	0.50],
-[2,	13,	0.3,    25200,  0,	1,	5,	1,	1.00E-09,	15,	1.00],
-[2,	17,	2,      180,    0,	4,	1,	0,	1.00E-08,	15,	0.25],
-[1,	25,	7,      900,    1,	1,	4,	0,	1.00E-07,   25,	0.50],
-[2,	13,	3,      180,    1,	2,	5,	0,	1.00E-06,	40,	1.00],
-[2,	9,	0.3,    7200,   0,	1,	1,	1,	1.00E-05,	25,	0.25],
-[1,	9,	1,      25200,  1,	4,	3,	1,	1.00E-04,	40,	0.50],
-[2,	13,	0.3,    25200,  0,	4,	0,	2,	1.00E-03,	20,	1.00],
-[2,	9,	7,      7200,   0,	4,	3,	1,	1.00E-02,	40,	1.00],
-[2,	17,	5,      180,    1,	4,	4,	2,	1.00E-11,	10,	0.25],
-[2,	9,	7,      900,    1,	4,	3,	3,	1.00E-10,	8,	0.50],
-[2,	9,	1,      7200,   0,	2,	4,	3,	1.00E-09,	10,	1.00],
-[2,	5,	0.3,    180,    1,	4,	1,	0,	1.00E-08,	10,	0.25],
-[1,	9,	1,      180,    0,	4,	1,	2,	1.00E-07,	40,	0.50],
-[2,	9,	3,      25200,  1,	1,	2,	1,	1.00E-06,	40,	1.00],
-[2,	5,	7,      7200,   0,	4,	3,	3,	1.00E-05,	20,	0.25],
-[2,	13,	5,      25200,  0,	4,	8,	3,	1.00E-04,	10,	0.50],
-[2,	5,	7,      25200,  1,	4,	2,	0,	1.00E-03,	10,	1.00],
-[1,	17,	7,      180,    1,	1,	2,	2,	1.00E-02,	20,	0.25],
-[2,	25,	0.7,    25200,  0,	1,	3,	1,	1.00E-11,	15,	0.50],
-[2,	13,	2,      25200,  0,	4,	1,	3,	1.00E-10,	30,	1.00],
-[1,	13,	13,     7200,   1,	2,	3,	1,	1.00E-09,   8,	0.25],
-[1,	5,	1,      900,    0,	1,	0,	3,	1.00E-08,	30,	0.50],
-[1,	17,	3,      7200,   1,	1,	1,	1,	1.00E-07,	10,	1.00],
-[1,	17,	0.3,    180,    0,	1,	4,	3,	1.00E-06,	20,	0.25],
-[1,	25,	13,     7200,   1,	4,	5,	2,	1.00E-05,	40,	0.50],
-[1,	25,	3,      900,    1,	1,	2,	0,	1.00E-04,	30,	1.00],
-[1,	9,	13,     25200,  0,	2,	2,	2,	1.00E-03,	25,	0.25],
-[2,	25,	1,      900,    1,	1,	5,	3,	1.00E-02,	30,	0.50],
-[1,	5,	2,      900,    0,	2,	5,	1,	1.00E-10,	10,	1.00],
-[2,	9,	1,      900,    0,	1,	3,	2,	1.00E-10,	40,	0.25],
-[1,	9,	5,      25200,  1,	2,	0,	2,	1.00E-11,	40,	0.50],
-[2,	25,	0.7,    180,    0,	2,	3,	3,	1.00E-11,   8,	1.00],
-[2,	13,	5,      900,    1,	2,	0,	1,	1.00E-08,	20,	1.00]
-]
+    ### shard 3
+    # id 5
+    [0, 0,  0,  1, 9, 1, 720,   0, 2, 4, 3, 1E-09, 10, 7],
+    [0, 1,  1,  1, 9, 1, 720,   0, 2, 4, 3, 1E-09, 10, 7],
+    [0, 2,  2,  1, 9, 1, 720,   0, 2, 4, 3, 1E-09, 10, 7],
+    [0, 3,  3,  1, 9, 1, 720,   0, 2, 4, 3, 1E-09, 10, 7],
+    [0, 4,  4,  1, 9, 1, 720,   0, 2, 4, 3, 1E-09, 10, 7],
+    [0, 5,  5,  1, 9, 1, 720,   0, 2, 4, 3, 1E-09, 10, 7],
+    
+    ## id 12
+    [0, 0,  0,  1, 13, 2, 7200, 1, 1, 2, 1, 1E-05, 25, 9],
+    [0, 1,  1,  1, 13, 2, 7200, 1, 1, 2, 1, 1E-05, 25, 9],
+    [0, 2,  2,  1, 13, 2, 7200, 1, 1, 2, 1, 1E-05, 25, 9],
+    [0, 3,  3,  1, 13, 2, 7200, 1, 1, 2, 1, 1E-05, 25, 9],
+    [0, 4,  4,  1, 13, 2, 7200, 1, 1, 2, 1, 1E-05, 25, 9],
+    [0, 5,  5,  1, 13, 2, 7200, 1, 1, 2, 1, 1E-05, 25, 9],
+    
+    ## id 14
+    [0, 0,  0,  1, 17, 7, 900,  1, 2, 5, 2, 1E-06, 20, 5],
+    [0, 1,  1,  1, 17, 7, 900,  1, 2, 5, 2, 1E-06, 20, 5],
+    [0, 2,  2,  1, 17, 7, 900,  1, 2, 5, 2, 1E-06, 20, 5],
+    [0, 3,  3,  1, 17, 7, 900,  1, 2, 5, 2, 1E-06, 20, 5],
+    [0, 4,  4,  1, 17, 7, 900,  1, 2, 5, 2, 1E-06, 20, 5],
+    [0, 5,  5,  1, 17, 7, 900,  1, 2, 5, 2, 1E-06, 20, 5],
+    
+    ## id 17
+    [0, 0,  0,  1, 25, 2, 7200, 0, 4, 4, 1, 0.0001, 10, 5],
+    [0, 1,  1,  1, 25, 2, 7200, 0, 4, 4, 1, 0.0001, 10, 5],
+    [0, 2,  2,  1, 25, 2, 7200, 0, 4, 4, 1, 0.0001, 10, 5],
+    [0, 3,  3,  1, 25, 2, 7200, 0, 4, 4, 1, 0.0001, 10, 5],
+    [0, 4,  4,  1, 25, 2, 7200, 0, 4, 4, 1, 0.0001, 10, 5],
+    [0, 5,  5,  1, 25, 2, 7200, 0, 4, 4, 1, 0.0001, 10, 5],
+    
+    ### id 8: low performance
+    [0, 0,  0,  1, 25, 13, 25200, 1, 2, 4, 1, 1E-07, 10, 7],
+    [0, 1,  1,  1, 25, 13, 25200, 1, 2, 4, 1, 1E-07, 10, 7],
+    [0, 2,  2,  1, 25, 13, 25200, 1, 2, 4, 1, 1E-07, 10, 7],
+    [0, 3,  3,  1, 25, 13, 25200, 1, 2, 4, 1, 1E-07, 10, 7],
+    [0, 4,  4,  1, 25, 13, 25200, 1, 2, 4, 1, 1E-07, 10, 7],
+    [0, 5,  5,  1, 25, 13, 25200, 1, 2, 4, 1, 1E-07, 10, 7],
+    
+    ## id 18: low performance
+    [0, 0,  0,  1, 9,  13, 7200,  1, 2, 2, 0, 0.0001, 20, 7],
+    [0, 1,  1,  1, 9,  13, 7200,  1, 2, 2, 0, 0.0001, 20, 7],
+    [0, 2,  2,  1, 9,  13, 7200,  1, 2, 2, 0, 0.0001, 20, 7],
+    [0, 3,  3,  1, 9,  13, 7200,  1, 2, 2, 0, 0.0001, 20, 7],
+    [0, 4,  4,  1, 9,  13, 7200,  1, 2, 2, 0, 0.0001, 20, 7],
+    [0, 5,  5,  1, 9,  13, 7200,  1, 2, 2, 0, 0.0001, 20, 7],
 
+
+    ## shard 9
+    ### id 7
+    #[0, 0,  0,  1, 25, 13, 900, 1, 2, 4, 1, 1E-07, 10, 7],
+    #[0, 1,  1,  1, 25, 13, 900, 1, 2, 4, 1, 1E-07, 10, 7],
+    #[0, 2,  2,  1, 25, 13, 900, 1, 2, 4, 1, 1E-07, 10, 7],
+    #[0, 3,  3,  1, 25, 13, 900, 1, 2, 4, 1, 1E-07, 10, 7],
+    #[0, 4,  4,  1, 25, 13, 900, 1, 2, 4, 1, 1E-07, 10, 7],
+    #[0, 5,  5,  1, 25, 13, 900, 1, 2, 4, 1, 1E-07, 10, 7],
+    #
+    ### id 11
+    #[0, 0,  0,  1, 25, 2, 7200, 0, 4, 4, 1, 1E-05, 10, 5],
+    #[0, 1,  1,  1, 25, 2, 7200, 0, 4, 4, 1, 1E-05, 10, 5],
+    #[0, 2,  2,  1, 25, 2, 7200, 0, 4, 4, 1, 1E-05, 10, 5],
+    #[0, 3,  3,  1, 25, 2, 7200, 0, 4, 4, 1, 1E-05, 10, 5],
+    #[0, 4,  4,  1, 25, 2, 7200, 0, 4, 4, 1, 1E-05, 10, 5],
+    #[0, 5,  5,  1, 25, 2, 7200, 0, 4, 4, 1, 1E-05, 10, 5],
+    #
+    ### id 14
+    #[0, 0,  0,  1, 17, 7, 900, 1, 2, 5, 2, 1E-06, 20, 5],
+    #[0, 1,  1,  1, 17, 7, 900, 1, 2, 5, 2, 1E-06, 20, 5],
+    #[0, 2,  2,  1, 17, 7, 900, 1, 2, 5, 2, 1E-06, 20, 5],
+    #[0, 3,  3,  1, 17, 7, 900, 1, 2, 5, 2, 1E-06, 20, 5],
+    #[0, 4,  4,  1, 17, 7, 900, 1, 2, 5, 2, 1E-06, 20, 5],
+    #[0, 5,  5,  1, 17, 7, 900, 1, 2, 5, 2, 1E-06, 20, 5],
+    # ## id 17
+    #
+    #[0, 0,  0,  1, 25, 2, 7200, 0, 4, 4, 1, 0.0001, 10, 5],
+    #[0, 1,  1,  1, 25, 2, 7200, 0, 4, 4, 1, 0.0001, 10, 5],
+    #[0, 2,  2,  1, 25, 2, 7200, 0, 4, 4, 1, 0.0001, 10, 5],
+    #[0, 3,  3,  1, 25, 2, 7200, 0, 4, 4, 1, 0.0001, 10, 5],
+    #[0, 4,  4,  1, 25, 2, 7200, 0, 4, 4, 1, 0.0001, 10, 5],
+    #[0, 5,  5,  1, 25, 2, 7200, 0, 4, 4, 1, 0.0001, 10, 5],
+    #     ### id: 5 low performance
+    #[0, 0,  0,  1, 9,  1, 720,  0, 2, 4, 3, 1E-09, 10, 7], 
+    #[0, 1,  1,  1, 9,  1, 720,  0, 2, 4, 3, 1E-09, 10, 7], 
+    #[0, 2,  2,  1, 9,  1, 720,  0, 2, 4, 3, 1E-09, 10, 7], 
+    #[0, 3,  3,  1, 9,  1, 720,  0, 2, 4, 3, 1E-09, 10, 7], 
+    #[0, 4,  4,  1, 9,  1, 720,  0, 2, 4, 3, 1E-09, 10, 7], 
+    #[0, 5,  5,  1, 9,  1, 720,  0, 2, 4, 3, 1E-09, 10, 7], 
+    #    ## id: 16 low performance
+    #[0, 0,  0,  1, 25, 13, 25200, 1, 2, 2, 0, 0.0001, 10, 7],
+    #[0, 1,  1,  1, 25, 13, 25200, 1, 2, 2, 0, 0.0001, 10, 7],
+    #[0, 2,  2,  1, 25, 13, 25200, 1, 2, 2, 0, 0.0001, 10, 7],
+    #[0, 3,  3,  1, 25, 13, 25200, 1, 2, 2, 0, 0.0001, 10, 7],
+    #[0, 4,  4,  1, 25, 13, 25200, 1, 2, 2, 0, 0.0001, 10, 7],
+    #[0, 5,  5,  1, 25, 13, 25200, 1, 2, 2, 0, 0.0001, 10, 7],
+    ]
 
 
 """ experiment checklist:
@@ -828,37 +909,37 @@ checklist for restarting the experiment
 
 # scenario parameters: topic_qty, pred_steps
 
-scenario_ID = 0
-removal_ratio = int(4.5e0)
+
+removal_ratio = int(1e0)
 scenario_dict = {
-        0 : {"topics" : None, "pred_steps" : 15},
-        1 : {"topics" : 1, "pred_steps" : 15},
-        2 : {"topics" : 0, "pred_steps" : 15},
+        #0 : {"topics" : None, "pred_steps" : 15},
+        #1 : {"topics" : 1, "pred_steps" : 15},
+        #2 : {"topics" : 0, "pred_steps" : 15},
         3 : {"topics" : None, "pred_steps" : 5},
         4 : {"topics" : 1, "pred_steps" : 5},
         5 : {"topics" : 0, "pred_steps" : 5},
-        6 : {"topics" : None, "pred_steps" : 3},
-        7 : {"topics" : 1, "pred_steps" : 3},
-        8 : {"topics" : 0, "pred_steps" : 3},
+        #6 : {"topics" : None, "pred_steps" : 3},
+        #7 : {"topics" : 1, "pred_steps" : 3},
+        #8 : {"topics" : 0, "pred_steps" : 3},
         9 : {"topics" : None, "pred_steps" : 1},
         10: {"topics" : 1, "pred_steps" : 1},
         11: {"topics" : 0, "pred_steps" : 1},
-        
-        
-        
     }
-shard = None
+
+loop = [3]#, 4, 5]#[9, 10, 11]#
+print("shard: {}".format(str(loop)))
 enable_GPU = False
 if enable_GPU == False:
     import tensorflow as tf
     tf.config.set_visible_devices([], 'GPU')
-if shard == None:
+if loop == None:
     loop = scenario_dict.keys()
-else:
-    loop = [shard]
+    init_doe = [init_doe[0]]
+    
+
 
 for scenario_ID in loop:
-    
+
     index_of_topic_qty = return_keys_within_2_level_dict(design_space_dict).index("senti_inputs_params_dict_topic_qty")
 
     # editing topic quantity values for scenario, 2 lines
@@ -875,18 +956,18 @@ for scenario_ID in loop:
     default_input_dict["senti_inputs_params_dict"]["topic_training_tweet_ratio_removed"] = removal_ratio
 
     # setting the optimisation objective functions
-    confidence_scoring_measure_tuple_1 = ("validation","results_x_mins_weighted",pred_steps,0.02)
-    confidence_scoring_measure_tuple_2 = ("validation","results_x_mins_PC",pred_steps,0.02)
-    confidence_scoring_measure_tuple_3 = ("validation","results_x_mins_score",pred_steps,0.02)
-    
-    
+    confidence_scoring_measure_tuple_1 = ("validation","results_x_mins_weighted",pred_steps,0.5)
+    confidence_scoring_measure_tuple_2 = ("validation","results_x_mins_PC",pred_steps,0.5)
+    confidence_scoring_measure_tuple_3 = ("validation","results_x_mins_score",pred_steps,0.5)
+
+
     optim_scores_vec = ["validation_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2, confidence_scoring_measure_tuple_3]
-    
+
     inverse_for_minimise_vec = [True, False, False, False]
-    
+
     optim_scores_vec = ["validation_" + testing_measure]
     inverse_for_minimise_vec = [True]
-    
+
 
     #what around to ensure that single topic sentiment data in more used in the model
     if default_senti_inputs_params_dict["topic_qty"] == 1:
@@ -895,9 +976,9 @@ for scenario_ID in loop:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "parallel_run_4_{}.csv".format(str(shard))
+    scenario_name_str = scenario_name_str + "time_shift_test_of_run13_{}.csv".format(str(scenario_ID))
 
-    
+
     if __name__ == '__main__':
         #scenario_name_str = "test 19"
         print("running scenario " + str(scenario_ID) + ": " + scenario_name_str + " - " + datetime.now().strftime("%H:%M:%S"))
@@ -911,7 +992,7 @@ for scenario_ID in loop:
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/parallel_run_5_{}.csv".format(str(shard)))
+            global_record_path=os.path.join(global_general_folder,r"outputs/time_shift_test_of_run13_{}.csv".format(str(scenario_ID)))
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
