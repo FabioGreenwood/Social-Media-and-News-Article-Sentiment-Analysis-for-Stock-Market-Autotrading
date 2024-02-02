@@ -1206,7 +1206,7 @@ def initiate_model(input_dict, hash_name=None):
     
     return estimator
 
-def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_features, dropout_cols):
+def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_features):
     
     ensemble_estimator = Sequential()
     
@@ -1240,7 +1240,7 @@ def return_RNN_ensamble_estimator(model_hyper_params, global_random_state, n_fea
     opt = keras.optimizers.Adam(learning_rate=model_hyper_params["learning_rate"])
     ensemble_estimator.compile(optimizer=opt, loss=model_hyper_params["testing_scoring"])
     ensemble_estimator.random_state = global_random_state
-    ensemble_estimator.dropout_cols_ = dropout_cols
+    
     
     return ensemble_estimator
 
@@ -1261,15 +1261,10 @@ class DRSLinRegRNN():
         else:
             self.name = hash_name
 
-    def return_single_ensable_model_fitted(self, model, X, Y):
-        raise SystemError("this logic shouldn't be being used")
-        X_indy, X = return_lookback_appropriate_index_andor_data(X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
-        Y_indy, Y = return_lookback_appropriate_index_andor_data(Y, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
-        model.fit(X, Y, epochs=self.epochs, shuffle=self.shuffle_fit)
-        return model
 
-    def return_single_ensable_model_fitted_with_early_stopping(self, model, X, Y, X_val, Y_val):
+    def return_single_component_model_fitted_with_early_stopping(self, model, X, Y, X_val, Y_val):
         verbose = 0
+        
         X_indy, X = return_lookback_appropriate_index_andor_data(X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
         Y_indy, Y = return_lookback_appropriate_index_andor_data(Y, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
         X_indy_val, X_val = return_lookback_appropriate_index_andor_data(X_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
@@ -1294,7 +1289,7 @@ class DRSLinRegRNN():
         global global_random_state
         global_random_state = 42
 
-        if hasattr(self,"training_scores_dict") and hasattr(self,"validation_scores_dict") and hasattr(self,"additional_validation_dict"):
+        if True == False and hasattr(self,"training_scores_dict") and hasattr(self,"validation_scores_dict") and hasattr(self,"additional_validation_dict"):
             training_scores_dict        = self.training_scores_dict
             validation_scores_dict      = self.validation_scores_dict
             additional_validation_dict  = self.additional_validation_dict
@@ -1309,19 +1304,17 @@ class DRSLinRegRNN():
                 print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
                 
                 for i_random in range(self.n_estimators_per_time_series_blocking):
-                    n_features = df_X.shape[1]
-                    dropout_cols = return_columns_to_remove(columns_list=df_X.columns, self=self)
-
                     # data prep
+                    single_estimator = self.estimators_[count]
+
                     X_train = df_X.loc[df_X.index[train_index].values].copy()
-                    X_train.loc[:, dropout_cols] = 0
+                    X_train.loc[:, list(single_estimator.dropout_cols)] = 0
                     y_train = df_y.loc[df_y.index[train_index].values].copy()
 
                     X_val = df_X.loc[df_X.index[val_index].values].copy()
-                    X_val.loc[:, dropout_cols] = 0
+                    X_val.loc[:, list(single_estimator.dropout_cols)] = 0
                     y_val = df_y.loc[df_y.index[val_index].values].copy()
-
-                    single_estimator = self.estimators_[count]
+                    
 
                     # produce standard training scores
                     y_pred_train = self.custom_single_predict(X_train, single_estimator)
@@ -1329,11 +1322,18 @@ class DRSLinRegRNN():
 
 
                     # collect training, validation, and validation additional analysis scores
-                    training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"], self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
-                    validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"], self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
+                    training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate_results(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"], self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
+                    validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate_results(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"], self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
                     training_scores_dict_list += [training_scores_dict_list_new]
                     validation_scores_dict_list += [validation_scores_dict_list_new]
                     additional_validation_dict_list += [additional_validation_dict_list_new]
+                    self.X_train_list += [X_train]
+                    self.y_train_list += [y_train]
+                    self.y_pred_list += [y_pred_val]
+                    self.y_val_list += [y_val]
+
+
+
                     count += 1
 
             training_scores_dict = average_list_of_identical_dicts(training_scores_dict_list)
@@ -1374,7 +1374,7 @@ class DRSLinRegRNN():
 
                 # data prep
                 X_train = df_X.loc[df_X.index[train_index].values].copy()
-                X_train.loc[:, dropout_cols] = 0
+                X_train[:, dropout_cols]     = 0
                 y_train = df_y.loc[df_y.index[train_index].values].copy()
 
                 X_val = df_X.loc[df_X.index[val_index].values].copy()
@@ -1383,9 +1383,10 @@ class DRSLinRegRNN():
 
                 
                 # initialising and prepping
-                single_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features, dropout_cols)
+                single_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features)
+                single_estimator.dropout_cols = dropout_cols
                 global_random_state += 1
-                single_estimator = self.return_single_ensable_model_fitted_with_early_stopping(single_estimator, X_train, y_train, X_val, y_val)
+                single_estimator = self.return_single_component_model_fitted_with_early_stopping(single_estimator, X_train, y_train, X_val, y_val)
                 self.X_train_list += [X_train]
                 self.y_train_list += [y_train]
                 
@@ -1396,8 +1397,8 @@ class DRSLinRegRNN():
                 self.y_val_list += [y_val]
 
                 # collect training, validation, and validation additional analysis scores
-                training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
-                validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
+                training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate_results(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
+                validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate_results(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
                 training_scores_dict_list += [training_scores_dict_list_new]
                 validation_scores_dict_list += [validation_scores_dict_list_new]
                 additional_validation_dict_list += [additional_validation_dict_list_new]
@@ -1433,22 +1434,26 @@ class DRSLinRegRNN():
 
         return scaler
 
-    def custom_single_predict(self, df_X, single_estimator):
-        index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
+    def custom_single_predict(self, df_X, single_estimator, dropout_cols_require_neutralising=False):
+        
+        if dropout_cols_require_neutralising==True:
+            df_X.loc[:, list(single_estimator.dropout_cols)] = 0
+
+
+        index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X, dropout_cols=single_estimator.dropout_cols)
         y_pred_values       = single_estimator.predict(input_data, verbose=0)
         y_pred_values       = self.scaler_y.inverse_transform(y_pred_values)
         y_pred_values = pd.DataFrame(y_pred_values, index=index)
 
         return y_pred_values
         
-    def evaluate(self, y_test, y_pred, outputs_params_dict, reporting_dict, financial_value_scaling):
+    def evaluate_results(self, y_test, y_pred, outputs_params_dict, reporting_dict, financial_value_scaling):
         
         pred_steps_value              = outputs_params_dict["pred_steps_ahead"]
         confidences_before_betting_PC = reporting_dict["confidence_thresholds"]
 
         #align indices
         if isinstance(y_pred, pd.Series):
-            a = copy.deepcopy(y_pred)
             y_pred = pd.DataFrame(y_pred)
         merged_df = pd.merge(y_test, y_pred, left_index=True, right_index=True, how='inner')
         y_test = y_test.loc[merged_df.index]
@@ -1464,7 +1469,7 @@ class DRSLinRegRNN():
         else:
             model_name = custom_hash(return_predictor_name(self.input_dict))
         folder_path = os.path.join(general_save_dir, model_name + "\\")
-        extension = ".h5"
+        extension = "h5"
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
         else:
@@ -1477,7 +1482,7 @@ class DRSLinRegRNN():
                 os.remove(os.path.join(folder_path, file))
         # Save each model in the ensemble
         for i, model in enumerate(self.estimators_):
-            model.save(os.path.join(folder_path, f'ensemble_model_{i}.{extension}'))
+            model.save(os.path.join(folder_path, f'component_model_{i}.{extension}'))
         with open(os.path.join(folder_path,"input_dict.pkl"), "wb") as file:
                 pickle.dump(self.input_dict, file)
         #save predictions if specified
@@ -1487,12 +1492,16 @@ class DRSLinRegRNN():
         if isinstance(y_testing, pd.Series) or isinstance(y_testing, pd.DataFrame):
             y_testing.to_csv(os.path.join(folder_path, 'y_testing.csv'))
         #save scaler and other assets
+        dropout_cols_dict = {}
+        for i, single_estimator in enumerate(self.estimators_):
+            dropout_cols_dict[i] = single_estimator.dropout_cols
         additional_assets_dict = {
             "scaler_X" : self.scaler_X,
             "scaler_y" : self.scaler_y,
             "training_scores_dict"        : self.training_scores_dict,
             "validation_scores_dict"      : self.validation_scores_dict,
-            "additional_validation_dict"  : self.additional_validation_dict
+            "additional_validation_dict"  : self.additional_validation_dict,
+            "dropout_cols"                : dropout_cols_dict
             }
         with open(os.path.join(folder_path,"additional_assets.pkl"), "wb") as file:
                 pickle.dump(additional_assets_dict, file)
@@ -1509,7 +1518,7 @@ class DRSLinRegRNN():
         y_ensemble = pd.DataFrame()
         for i, single_estimator in enumerate(self.estimators_):
             # randomly select features to drop out
-            y_ensemble[i] = self.custom_single_predict(X, single_estimator)
+            y_ensemble[i] = self.custom_single_predict(X, single_estimator, dropout_cols_require_neutralising=True)
         
         output = y_ensemble.mean(axis=1)
 
@@ -1566,16 +1575,25 @@ class DRSLinRegRNN():
         
         # otherwise load the file
         print("xxx loading predictor{}".format(folder_name))
+        with open(os.path.join(predictor_location_folder_path,"additional_assets.pkl"), "rb") as file:
+            additional_assets_dict = pickle.load(file)
         for filename in os.listdir(predictor_location_folder_path):
             if filename.endswith(".h5"):
                 file_path = os.path.join(predictor_location_folder_path, filename)
-                self.estimators_ += [load_model(file_path)]
+                #each component model needs its dropout cols individually populated
+                file_num = filename.replace("component_model_","")
+                file_num = int(file_num.replace(".h5",""))
+                single_estimator = load_model(file_path)
+                single_estimator.dropout_cols = additional_assets_dict["dropout_cols"][file_num]
+                self.estimators_ += [single_estimator]
+
         # load additional factors
-        with open(os.path.join(predictor_location_folder_path,"additional_assets.pkl"), "rb") as file:
-            additional_assets_dict = pickle.load(file)
-            for attr in ["scaler_X", "scaler_y", "training_scores_dict", "validation_scores_dict", "additional_validation_dict"]:
-                if attr in additional_assets_dict.keys():
-                    setattr(self, attr, additional_assets_dict[attr])
+        for attr in ["scaler_X", "scaler_y", "training_scores_dict", "validation_scores_dict", "additional_validation_dict"]:
+            if attr in additional_assets_dict.keys():
+                setattr(self, attr, additional_assets_dict[attr])
+
+        
+
 
 
 def load_RNN_predictor(input_dict, predictor_location_folder_path, only_return_viability=False):
@@ -1585,7 +1603,7 @@ def load_RNN_predictor(input_dict, predictor_location_folder_path, only_return_v
         predictor.load(predictor_location_folder_path)
         return predictor
 
-def return_lookback_appropriate_index_andor_data(df_x, lookbacks, return_index=False, return_input=False, scaler=None):
+def return_lookback_appropriate_index_andor_data(df_x, lookbacks, return_index=False, return_input=False, scaler=None, dropout_cols=None):
     # this method, according to result bools, returns the index and input data so that time 
     # periods spanning two days are removed
     if return_index == False and return_input == False:
@@ -1596,6 +1614,7 @@ def return_lookback_appropriate_index_andor_data(df_x, lookbacks, return_index=F
     ori_index = df_x.index
     if not scaler == None:
         df_x = pd.DataFrame(scaler.transform(df_x), index=df_x.index, columns=df_x.columns)
+
     else:
         raise ValueError("there should be a scaler used")
 
@@ -1722,7 +1741,7 @@ def generate_testing_scores(predictor, input_dict, return_time_series=False):
     
     # step 4: generate score
     print(datetime.now().strftime("%H:%M:%S") + " - testing - step 4: generate score")
-    testing_scores, additional_results_dict = predictor.evaluate(y_testing, Y_preds_testing, outputs_params_dict, reporting_dict, input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
+    testing_scores, additional_results_dict = predictor.evaluate_results(y_testing, Y_preds_testing, outputs_params_dict, reporting_dict, input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
     predictor.save(Y_preds_testing=Y_preds_testing, y_testing=y_testing)
     if return_time_series == False:
         return testing_scores
