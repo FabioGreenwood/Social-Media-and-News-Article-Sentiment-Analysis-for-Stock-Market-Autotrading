@@ -1266,15 +1266,15 @@ class DRSLinRegRNN():
         verbose = 0
         
         X_indy, X = return_lookback_appropriate_index_andor_data(X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
-        Y_indy, Y = return_lookback_appropriate_index_andor_data(Y, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
+        #Y_indy, Y = return_lookback_appropriate_index_andor_data(Y, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
         X_indy_val, X_val = return_lookback_appropriate_index_andor_data(X_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
-        Y_indy_val, Y_val = return_lookback_appropriate_index_andor_data(Y_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
+        #Y_indy_val, Y_val = return_lookback_appropriate_index_andor_data(Y_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
 
         if self.model_hyper_params["early_stopping"] != 0:
             early_stopping = EarlyStopping(monitor='val_loss', patience=self.model_hyper_params["early_stopping"], restore_best_weights=True)
-            history = model.fit(X, Y, epochs=self.model_hyper_params["epochs"], validation_data=(X_val, Y_val), callbacks=[early_stopping], verbose=verbose)
+            history = model.fit(X, Y.loc[X_indy,:], epochs=self.model_hyper_params["epochs"], validation_data=(X_val, Y_val.loc[X_indy_val,:]), callbacks=[early_stopping], verbose=verbose)
         else:
-            history = model.fit(X, Y, epochs=self.model_hyper_params["epochs"], validation_data=(X_val, Y_val), verbose=verbose)
+            history = model.fit(X, Y.loc[X_indy,:], epochs=self.model_hyper_params["epochs"], validation_data=(X_val, Y_val.loc[X_indy_val,:]), verbose=verbose)
         print(datetime.now().strftime("%H:%M:%S") + " - fit complete")
         # Train the model with early stopping
         
@@ -1308,11 +1308,11 @@ class DRSLinRegRNN():
                     single_estimator = self.estimators_[count]
 
                     X_train = df_X.loc[df_X.index[train_index].values].copy()
-                    X_train.loc[:, list(single_estimator.dropout_cols)] = 0
+                    X_train.loc[:, single_estimator.dropout_cols] = 0
                     y_train = df_y.loc[df_y.index[train_index].values].copy()
 
                     X_val = df_X.loc[df_X.index[val_index].values].copy()
-                    X_val.loc[:, list(single_estimator.dropout_cols)] = 0
+                    X_val.loc[:, single_estimator.dropout_cols] = 0
                     y_val = df_y.loc[df_y.index[val_index].values].copy()
                     
 
@@ -1374,7 +1374,7 @@ class DRSLinRegRNN():
 
                 # data prep
                 X_train = df_X.loc[df_X.index[train_index].values].copy()
-                X_train[:, dropout_cols]     = 0
+                X_train.loc[:, dropout_cols]     = 0
                 y_train = df_y.loc[df_y.index[train_index].values].copy()
 
                 X_val = df_X.loc[df_X.index[val_index].values].copy()
@@ -1437,7 +1437,7 @@ class DRSLinRegRNN():
     def custom_single_predict(self, df_X, single_estimator, dropout_cols_require_neutralising=False):
         
         if dropout_cols_require_neutralising==True:
-            df_X.loc[:, list(single_estimator.dropout_cols)] = 0
+            df_X.loc[:, single_estimator.dropout_cols] = 0
 
 
         index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X, dropout_cols=single_estimator.dropout_cols)
