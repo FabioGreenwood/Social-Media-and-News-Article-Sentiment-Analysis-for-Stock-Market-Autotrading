@@ -842,7 +842,7 @@ scenario_dict = {
         3 : {"topics" : None, "pred_steps" : 5},
         4 : {"topics" : 1, "pred_steps" : 5},
         5 : {"topics" : 0, "pred_steps" : 5},
-        #6 : {"topics" : None, "pred_steps" : 3},
+        6 : {"topics" : None, "pred_steps" : 3},
         #7 : {"topics" : 1, "pred_steps" : 3},
         #8 : {"topics" : 0, "pred_steps" : 3},
         9 : {"topics" : None, "pred_steps" : 1},
@@ -850,7 +850,7 @@ scenario_dict = {
         11: {"topics" : 0, "pred_steps" : 1},
     }
 
-loop = [5]#[5,11]#[3, 4]#
+loop = [6]#[5,11]#[3, 4]#
 print("shard: {}".format(str(loop)))
 enable_GPU = False
 if enable_GPU == False:

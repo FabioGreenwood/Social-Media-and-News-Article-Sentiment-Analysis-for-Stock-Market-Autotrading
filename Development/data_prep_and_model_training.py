@@ -1262,19 +1262,67 @@ class DRSLinRegRNN():
             self.name = hash_name
 
 
-    def return_single_component_model_fitted_with_early_stopping(self, model, X, Y, X_val, Y_val):
-        verbose = 0
-        
-        X_indy, X = return_lookback_appropriate_index_andor_data(X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
-        #Y_indy, Y = return_lookback_appropriate_index_andor_data(Y, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
-        X_indy_val, X_val = return_lookback_appropriate_index_andor_data(X_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X)
-        #Y_indy_val, Y_val = return_lookback_appropriate_index_andor_data(Y_val, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_y)
+    def scale_output_according_to_input_scaler(self, X, Y, prediction_col_in_input="£_close"):
+        # to ensure that the ouput uses the same scaling as the input
+        original_col_string = Y.columns[0]
+        Y[X.columns] = np.nan
+        Y[prediction_col_in_input] = Y[original_col_string]
+        Y = Y.drop(original_col_string, axis=1)
+        Y = pd.DataFrame(self.scaler_X.transform(Y), index=Y.index, columns=Y.columns)
+        Y[original_col_string] = Y[prediction_col_in_input]
+        Y = pd.DataFrame(Y[original_col_string])
+        return Y
+    
+    def inverse_scale_output_according_to_input_scaler(self, X, Y, prediction_col_in_input="£_close"):
+        # to ensure that the ouput uses the same scaling as the input
+        original_col_string = Y.columns[0]
+        Y[X.columns] = np.nan
+        Y[prediction_col_in_input] = Y[original_col_string]
+        Y = Y.drop(original_col_string, axis=1)
+        Y = pd.DataFrame(self.scaler_X.inverse_transform(Y), index=Y.index, columns=Y.columns)
+        Y[original_col_string] = Y[prediction_col_in_input]
+        Y = pd.DataFrame(Y[original_col_string])
+        return Y
 
+
+    def return_single_component_model_fitted_with_early_stopping(self, model, X_input, Y_input, X_val_input, Y_val_input):
+        verbose = 1
+        
+        # Create input sequences and labels manually
+        data = np.array(X_input)  
+        targets = np.array(Y_input)  
+        sequences = [X_input[i:i+self.lookbacks] for i in range(len(X_input) - self.lookbacks + 1)]
+        labels = [Y_input[i:i+self.lookbacks] for i in range(len(Y_input) - self.lookbacks + 1)]
+        labels = Y_input[self.lookbacks-1:]
+        dataset = tf.data.Dataset.from_tensor_slices((sequences, labels))
+        
+        history = model.fit(sequences, labels, epochs=self.model_hyper_params["epochs"], verbose = 1)
+        # Convert to TensorFlow dataset
+        
+        dataset = dataset.batch(32)
+
+
+
+
+        X_indy, X = return_lookback_appropriate_index_andor_data(X_input, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X, dropout_cols=model.dropout_cols)
+        Y = self.scale_output_according_to_input_scaler(X_input, Y_input)
+        # Y needs to have the same entries that were removed in X due to them straddling days when lookback was considered
+        Y = Y.loc[X_indy,:]
+        
+        X_indy_val, X_val = return_lookback_appropriate_index_andor_data(X_val_input, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X, dropout_cols=model.dropout_cols)
+        Y_val = self.scale_output_according_to_input_scaler(X_val_input, Y_val_input)
+        # As above
+        Y_val = Y_val.loc[X_indy_val,:]
+
+
+
+
+        
         if self.model_hyper_params["early_stopping"] != 0:
             early_stopping = EarlyStopping(monitor='val_loss', patience=self.model_hyper_params["early_stopping"], restore_best_weights=True)
-            history = model.fit(X, Y.loc[X_indy,:], epochs=self.model_hyper_params["epochs"], validation_data=(X_val, Y_val.loc[X_indy_val,:]), callbacks=[early_stopping], verbose=verbose)
+            history = model.fit(X, Y, epochs=self.model_hyper_params["epochs"], validation_data=(X_val, Y_val), callbacks=[early_stopping], verbose=verbose)
         else:
-            history = model.fit(X, Y.loc[X_indy,:], epochs=self.model_hyper_params["epochs"], validation_data=(X_val, Y_val.loc[X_indy_val,:]), verbose=verbose)
+            history = model.fit(X, Y, epochs=self.model_hyper_params["epochs"], validation_data=(X_val, Y_val), verbose=verbose)
         print(datetime.now().strftime("%H:%M:%S") + " - fit complete")
         # Train the model with early stopping
         
@@ -1308,11 +1356,9 @@ class DRSLinRegRNN():
                     single_estimator = self.estimators_[count]
 
                     X_train = df_X.loc[df_X.index[train_index].values].copy()
-                    X_train.loc[:, single_estimator.dropout_cols] = 0
                     y_train = df_y.loc[df_y.index[train_index].values].copy()
 
                     X_val = df_X.loc[df_X.index[val_index].values].copy()
-                    X_val.loc[:, single_estimator.dropout_cols] = 0
                     y_val = df_y.loc[df_y.index[val_index].values].copy()
                     
 
@@ -1357,14 +1403,12 @@ class DRSLinRegRNN():
         print(datetime.now().strftime("%H:%M:%S") + " - training model")
 
         scaler_X = MinMaxScaler()
-        scaler_y = MinMaxScaler()
         self.scaler_X = scaler_X.fit(df_X)
-        self.scaler_y = scaler_y.fit(df_y)
         self.X_train_list = []
         self.y_train_list = []
         self.y_pred_list = []
         self.y_val_list = []
-        del scaler_X, scaler_y
+        del scaler_X
         for train_index, val_index in kf.split(df_X):
             count += 1
             print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
@@ -1374,11 +1418,9 @@ class DRSLinRegRNN():
 
                 # data prep
                 X_train = df_X.loc[df_X.index[train_index].values].copy()
-                X_train.loc[:, dropout_cols]     = 0
                 y_train = df_y.loc[df_y.index[train_index].values].copy()
 
                 X_val = df_X.loc[df_X.index[val_index].values].copy()
-                X_val.loc[:, dropout_cols] = 0
                 y_val = df_y.loc[df_y.index[val_index].values].copy()
 
                 
@@ -1386,12 +1428,15 @@ class DRSLinRegRNN():
                 single_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features)
                 single_estimator.dropout_cols = dropout_cols
                 global_random_state += 1
-                single_estimator = self.return_single_component_model_fitted_with_early_stopping(single_estimator, X_train, y_train, X_val, y_val)
+                single_estimator = self.return_single_component_model_fitted_with_early_stopping(single_estimator, X_train, y_train.copy(), X_val, y_val)
+                
+                #record training data, without scaling
+                X_train.loc[:,dropout_cols] = 0
                 self.X_train_list += [X_train]
                 self.y_train_list += [y_train]
                 
                 # produce standard training scores
-                y_pred_train = self.custom_single_predict(X_train, single_estimator)
+                y_pred_train = self.custom_single_predict(X_train, single_estimator) # pred here is the prediction of the price at [time + pred horizon] made at [time]
                 y_pred_val = self.custom_single_predict(X_val, single_estimator)
                 self.y_pred_list += [y_pred_val]
                 self.y_val_list += [y_val]
@@ -1434,16 +1479,13 @@ class DRSLinRegRNN():
 
         return scaler
 
-    def custom_single_predict(self, df_X, single_estimator, dropout_cols_require_neutralising=False):
-        
-        if dropout_cols_require_neutralising==True:
-            df_X.loc[:, single_estimator.dropout_cols] = 0
-
+    def custom_single_predict(self, df_X, single_estimator, output_col_name="prediction_X_ahead"):
 
         index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X, dropout_cols=single_estimator.dropout_cols)
-        y_pred_values       = single_estimator.predict(input_data, verbose=0)
-        y_pred_values       = self.scaler_y.inverse_transform(y_pred_values)
-        y_pred_values = pd.DataFrame(y_pred_values, index=index)
+        y_pred_values       = single_estimator.predict(input_data, verbose=1)
+        y_pred_values       = pd.DataFrame(y_pred_values, index=index, columns=[output_col_name])
+        y_pred_values       = self.inverse_scale_output_according_to_input_scaler(df_X, y_pred_values)
+        
 
         return y_pred_values
         
@@ -1497,7 +1539,6 @@ class DRSLinRegRNN():
             dropout_cols_dict[i] = single_estimator.dropout_cols
         additional_assets_dict = {
             "scaler_X" : self.scaler_X,
-            "scaler_y" : self.scaler_y,
             "training_scores_dict"        : self.training_scores_dict,
             "validation_scores_dict"      : self.validation_scores_dict,
             "additional_validation_dict"  : self.additional_validation_dict,
@@ -1518,7 +1559,7 @@ class DRSLinRegRNN():
         y_ensemble = pd.DataFrame()
         for i, single_estimator in enumerate(self.estimators_):
             # randomly select features to drop out
-            y_ensemble[i] = self.custom_single_predict(X, single_estimator, dropout_cols_require_neutralising=True)
+            y_ensemble[i] = self.custom_single_predict(X, single_estimator)
         
         output = y_ensemble.mean(axis=1)
 
@@ -1588,7 +1629,7 @@ class DRSLinRegRNN():
                 self.estimators_ += [single_estimator]
 
         # load additional factors
-        for attr in ["scaler_X", "scaler_y", "training_scores_dict", "validation_scores_dict", "additional_validation_dict"]:
+        for attr in ["scaler_X", "training_scores_dict", "validation_scores_dict", "additional_validation_dict"]:
             if attr in additional_assets_dict.keys():
                 setattr(self, attr, additional_assets_dict[attr])
 
@@ -1609,34 +1650,52 @@ def return_lookback_appropriate_index_andor_data(df_x, lookbacks, return_index=F
     if return_index == False and return_input == False:
         raise ValueError("this method should at least request one of the outputs")
 
+    if dropout_cols == None:
+        raise ValueError("dropout_cols must be passed through")
+    
     output_input, output_index = [], []
     trim_from_indexes = lookbacks-1
     ori_index = df_x.index
     if not scaler == None:
         df_x = pd.DataFrame(scaler.transform(df_x), index=df_x.index, columns=df_x.columns)
-
+        df_x.loc[:, dropout_cols] = 0
     else:
         raise ValueError("there should be a scaler used")
-
-    if return_index==True:
-        for ts0, ts1 in zip(ori_index[:-trim_from_indexes], ori_index[trim_from_indexes:]):
-            if ts0.day == ts1.day:
-                output_index += [ts1]
-        output_index = np.array(output_index)
-        output_single = np.array(output_index)
     
+    X, y = [], []
+    for i in range(len(df_x)):
+        end_ix = i + lookbacks
+        if end_ix > len(df_x) - 1:
+            break
+        seq_x, seq_y = df_x.iloc[i:end_ix, :], df_x.iloc[end_ix, :]
+        X.append(seq_x.values)
+        y.append(seq_y.values)
+    
+    X, y = np.array(X), np.array(y)
+
+
+
+    df_x.reshape(df_x.shape[0] - 9, 10, df_x.shape[1])
+
     if return_input==True:
-        for ts0, ts1 in zip(ori_index[:-trim_from_indexes], ori_index[trim_from_indexes:]):
+        for ts0, ts1 in zip(ori_index[trim_from_indexes:], ori_index[trim_from_indexes:]):
             if ts0.day == ts1.day:
                 output_input += [list(df_x.loc[ts0:ts1,:].values)]
                 #output_input += [list(ori_index[ts0:ts1].values)]
         output_input = np.array(output_input)
-        output_single = np.array(output_input)
-
+    
+    if return_index==True:
+        for ts0, ts1 in zip(ori_index[:-trim_from_indexes], ori_index[trim_from_indexes:]):
+            if ts0.day == ts1.day:
+                output_index += [ts0]
+        output_index = np.array(output_index)
+        
     if return_index==True and return_input==True:
         return output_index, output_input
-    else:
-        return output_single
+    elif return_index==True and return_input==False:
+        return output_index
+    elif return_index==False and return_input==True:
+        return output_input
 
 
 def return_filtered_batches_that_dont_cross_two_days(training_generator, datetime_generator):
