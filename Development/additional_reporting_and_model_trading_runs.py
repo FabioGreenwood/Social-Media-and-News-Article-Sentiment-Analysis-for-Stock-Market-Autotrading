@@ -47,11 +47,12 @@ def return_realign_plus_minus_table(preds, y_test, pred_steps_list, pred_output_
     
     return reaglined_plus_minus_dict
 
-def return_results_X_min_plus_minus_accuracy(y_preds, y_test, pred_steps_list, confidences_before_betting_PC=[0, 0.01], financial_value_scaling=None):
-        
+def return_results_X_min_plus_minus_accuracy(y_preds_input, y_test_input, pred_steps_list, confidences_before_betting_PC=[0, 0.01], financial_value_scaling=None, seconds_per_time_steps=7):
+    
     # variables and checks
     if financial_value_scaling==None:
         raise ValueError("financial_value_scaling must be set")
+    
     
     results_dict = {
         "results_bets_with_confidence_proportion" : dict(), 
@@ -63,8 +64,7 @@ def return_results_X_min_plus_minus_accuracy(y_preds, y_test, pred_steps_list, c
     if type(pred_steps_list) == int:
         pred_steps_list = [pred_steps_list]
     
-
-
+    
     # logic
     for steps_back in pred_steps_list:
         #initialise variables
@@ -72,26 +72,29 @@ def return_results_X_min_plus_minus_accuracy(y_preds, y_test, pred_steps_list, c
         results_dict["results_x_mins_PC"][steps_back]                       = dict()
         results_dict["results_x_mins_score"][steps_back]                    = dict()
         results_dict["results_x_mins_weighted"][steps_back]                 = dict()
+        
+        y_preds, y_test = copy.deepcopy(y_preds_input), copy.deepcopy(y_test_input)
+        y_original_val  = copy.deepcopy(y_test_input)
+        # this time delta is reversed as now the test(actual), pred(predicted) & original value for a give prediction all share the same index value
+        y_original_val.index += timedelta(seconds=steps_back*seconds_per_time_steps)
 
-
-        # trim/align values
-        y_test_original = copy.deepcopy(y_test)
+        # trim dfs so they all share the same index
         if isinstance(y_preds, pd.Series):
             y_preds_inputs = copy.deepcopy(y_preds)
             y_preds = pd.DataFrame(y_preds)
         merged_df = pd.merge(y_test, y_preds, left_index=True, right_index=True, how='inner')
+        merged_df = pd.merge(merged_df, y_original_val, left_index=True, right_index=True, how='inner')
         y_test = y_test.loc[merged_df.index]
         y_preds = y_preds.loc[merged_df.index]
+        y_original_val = y_original_val.loc[merged_df.index]
         
         #adjust if the data input is not in the "price delta form"
         if financial_value_scaling != "delta_scaled":
             df_x_values_delta, df_y_values_delta = pd.DataFrame(columns=["delta_price"]), pd.DataFrame(columns=["delta_price"])
             test_col_temp, pred_col_temp = y_test.columns[0], y_preds.columns[0]
             for prediction_index in merged_df.index[steps_back:]:
-                original_close_row = y_test_original.index.get_loc(prediction_index) - steps_back
-                original_close_price = y_test_original.iloc[original_close_row,0]
-                df_x_values_delta.loc[prediction_index, "delta_price"] = y_test.loc[prediction_index,test_col_temp]  - original_close_price
-                df_y_values_delta.loc[prediction_index, "delta_price"] = y_preds.loc[prediction_index,pred_col_temp] - original_close_price
+                df_x_values_delta.loc[prediction_index, "delta_price"] = y_test.loc[prediction_index,test_col_temp]  - y_original_val.loc[prediction_index,test_col_temp]
+                df_y_values_delta.loc[prediction_index, "delta_price"] = y_preds.loc[prediction_index,pred_col_temp] - y_original_val.loc[prediction_index,test_col_temp]
         else: # no convertion needed
             df_x_values_delta = y_test
             df_y_values_delta = y_preds
@@ -134,9 +137,6 @@ def return_results_X_min_plus_minus_accuracy(y_preds, y_test, pred_steps_list, c
                 results_dict["results_x_mins_PC"][steps_back][confidence_threshold_key]         = 0.0
                 results_dict["results_x_mins_score"][steps_back][confidence_threshold_key]      = 0.0
                 results_dict["results_x_mins_weighted"][steps_back][confidence_threshold_key]   = 0.0
-
-
-
     
     return results_dict
 
@@ -214,11 +214,12 @@ def run_additional_reporting(preds=None,
                             y_testing = None, 
                             pred_steps_list = None,
                             confidences_before_betting_PC=None,
-                            financial_value_scaling=None
+                            financial_value_scaling=None,
+                            seconds_per_time_steps=7
                             ):
     
     #df_realigned_dict                   = return_realign_plus_minus_table(preds, y_test, pred_steps_list, pred_output_and_tickers_combos_list, make_relative=True)
-    results_tables_dict                 = return_results_X_min_plus_minus_accuracy(preds, y_testing, pred_steps_list, confidences_before_betting_PC=confidences_before_betting_PC, financial_value_scaling=financial_value_scaling)
+    results_tables_dict                 = return_results_X_min_plus_minus_accuracy(preds, y_testing, pred_steps_list, confidences_before_betting_PC=confidences_before_betting_PC, financial_value_scaling=financial_value_scaling, seconds_per_time_steps=seconds_per_time_steps)
     #plt, df_realigned_dict              = return_model_performance_tables_figs(df_realigned_dict, preds, pred_steps_list, results_tables_dict, DoE_name = DoE_orders_dict["name"], model_type_name=model_type_name, model_start_time = model_start_time, outputs_folder_path = outputs_path, timestamp = False)
     
     return results_tables_dict#, plt, df_realigned_dict

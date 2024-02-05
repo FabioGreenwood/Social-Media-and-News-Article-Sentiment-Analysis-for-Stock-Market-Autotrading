@@ -504,7 +504,7 @@ def retrieve_sentiment_data():
 
 
 
-def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, repeat_timer=10, training_or_testing="training", hardcode_df_annotated_tweets=None):
+def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training", hardcode_df_annotated_tweets=None):
     
     #general parameters
     global global_financial_history_folder_path, global_precalculated_assets_locations_dict
@@ -585,7 +585,7 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
             senti_scores = senti_scores + [score_numer / score_denom]
         return senti_scores
 
-    def process_row_with_topic_vol(row, df_annotated_tweets=df_annotated_tweets, topic_num=num_topics, relavance_halflife=relavance_halflife):
+    def process_row_with_topic_vol(row, df_annotated_tweets=df_annotated_tweets, num_topics=num_topics, relavance_halflife=relavance_halflife):
         tweet_cohort_start_post = row["tweet_cohort_start_post"]
         tweet_cohort_end_post = row["tweet_cohort_end_post"]
         tweet_cohort = return_tweet_cohort_from_scratch(df_annotated_tweets, tweet_cohort_start_post, tweet_cohort_end_post)
@@ -670,22 +670,6 @@ def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, sent
     print("annotating {} tweets/news articles".format(len(df_annotated_tweets.index)))
     start_time          = datetime.now()
     
-    """# Calculate sentiment scores for all tweets
-    sentiment_scores = df_annotated_tweets['body'].apply(lambda text: sentiment_method.polarity_scores(text)['compound'])
-    sentiment_scores.name = "~sent_overall"
-
-    # Calculate topic weights for all tweets
-    topic_weights = df_annotated_tweets['body'].apply(lambda text: return_topic_weight(text, topic_model_dict, num_topics))
-    topic_weights = topic_weights.apply(lambda topic_tuples: [t[1] for t in topic_tuples] if len(topic_tuples) == num_topics else list(np.zeros(num_topics)))
-    if topic_weight_square_factor != 1:
-        topic_weights = topic_weights.apply(lambda x: adjust_topic_weights(x, topic_weight_square_factor))
-
-    
-    # Combine sentiment and topic weights
-    temp_list = []
-    for indy in topic_weights.index: temp_list = temp_list + [topic_weights[indy]]
-    topic_weights_prepped = pd.DataFrame(temp_list, index=sentiment_scores.index, columns=sentiment_col_strs)
-    sentiment_analysis = pd.concat([sentiment_scores, topic_weights_prepped], axis=1, ignore_index=False)"""
     sentiment_scores = df_annotated_tweets['body'].apply(lambda text: sentiment_method.polarity_scores(text)['compound'])
     # Calculate topic weights for all tweets
     topic_weights = df_annotated_tweets['body'].apply(lambda text: return_topic_weight(text, topic_model_dict, num_topics))
@@ -1148,10 +1132,10 @@ class BlockingTimeSeriesSplit():
             mid = int(1.0 * (stop - start)) + start
             yield indices[start: mid], indices[mid + margin: stop]
 
-def create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list, pred_steps_ahead, financial_value_scaling):
+def create_step_responces(df_financial_data, df_sentiment_data_input, pred_output_and_tickers_combos_list, pred_steps_ahead, financial_value_scaling):
     #this method populates each row with the next X output results, this is done so that, each time step can be trained
     #to predict the value of the next X steps
-    
+    df_sentiment_data = copy.deepcopy(df_sentiment_data_input)
     new_col_str = "{}_{}"
     list_of_new_columns = []
     nan_values_replaced = 0
@@ -1284,40 +1268,48 @@ class DRSLinRegRNN():
         Y = pd.DataFrame(Y[original_col_string])
         return Y
 
+    def align_X_and_Y_for_fitting(self, X_indy, X, Y_indy, Y, pred_steps):
+        # this method trims both X and Y so that they are aligned with a displacement equal to the prediction steps for the model.
+        # in this process, X steps that dont have an appropriate following Y step (i.e in the next step) are deleted
+        # it is assumed that the upstream processes are outputting duplicate X_indys and Y_indys. if this is not the case this 
+        # will have to be adjusted within the model
+        time_shift_secs = self.input_dict["temporal_params_dict"]["time_step_seconds"]
+
+        if not (X_indy == Y_indy).all():
+            raise validation_dict("expected these values to equal, this method needs to be adapted to accomodate this")
+        if pred_steps != 0:
+            raise validation_dict("pred steps expected to be zero")
+
+        # y indy are adjusted to match thier corresponding x indexs (the time the prediction is made)
+        Y_indy = Y_indy.copy()
+        Y_indy -= timedelta(seconds=time_shift_secs)
+        
+        output_X = np.array([X[0]])
+        output_Y = np.array([Y[0]])
+        for i, X_ts in enumerate(X_indy):
+            if X_ts in Y_indy:
+                output_X = np.append(output_X, [X[i]], axis=0)
+                output_Y = np.append(output_Y, [Y[i]], axis=0)
+        output_X = output_X[1:]
+        output_Y = output_Y[1:]
+        return  output_X, output_Y       
+
+
 
     def return_single_component_model_fitted_with_early_stopping(self, model, X_input, Y_input, X_val_input, Y_val_input):
-        verbose = 1
+        verbose = 0
+        X, Y, X_val, Y_val = copy.deepcopy(X_input), copy.deepcopy(Y_input), copy.deepcopy(X_val_input), copy.deepcopy(Y_val_input)
         
-        # Create input sequences and labels manually
-        data = np.array(X_input)  
-        targets = np.array(Y_input)  
-        sequences = [X_input[i:i+self.lookbacks] for i in range(len(X_input) - self.lookbacks + 1)]
-        labels = [Y_input[i:i+self.lookbacks] for i in range(len(Y_input) - self.lookbacks + 1)]
-        labels = Y_input[self.lookbacks-1:]
-        dataset = tf.data.Dataset.from_tensor_slices((sequences, labels))
-        
-        history = model.fit(sequences, labels, epochs=self.model_hyper_params["epochs"], verbose = 1)
-        # Convert to TensorFlow dataset
-        
-        dataset = dataset.batch(32)
 
+        X_indy, X = return_lookback_appropriate_index_andor_data(X, self.lookbacks, scaler=self.scaler_X, dropout_cols=model.dropout_cols)
+        Y = self.scale_output_according_to_input_scaler(X_input, Y, prediction_col_in_input="£_close")
+        Y_indy, Y = return_lookback_appropriate_index_andor_data(Y, self.lookbacks, scaler=None)
+        X_indy_val, X_val = return_lookback_appropriate_index_andor_data(X_val, self.lookbacks, scaler=self.scaler_X, dropout_cols=model.dropout_cols)
+        Y_val = self.scale_output_according_to_input_scaler(X_val_input, Y_val, prediction_col_in_input="£_close")
+        Y_indy_val, Y_val = return_lookback_appropriate_index_andor_data(Y_val, self.lookbacks, scaler=None)
+        #X_indy, X, Y_indy, Y                 = self.align_X_and_Y_for_fitting(X_indy, X, Y_indy, Y, 0)
+        #X_indy_val, X_val, Y_indy_val, Y_val = self.align_X_and_Y_for_fitting(X_indy_val, X_val, Y_indy_val, Y_val, 0)
 
-
-
-        X_indy, X = return_lookback_appropriate_index_andor_data(X_input, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X, dropout_cols=model.dropout_cols)
-        Y = self.scale_output_according_to_input_scaler(X_input, Y_input)
-        # Y needs to have the same entries that were removed in X due to them straddling days when lookback was considered
-        Y = Y.loc[X_indy,:]
-        
-        X_indy_val, X_val = return_lookback_appropriate_index_andor_data(X_val_input, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X, dropout_cols=model.dropout_cols)
-        Y_val = self.scale_output_according_to_input_scaler(X_val_input, Y_val_input)
-        # As above
-        Y_val = Y_val.loc[X_indy_val,:]
-
-
-
-
-        
         if self.model_hyper_params["early_stopping"] != 0:
             early_stopping = EarlyStopping(monitor='val_loss', patience=self.model_hyper_params["early_stopping"], restore_best_weights=True)
             history = model.fit(X, Y, epochs=self.model_hyper_params["epochs"], validation_data=(X_val, Y_val), callbacks=[early_stopping], verbose=verbose)
@@ -1347,7 +1339,7 @@ class DRSLinRegRNN():
             kf = KFold(n_splits=self.K_fold_splits, shuffle=False)
 
             print(datetime.now().strftime("%H:%M:%S") + " - evaluating model")
-
+            
             for train_index, val_index in kf.split(df_X):
                 print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
                 
@@ -1373,13 +1365,6 @@ class DRSLinRegRNN():
                     training_scores_dict_list += [training_scores_dict_list_new]
                     validation_scores_dict_list += [validation_scores_dict_list_new]
                     additional_validation_dict_list += [additional_validation_dict_list_new]
-                    self.X_train_list += [X_train]
-                    self.y_train_list += [y_train]
-                    self.y_pred_list += [y_pred_val]
-                    self.y_val_list += [y_val]
-
-
-
                     count += 1
 
             training_scores_dict = average_list_of_identical_dicts(training_scores_dict_list)
@@ -1392,7 +1377,7 @@ class DRSLinRegRNN():
 
         return self, training_scores_dict, validation_scores_dict, additional_validation_dict
 
-    def fit_ensemble(self, df_X, df_y, pred_steps_value, confidences_before_betting_PC):
+    def fit_ensemble(self, df_X, df_y):
         count = 0
         global global_random_state
         global_random_state = 42
@@ -1414,13 +1399,15 @@ class DRSLinRegRNN():
             print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
             for i_random in range(self.n_estimators_per_time_series_blocking):
                 n_features = df_X.shape[1]
-                dropout_cols = return_columns_to_remove(columns_list=df_X.columns, self=self)
+                dropout_cols = return_columns_to_remove(columns_list=df_X.columns, model=self)
 
                 # data prep
                 X_train = df_X.loc[df_X.index[train_index].values].copy()
+                X_train.loc[:,dropout_cols] = 0
                 y_train = df_y.loc[df_y.index[train_index].values].copy()
 
                 X_val = df_X.loc[df_X.index[val_index].values].copy()
+                X_val.loc[:,dropout_cols] = 0
                 y_val = df_y.loc[df_y.index[val_index].values].copy()
 
                 
@@ -1428,10 +1415,10 @@ class DRSLinRegRNN():
                 single_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features)
                 single_estimator.dropout_cols = dropout_cols
                 global_random_state += 1
-                single_estimator = self.return_single_component_model_fitted_with_early_stopping(single_estimator, X_train, y_train.copy(), X_val, y_val)
+                single_estimator = self.return_single_component_model_fitted_with_early_stopping(single_estimator, X_train, y_train, X_val, y_val)
                 
                 #record training data, without scaling
-                X_train.loc[:,dropout_cols] = 0
+                
                 self.X_train_list += [X_train]
                 self.y_train_list += [y_train]
                 
@@ -1458,43 +1445,23 @@ class DRSLinRegRNN():
 
         return self, training_scores_dict, validation_scores_dict, additional_validation_dict
 
-    def adjust_scaler_to_accept_distant_pricings(self, scaler, df):
-        lowest_expected_close_price  = 2.5
-        largest_expected_close_price = 132
-
-        df_new = pd.DataFrame(columns=df.columns)
-        #create min line
-        min_dict = dict()
-        max_dict = dict()
-        for col in df.columns:
-            if any(substring in col for substring in ["£_", "$_"]) and not "macd" in col:
-                min_dict[col] = lowest_expected_close_price
-                max_dict[col] = largest_expected_close_price
-            else:
-                min_dict[col] = min(df.loc[:,col])
-                max_dict[col] = max(df.loc[:,col])
-        df_new = pd.concat([df_new, pd.DataFrame([min_dict.values()], columns=min_dict.keys())], axis=0)
-        df_new = pd.concat([df_new, pd.DataFrame([max_dict.values()], columns=max_dict.keys())], axis=0)
-        scaler.fit(df_new)
-
-        return scaler
-
     def custom_single_predict(self, df_X, single_estimator, output_col_name="prediction_X_ahead"):
 
-        index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, return_index=True, return_input=True, scaler=self.scaler_X, dropout_cols=single_estimator.dropout_cols)
+        index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, scaler=self.scaler_X, dropout_cols=single_estimator.dropout_cols)
         y_pred_values       = single_estimator.predict(input_data, verbose=1)
         y_pred_values       = pd.DataFrame(y_pred_values, index=index, columns=[output_col_name])
         y_pred_values       = self.inverse_scale_output_according_to_input_scaler(df_X, y_pred_values)
         
-
         return y_pred_values
         
-    def evaluate_results(self, y_test, y_pred, outputs_params_dict, reporting_dict, financial_value_scaling):
+    def evaluate_results(self, y_test_input, y_pred_input, outputs_params_dict, reporting_dict, financial_value_scaling):
         
         pred_steps_value              = outputs_params_dict["pred_steps_ahead"]
         confidences_before_betting_PC = reporting_dict["confidence_thresholds"]
-
-        #align indices
+        seconds_per_time_steps        = self.input_dict["temporal_params_dict"]["time_step_seconds"]
+        
+        # they are then trimmed so that they align for the traditional measures
+        y_test, y_pred = copy.deepcopy(y_test_input), copy.deepcopy(y_pred_input)
         if isinstance(y_pred, pd.Series):
             y_pred = pd.DataFrame(y_pred)
         merged_df = pd.merge(y_test, y_pred, left_index=True, right_index=True, how='inner')
@@ -1502,7 +1469,7 @@ class DRSLinRegRNN():
         y_pred = y_pred.loc[merged_df.index]
         
         traditional_scores_dict_list = {"r2": r2_score(y_test, y_pred), "mse": mean_squared_error(y_test, y_pred), "mae": mean_absolute_error(y_test, y_pred)}
-        additional_results_dict_list = FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred, y_test, pred_steps_value, confidences_before_betting_PC=confidences_before_betting_PC, financial_value_scaling=financial_value_scaling)
+        additional_results_dict_list = FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred, y_test, pred_steps_value, confidences_before_betting_PC=confidences_before_betting_PC, financial_value_scaling=financial_value_scaling, seconds_per_time_steps=seconds_per_time_steps)
         return traditional_scores_dict_list, additional_results_dict_list
         
     def save(self, general_save_dir = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["predictive_model"], Y_preds_testing=None, y_testing=None):
@@ -1529,7 +1496,6 @@ class DRSLinRegRNN():
                 pickle.dump(self.input_dict, file)
         #save predictions if specified
         if isinstance(Y_preds_testing, pd.Series) or isinstance(Y_preds_testing, pd.DataFrame):
-            Y_preds_testing = Y_preds_testing.shift(self.input_dict["outputs_params_dict"]["pred_steps_ahead"])
             Y_preds_testing.to_csv(os.path.join(folder_path, 'Y_preds_testing.csv'))
         if isinstance(y_testing, pd.Series) or isinstance(y_testing, pd.DataFrame):
             y_testing.to_csv(os.path.join(folder_path, 'y_testing.csv'))
@@ -1644,87 +1610,38 @@ def load_RNN_predictor(input_dict, predictor_location_folder_path, only_return_v
         predictor.load(predictor_location_folder_path)
         return predictor
 
-def return_lookback_appropriate_index_andor_data(df_x, lookbacks, return_index=False, return_input=False, scaler=None, dropout_cols=None):
-    # this method, according to result bools, returns the index and input data so that time 
+def return_lookback_appropriate_index_andor_data(df_x_input, lookbacks, scaler=None, dropout_cols=None):
+     # this method, according to result bools, returns the index and input data so that time 
     # periods spanning two days are removed
-    if return_index == False and return_input == False:
-        raise ValueError("this method should at least request one of the outputs")
-
-    if dropout_cols == None:
-        raise ValueError("dropout_cols must be passed through")
-    
+    df_x = copy.deepcopy(df_x_input)
     output_input, output_index = [], []
     trim_from_indexes = lookbacks-1
     ori_index = df_x.index
     if not scaler == None:
         df_x = pd.DataFrame(scaler.transform(df_x), index=df_x.index, columns=df_x.columns)
-        df_x.loc[:, dropout_cols] = 0
-    else:
-        raise ValueError("there should be a scaler used")
+
+    if not dropout_cols == None:
+        df_x.loc[:,dropout_cols] = 0
+
+    for ts0, ts1 in zip(ori_index[:-trim_from_indexes], ori_index[trim_from_indexes:]):
+        if ts0.day == ts1.day:
+            output_index += [ts1]
+            output_input += [df_x.loc[ts0:ts1,:].values]
+            #output_input += [list(ori_index[ts0:ts1].values)]
+    output_index = np.array(output_index)
+    output_input = np.array(output_input)
     
-    X, y = [], []
-    for i in range(len(df_x)):
-        end_ix = i + lookbacks
-        if end_ix > len(df_x) - 1:
-            break
-        seq_x, seq_y = df_x.iloc[i:end_ix, :], df_x.iloc[end_ix, :]
-        X.append(seq_x.values)
-        y.append(seq_y.values)
+
+    return output_index, output_input
     
-    X, y = np.array(X), np.array(y)
 
-
-
-    df_x.reshape(df_x.shape[0] - 9, 10, df_x.shape[1])
-
-    if return_input==True:
-        for ts0, ts1 in zip(ori_index[trim_from_indexes:], ori_index[trim_from_indexes:]):
-            if ts0.day == ts1.day:
-                output_input += [list(df_x.loc[ts0:ts1,:].values)]
-                #output_input += [list(ori_index[ts0:ts1].values)]
-        output_input = np.array(output_input)
+def return_columns_to_remove(columns_list, model=None):
     
-    if return_index==True:
-        for ts0, ts1 in zip(ori_index[:-trim_from_indexes], ori_index[trim_from_indexes:]):
-            if ts0.day == ts1.day:
-                output_index += [ts0]
-        output_index = np.array(output_index)
-        
-    if return_index==True and return_input==True:
-        return output_index, output_input
-    elif return_index==True and return_input==False:
-        return output_index
-    elif return_index==False and return_input==True:
-        return output_input
-
-
-def return_filtered_batches_that_dont_cross_two_days(training_generator, datetime_generator):
-    mask = np.array([np.datetime_as_string(batch_x[0][0], unit='D')[-2:] == np.datetime_as_string(batch_x[0][-1], unit='D')[-2:] for batch_x, _ in datetime_generator])
-    mask = np.concatenate([mask,[False] * int(training_generator.data.shape[0] - len(mask))])
-    new_data = training_generator.data[mask]
-    new_targets = training_generator.targets[mask]
-
-    ## Replace removed batches with random batches
-    #for i in range(sum(mask), len(mask)):
-    #    random_index = random.randint(0, sum(mask)-1)
-    #    new_data = np.append(new_data, [new_data[random_index]], axis=0)
-    #    new_targets = np.append(new_targets, [new_targets[random_index]], axis=0)
-
-    # Transfer final batches directly
-    new_data = np.append(new_data, training_generator.data[len(new_data):], axis=0)
-    new_targets = np.append(new_targets, training_generator.targets[len(new_targets):], axis=0)
-
-    training_generator.data = new_data
-    training_generator.targets = new_targets
-    return training_generator
-
-def return_columns_to_remove(columns_list, self):
-    columns_list_original = columns_list
     columns_to_remove = list(copy.deepcopy(columns_list))
     retain_cols = []
     
-    retain_dict = self.model_hyper_params["cohort_retention_rate_dict"]
-    general_adjusting_square_factor = self.model_hyper_params["general_adjusting_square_factor"]
+    retain_dict = model.model_hyper_params["cohort_retention_rate_dict"]
+    general_adjusting_square_factor = model.model_hyper_params["general_adjusting_square_factor"]
 
     #max_features = self.max_features
     stock_strings_list = []
@@ -1865,7 +1782,7 @@ def generate_model_and_validation_scores(temporal_params_dict,
     #model training - create regressors
     X_train, y_train   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"], financial_value_scaling=fin_inputs_params_dict["financial_value_scaling"])
     model              = initiate_model(input_dict, hash_name = hash_name)
-    model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.fit_ensemble(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"])
+    model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.fit_ensemble(X_train, y_train)
     #report timings
     print(datetime.now().strftime("%H:%M:%S") + " - complete generating model")
     global global_start_time
