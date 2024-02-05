@@ -36,7 +36,7 @@ if not sys.warnoptions:
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import matplotlib.pyplot as plt
 import random
-from config import global_general_folder, global_outputs_folder, global_input_cols_to_include_list, global_index_cols_list, global_index_col_str, global_target_file_folder_path, global_feature_qty, global_outputs_folder_path, global_financial_history_folder_path, global_df_stocks_list_file          , global_start_time, global_error_str_1, global_random_state, global_scores_database, global_strptime_str, global_strptime_str_2, global_strptime_str_filename, global_precalculated_assets_locations_dict, global_designs_record_final_columns_list, SECS_IN_A_DAY, SECS_IN_AN_HOUR, FIVE_MIN_TIME_STEPS_IN_A_DAY
+from config import global_general_folder, global_outputs_folder, global_exclusively_str, global_input_cols_to_include_list, global_index_cols_list, global_index_col_str, global_target_file_folder_path, global_feature_qty, global_outputs_folder_path, global_financial_history_folder_path, global_df_stocks_list_file          , global_start_time, global_error_str_1, global_random_state, global_scores_database, global_strptime_str, global_strptime_str_2, global_strptime_str_filename, global_precalculated_assets_locations_dict, global_designs_record_final_columns_list, SECS_IN_A_DAY, SECS_IN_AN_HOUR, FIVE_MIN_TIME_STEPS_IN_A_DAY
 import hashlib
 
 
@@ -44,11 +44,9 @@ import hashlib
 
 default_temporal_params_dict        = {
     "train_period_start"    : datetime.strptime('01/01/16 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/02/16 00:00:00', global_strptime_str), #fg_placeholder
-    #"train_period_end"      : datetime.strptime('20/07/19 00:00:00', global_strptime_str), 
+    "train_period_end"      : datetime.strptime('01/07/19 00:00:00', global_strptime_str),
     "time_step_seconds"     : 5*60, #5 mins,
-    "test_period_start"     : datetime.strptime('01/12/19 00:00:00', global_strptime_str), #fg_placeholder
-    #"test_period_start"     : datetime.strptime('01/07/19 00:00:00', global_strptime_str),
+    "test_period_start"     : datetime.strptime('01/07/19 00:00:00', global_strptime_str),
     "test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str)
 }
 default_fin_inputs_params_dict      = {
@@ -79,8 +77,8 @@ default_senti_inputs_params_dict    = {
     "regenerate_cleaned_tweets_for_subject_discovery" : False,
     "inc_new_combined_stopwords_list" : True,
     "topic_weight_square_factor" : 1,
-    "factor_tweet_attention" : True,
-    "factor_topic_volume" : True
+    "factor_tweet_attention" : False,
+    "factor_topic_volume" : False, 
 }
 default_outputs_params_dict         = {
     "output_symbol_indicators_tuple"    : ("aapl", "close"), 
@@ -159,17 +157,15 @@ def return_keys_within_2_level_dict(input_dict):
             output_list = output_list + [key]
     return output_list
     
-def save_designs_record_csv_and_dict(records_path_list, df_designs_record=None, design_history_dict=None, optim_run_name=None):
+def save_designs_record_csv_and_dict(records_path_list_input, df_designs_record=None, design_history_dict=None, optim_run_name=None):
+    records_path_list = records_path_list_input.copy()
     if not type(records_path_list) == list:
         records_path_list = [records_path_list]
 
     #remove items with weak predictors and add names of predictors
     for id in design_history_dict.keys():
-        if "predictor" in design_history_dict[id].keys():
-            if not isinstance(design_history_dict[id]["predictor"],str):
-                predictor_name = FG_model_training.custom_hash(design_history_dict[id]["predictor"].input_dict)
-                design_history_dict[id]["predictor"] = predictor_name
-            df_designs_record.loc[id, "predictor_names"] = design_history_dict[id]["predictor"]
+        if "predictor_names" in design_history_dict[id].keys():
+            df_designs_record.loc[id, "predictor_names"] = design_history_dict[id]["predictor_names"]
 
     for path in records_path_list:
         file_path = os.path.join(path, optim_run_name)
@@ -183,6 +179,7 @@ def save_designs_record_csv_and_dict(records_path_list, df_designs_record=None, 
             except:
                 df_designs_record.to_csv(file_path + ".csvBACKUP", index=False)
                 print("please close the csv")
+        
         if design_history_dict != None:
             with open(file_path + ".py_dict", "wb") as file:
                 pickle.dump(design_history_dict, file)
@@ -272,8 +269,12 @@ def return_scenario_name_str(topic_qty, pred_steps, ratio_removed):
     return output + str(pred_steps) + "_" + removal_str
 
 def update_design_hist_dict_post_training(design_history_dict_single, predictor, training_scores_dict, validation_scores_dict, additional_validation_dict):
-    #design_history_dict_single["predictor"] = FG_model_training.custom_hash(FG_model_training.return_predictor_name(predictor.input_dict))
-    design_history_dict_single["predictor"] = predictor
+    #design_history_dict_single["predictor"] = FG_model_training.custom_hash(FG_model_training.return_predictor_names(predictor.input_dict))
+    #design_history_dict_single["predictor"] = predictor
+    if hasattr(predictor, "name"):
+        design_history_dict_single["predictor_names"] = predictor.name
+    else:
+        design_history_dict_single["predictor_names"] = "Not Recorded"
     design_history_dict_single["training_r2"], design_history_dict_single["training_mse"], design_history_dict_single["training_mae"] = training_scores_dict["r2"], training_scores_dict["mse"], training_scores_dict["mae"]
     design_history_dict_single["validation_r2"], design_history_dict_single["validation_mse"], design_history_dict_single["validation_mae"] = validation_scores_dict["r2"], validation_scores_dict["mse"], validation_scores_dict["mae"]
     design_history_dict_single["validation_results_dict"] = additional_validation_dict
@@ -379,7 +380,7 @@ def define_DoE(bounds, DoE_size):
             DoE = np.hstack((DoE, values_for_params))
     return DoE
 
-def return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, opt_obj, inverse_for_minimise, objective_function_name="testing_mae"):
+def return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, inverse_for_minimise, objective_function_name="testing_mae"):
     # please note this has been converted to a multi-objective function, it will cycle through the objective_function_name variable if list
     # this functionality can be removed by entering a non-iterable as objective_function_name
     output_X, output_Y = [], []
@@ -426,7 +427,7 @@ def run_experiment_and_return_updated_design_history_dict(design_history_dict_si
     
     if design_history_dict_single[col_testing_str] == None:
         temp_input_dict = return_edited_input_dict(design_history_dict_single["X"], design_space_dict, default_input_dict)
-        testing_scores, X_testing, y_testing, Y_preds = model_testing_method(design_history_dict_single["predictor"], temp_input_dict)
+        testing_scores, X_testing, y_testing, Y_preds = model_testing_method(predictor, temp_input_dict)
         #del temp_input_dict
         testing_results_dict = FG_additional_reporting.run_additional_reporting(preds=Y_preds,
                 y_testing = y_testing, 
@@ -526,7 +527,9 @@ def print_desired_scores(design_history, df_designs_record, design_space_dict, o
         
         
         
-def return_if_design_unique(x_next, design_history_dict):
+def return_if_design_unique(x_next_input, design_history_dict):
+
+    x_next = x_next_input.copy()
     try:
         x_next = x_next[0][0]
     except:
@@ -540,7 +543,8 @@ def return_if_design_unique(x_next, design_history_dict):
     return unique
     
 
-def check_if_experiment_already_ran_if_so_return_random_unique_design(x_next, design_history_dict, bounds):
+def check_if_experiment_already_ran_if_so_return_random_unique_design(x_next_input, design_history_dict, bounds):
+    x_next = x_next_input.copy()
     unique = return_if_design_unique(x_next, design_history_dict)
     if unique == False:
         x_next = define_DoE(bounds, 1)
@@ -605,7 +609,7 @@ def experiment_manager(
     model_training_method=FG_model_training.retrieve_or_generate_model_and_training_scores,
     model_testing_method=FG_model_training.return_testing_scores_and_testing_time_series,
     initial_doe_size_or_DoE=5,
-    max_iter=5,
+    max_iter=0,
     optimisation_method=None,
     default_input_dict = default_input_dict,
     minimise=True,
@@ -708,7 +712,7 @@ def experiment_manager(
         continue_optimisation = False
     
     while continue_optimisation == True:
-        X, Y = return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, bo, inverse_for_minimise=inverse_for_minimise_vec, objective_function_name=optim_scores_vec)
+        X, Y = return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, inverse_for_minimise=inverse_for_minimise_vec, objective_function_name=optim_scores_vec)
         bo.X = np.array(X)
         bo.Y = np.array(Y).reshape(-1,1)
         bo.run_optimization()
@@ -750,7 +754,7 @@ design_space_dict = {
         "financial_value_scaling" : {
             #0 : None,
             1 : "day_scaled",
-            2 : "delta_scaled"}
+            2: "delta_scaled"}
     },
     "senti_inputs_params_dict" : {
         "topic_qty" : [5, 9, 13, 17, 25],
@@ -758,6 +762,8 @@ design_space_dict = {
         "relative_halflife" : [3*60, 0.25 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR], 
         "apply_IDF" : [False, True],
         "topic_weight_square_factor" : [1, 2, 4],
+        "factor_tweet_attention" : [False, True],
+        "factor_topic_volume" : {0 : False, 1 : True, 2 : global_exclusively_str}
     },
     "model_hyper_params" : {
         "estimator__hidden_layer_sizes" : {
@@ -769,8 +775,8 @@ design_space_dict = {
             5 : [("LSTM", 60), ("GRU", 30), ("LSTM", 8)]
             },
         "general_adjusting_square_factor" : [3, 2, 1, 0],
-        "estimator__alpha"                : [1e-11, 1e-10, 1e-9, 1e-8, 1e-7], 
-        "lookbacks"                       : [8, 10, 15, 20, 25],
+        "estimator__alpha"                : [1e-11, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-4], 
+        "lookbacks"                       : [8, 10, 15, 20, 25, 50],
         "early_stopping" : [5, 7, 9, 12]
         },
         
@@ -779,15 +785,42 @@ design_space_dict = {
 
 
 
-
-
-
 global_run_count = 0
 
 init_doe = [
-    [1,	   9,  1.8,   720,    0,	2,	4,	3,	1.3e-09,   10,  1],
+    [1, 9,  1,   720,   0, 2, 0, 0, 4, 3, 1.00E-09, 10, 7],   # 0
+    [1, 25, 2,   25200, 0, 4, 0, 0, 4, 3, 1.00E-08, 15, 7],   # 1
+    [1, 25, 13,  900,   1, 2, 0, 0, 4, 1, 1.00E-07, 10, 7],   # 2
+    [1, 25, 13,  25200, 1, 2, 0, 0, 4, 1, 1.00E-07, 10, 7],   # 3
+    [1, 25, 3,   7200,  1, 2, 0, 0, 2, 0, 1.00E-06, 10, 12],  # 4
+    [1, 25, 13,  900,   0, 2, 0, 0, 0, 0, 1.00E-05, 8,  12],  # 5
+    [1, 25, 2,   7200,  0, 4, 0, 0, 4, 1, 1.00E-05, 10, 5],   # 6
+    [1, 13, 2,   7200,  1, 1, 0, 0, 2, 1, 1.00E-05, 25, 9],   # 7
+    [1, 25, 2,   25200, 0, 4, 0, 0, 2, 3, 1.00E-11, 30, 5],   # 8
+    [1, 17, 7,   900,   1, 2, 0, 0, 5, 2, 1.00E-06, 20, 5],   # 9
+    [1, 17, 3,   720,   0, 4, 0, 0, 0, 0, 1.00E-08, 8,  9],   # 10
+    [1, 25, 0.3, 25200, 1, 2, 0, 0, 2, 0, 1.00E-04, 40, 7],   # 11
+    [1, 25, 2,   7200,  0, 4, 0, 0, 4, 1, 1.00E-04, 10, 5],   # 12
+    [1, 9,  13,  7200,  1, 2, 0, 0, 2, 0, 1.00E-04, 20, 7],   # 13
+    [1, 17, 0.7, 180,   0, 1, 0, 0, 2, 3, 1.00E-04, 8,  12],  # 14
+    [1, 5,  0.7, 7200,  1, 4, 0, 2, 0, 2, 1.00E-10, 40, 5],   # 15
+    [1, 9,  0.3, 25200, 0, 1, 1, 2, 3, 3, 1.00E-04, 20, 7],   # 16
+    [1, 5,  7,   900,   1, 4, 1, 2, 5, 2, 1.00E-09, 10, 7],   # 17
+    [1, 9,  7,   180,   1, 2, 1, 2, 5, 1, 1.00E-04, 8,  5],   # 18
+    [1, 5,  0.3, 25200, 0, 1, 0, 1, 1, 2, 1.00E-07, 10, 9],   # 19
+    [1, 17, 7,   180,   0, 1, 1, 2, 3, 2, 1.00E-10, 10, 5],   # 20
+    [1, 5,  5,   900,   1, 4, 1, 1, 3, 0, 1.00E-09, 25, 5],   # 21
+    [1, 9,  5,   180,   0, 4, 0, 1, 1, 2, 1.00E-06, 8,  7],   # 22
+    [1, 9,  7,   180,   0, 4, 1, 2, 0, 2, 1.00E-04, 10, 9],   # 23
+    [1, 5,  2,   25200, 1, 4, 0, 1, 2, 1, 1.00E-05, 25, 9],   # 24
+    [1, 25, 0.3, 25200, 1, 2, 1, 2, 4, 3, 1.00E-10, 15, 7],   # 25
+    [1, 9,  13,  900,   0, 2, 1, 1, 5, 3, 1.00E-10, 15, 12]   # 26
     ]
-test_num = 6
+
+
+
+
+
 
 """ experiment checklist:
 1. ensure that the value for steps ahead is updated on the dictionary line below
@@ -814,7 +847,7 @@ scenario_dict = {
         3 : {"topics" : None, "pred_steps" : 5},
         4 : {"topics" : 1, "pred_steps" : 5},
         5 : {"topics" : 0, "pred_steps" : 5},
-        #6 : {"topics" : None, "pred_steps" : 3},
+        6 : {"topics" : None, "pred_steps" : 3},
         #7 : {"topics" : 1, "pred_steps" : 3},
         #8 : {"topics" : 0, "pred_steps" : 3},
         9 : {"topics" : None, "pred_steps" : 1},
@@ -822,7 +855,7 @@ scenario_dict = {
         11: {"topics" : 0, "pred_steps" : 1},
     }
 
-loop = [9]#[3, 4, 5]#
+loop = [6]#[5,11]#[3, 4]#
 print("shard: {}".format(str(loop)))
 enable_GPU = False
 if enable_GPU == False:
@@ -837,13 +870,17 @@ if loop == None:
 for scenario_ID in loop:
 
     index_of_topic_qty = return_keys_within_2_level_dict(design_space_dict).index("senti_inputs_params_dict_topic_qty")
+    index_of_factor_topic_volume = return_keys_within_2_level_dict(design_space_dict).index("senti_inputs_params_dict_factor_topic_volume")
 
     # editing topic quantity values for scenario, 2 lines
     topic_qty = scenario_dict[scenario_ID]["topics"]
     if isinstance(init_doe, list) and topic_qty != None:
-            for i in range(len(init_doe)): init_doe[i][index_of_topic_qty] = 1
-            design_space_dict["senti_inputs_params_dict"]["topic_qty"] = [1]
-            default_input_dict["senti_inputs_params_dict"]["topic_qty"] = 1
+            for i in range(len(init_doe)): init_doe[i][index_of_topic_qty] = topic_qty; init_doe[i][index_of_factor_topic_volume] = 0
+            design_space_dict["senti_inputs_params_dict"]["topic_qty"] = [topic_qty]
+            default_input_dict["senti_inputs_params_dict"]["topic_qty"] = topic_qty
+            design_space_dict["senti_inputs_params_dict"]["factor_topic_volume"] = [0]
+            default_input_dict["senti_inputs_params_dict"]["factor_topic_volume"] = 0
+            
 
     # setting various optimisation variabls
     pred_steps = scenario_dict[scenario_ID]["pred_steps"]
@@ -852,9 +889,9 @@ for scenario_ID in loop:
     default_input_dict["senti_inputs_params_dict"]["topic_training_tweet_ratio_removed"] = removal_ratio
 
     # setting the optimisation objective functions
-    confidence_scoring_measure_tuple_1 = ("validation","results_x_mins_weighted",pred_steps,0.5)
-    confidence_scoring_measure_tuple_2 = ("validation","results_x_mins_PC",pred_steps,0.5)
-    confidence_scoring_measure_tuple_3 = ("validation","results_x_mins_score",pred_steps,0.5)
+    confidence_scoring_measure_tuple_1 = ("validation","results_x_mins_weighted",pred_steps,0.9)
+    confidence_scoring_measure_tuple_2 = ("validation","results_x_mins_PC",pred_steps,0.9)
+    confidence_scoring_measure_tuple_3 = ("validation","results_x_mins_score",pred_steps,0.9)
 
 
     optim_scores_vec = ["validation_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2, confidence_scoring_measure_tuple_3]
@@ -863,7 +900,9 @@ for scenario_ID in loop:
 
     optim_scores_vec = ["validation_" + testing_measure]
     inverse_for_minimise_vec = [True]
+    optim_scores_vec = [confidence_scoring_measure_tuple_1]
 
+    inverse_for_minimise_vec = [False]
 
     #what around to ensure that single topic sentiment data in more used in the model
     if default_senti_inputs_params_dict["topic_qty"] == 1:
@@ -872,7 +911,7 @@ for scenario_ID in loop:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "minitest{}_{}.csv".format(test_num,str(scenario_ID))
+    scenario_name_str = scenario_name_str + "run20_{}.csv".format(str(scenario_ID))
 
 
     if __name__ == '__main__':
@@ -888,9 +927,11 @@ for scenario_ID in loop:
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/minitest{}_{}.csv".format(test_num, str(scenario_ID)))
+            global_record_path=os.path.join(global_general_folder,r"outputs/run20_{}.csv".format(str(scenario_ID)))
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
+
+
 
 
 
