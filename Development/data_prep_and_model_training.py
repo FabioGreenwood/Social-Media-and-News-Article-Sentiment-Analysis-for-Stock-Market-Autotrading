@@ -851,7 +851,7 @@ def prep_twitter_text_for_subject_discovery(input_list, df_stocks_list_file=None
     
     for tweet in split_tweets:
         #for word in reversed(tweet):
-        copy_of_tweet = copy.deepcopy(tweet)
+        copy_of_tweet = tweet.copy()
         for word in copy_of_tweet:
             Removed = False
             # remove words containing "x"
@@ -1135,7 +1135,7 @@ class BlockingTimeSeriesSplit():
 def create_step_responces(df_financial_data, df_sentiment_data_input, pred_output_and_tickers_combos_list, pred_steps_ahead, financial_value_scaling):
     #this method populates each row with the next X output results, this is done so that, each time step can be trained
     #to predict the value of the next X steps
-    df_sentiment_data = copy.deepcopy(df_sentiment_data_input)
+    df_sentiment_data = df_sentiment_data_input.copy()
     new_col_str = "{}_{}"
     list_of_new_columns = []
     nan_values_replaced = 0
@@ -1171,8 +1171,8 @@ def create_step_responces(df_financial_data, df_sentiment_data_input, pred_outpu
     data = data.dropna(axis=1, how='all', inplace=False)
     data = data.dropna(inplace=False)
 
-    X = copy.deepcopy(data)
-    y = copy.deepcopy(data[list_of_new_columns])
+    X = copy.copy(data)
+    y = copy.copy(data[list_of_new_columns])
     
     for col in list_of_new_columns:
         X = X.drop(col, axis=1)
@@ -1298,7 +1298,7 @@ class DRSLinRegRNN():
 
     def return_single_component_model_fitted_with_early_stopping(self, model, X_input, Y_input, X_val_input, Y_val_input):
         verbose = 0
-        X, Y, X_val, Y_val = copy.deepcopy(X_input), copy.deepcopy(Y_input), copy.deepcopy(X_val_input), copy.deepcopy(Y_val_input)
+        X, Y, X_val, Y_val = copy.copy(X_input), copy.copy(Y_input), copy.copy(X_val_input), copy.copy(Y_val_input)
         
 
         X_indy, X = return_lookback_appropriate_index_andor_data(X, self.lookbacks, scaler=self.scaler_X, dropout_cols=model.dropout_cols)
@@ -1461,7 +1461,7 @@ class DRSLinRegRNN():
         seconds_per_time_steps        = self.input_dict["temporal_params_dict"]["time_step_seconds"]
         
         # they are then trimmed so that they align for the traditional measures
-        y_test, y_pred = copy.deepcopy(y_test_input), copy.deepcopy(y_pred_input)
+        y_test, y_pred = copy.copy(y_test_input), copy.copy(y_pred_input)
         if isinstance(y_pred, pd.Series):
             y_pred = pd.DataFrame(y_pred)
         merged_df = pd.merge(y_test, y_pred, left_index=True, right_index=True, how='inner')
@@ -1613,7 +1613,7 @@ def load_RNN_predictor(input_dict, predictor_location_folder_path, only_return_v
 def return_lookback_appropriate_index_andor_data(df_x_input, lookbacks, scaler=None, dropout_cols=None):
      # this method, according to result bools, returns the index and input data so that time 
     # periods spanning two days are removed
-    df_x = copy.deepcopy(df_x_input)
+    df_x = copy.copy(df_x_input)
     output_input, output_index = [], []
     trim_from_indexes = lookbacks-1
     ori_index = df_x.index
@@ -1623,11 +1623,16 @@ def return_lookback_appropriate_index_andor_data(df_x_input, lookbacks, scaler=N
     if not dropout_cols == None:
         df_x.loc[:,dropout_cols] = 0
 
+    days = ori_index.day.values
+
     for ts0, ts1 in zip(ori_index[:-trim_from_indexes], ori_index[trim_from_indexes:]):
         if ts0.day == ts1.day:
-            output_index += [ts1]
-            output_input += [df_x.loc[ts0:ts1,:].values]
+            #output_index += [ts1]
+            #output_input += [df_x.loc[ts0:ts1,:].values]
+            output_index.append(ts1)
+            output_input.append(df_x.loc[ts0:ts1,:].values)
             #output_input += [list(ori_index[ts0:ts1].values)]
+
     output_index = np.array(output_index)
     output_input = np.array(output_input)
     
@@ -1637,7 +1642,7 @@ def return_lookback_appropriate_index_andor_data(df_x_input, lookbacks, scaler=N
 
 def return_columns_to_remove(columns_list, model=None):
     
-    columns_to_remove = list(copy.deepcopy(columns_list))
+    columns_to_remove = list(columns_list.copy())
     retain_cols = []
     
     retain_dict = model.model_hyper_params["cohort_retention_rate_dict"]
