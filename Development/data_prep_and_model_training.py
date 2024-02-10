@@ -1363,7 +1363,9 @@ class DRSLinRegRNN():
 
 
                     # collect training, validation, and validation additional analysis scores
+                    print(datetime.now().strftime("%H:%M:%S") + "- evaluate_results validation")
                     training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate_results(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"], self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
+                    print(datetime.now().strftime("%H:%M:%S") + "- evaluate_results validation")
                     validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate_results(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"], self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
                     training_scores_dict_list += [training_scores_dict_list_new]
                     validation_scores_dict_list += [validation_scores_dict_list_new]
@@ -1426,8 +1428,9 @@ class DRSLinRegRNN():
                 self.y_train_list += [y_train]
                 
                 # produce standard training scores
-                print(datetime.now().strftime("%H:%M:%S") + "- testing pred")
+                print(datetime.now().strftime("%H:%M:%S") + "- evaluate_results validation")
                 y_pred_train = self.custom_single_predict(X_train, single_estimator) # pred here is the prediction of the price at [time + pred horizon] made at [time]
+                print(datetime.now().strftime("%H:%M:%S") + "- evaluate_results validation")
                 y_pred_val = self.custom_single_predict(X_val, single_estimator)
                 self.y_pred_list += [y_pred_val]
                 self.y_val_list += [y_val]
@@ -1460,7 +1463,7 @@ class DRSLinRegRNN():
         return y_pred_values
         
     def evaluate_results(self, y_test_input, y_pred_input, outputs_params_dict, reporting_dict, financial_value_scaling):
-        
+        print(datetime.now().strftime("%H:%M:%S") + "- evaluate_results - prep results")
         pred_steps_value              = outputs_params_dict["pred_steps_ahead"]
         confidences_before_betting_PC = reporting_dict["confidence_thresholds"]
         seconds_per_time_steps        = self.input_dict["temporal_params_dict"]["time_step_seconds"]
@@ -1472,8 +1475,9 @@ class DRSLinRegRNN():
         merged_df = pd.merge(y_test, y_pred, left_index=True, right_index=True, how='inner')
         y_test = y_test.loc[merged_df.index]
         y_pred = y_pred.loc[merged_df.index]
-        
+        print(datetime.now().strftime("%H:%M:%S") + "- evaluate_results - trad results")
         traditional_scores_dict_list = {"r2": r2_score(y_test, y_pred), "mse": mean_squared_error(y_test, y_pred), "mae": mean_absolute_error(y_test, y_pred)}
+        print(datetime.now().strftime("%H:%M:%S") + "- evaluate_results - custom results")
         additional_results_dict_list = FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred, y_test, pred_steps_value, confidences_before_betting_PC=confidences_before_betting_PC, financial_value_scaling=financial_value_scaling, seconds_per_time_steps=seconds_per_time_steps)
         return traditional_scores_dict_list, additional_results_dict_list
         
