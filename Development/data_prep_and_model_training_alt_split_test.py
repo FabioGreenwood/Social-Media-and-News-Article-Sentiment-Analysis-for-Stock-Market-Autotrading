@@ -1404,7 +1404,7 @@ class DRSLinRegRNN():
         del scaler_X
 
         X_tensor_indy, X_tensor, y_tensor_indy, y_tensor = self.return_X_Y_tensor(df_X, df_y)
-
+        print("new")
         #for train_index, val_index in kf.split(df_X):
         for train_index, val_index in kf.split(X_tensor_indy):
             count += 1
@@ -1423,11 +1423,12 @@ class DRSLinRegRNN():
                 X_val[:, :, dropout_cols_numerical] = 0
                 y_val = y_tensor[val_index]
 
-                
+                print(datetime.now().strftime("%H:%M:%S") + "- return predictor")
                 # initialising and prepping
                 single_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features)
                 single_estimator.dropout_cols = dropout_cols
                 global_random_state += 1
+                print(datetime.now().strftime("%H:%M:%S") + "- fitting")
                 single_estimator = self.return_single_component_model_fitted_with_early_stopping(single_estimator, X_train, y_train, X_val, y_val, inputs_already_transformed=True)
                 
                 #record training data, without scaling
@@ -1436,12 +1437,14 @@ class DRSLinRegRNN():
                 self.y_train_list += [None] #self.y_train_list += [y_train]
                 
                 # produce standard training scores
+                print(datetime.now().strftime("%H:%M:%S") + "- testing pred")
                 y_pred_train = self.custom_single_predict(df_X, single_estimator, inputs_already_transformed=True, index=X_tensor_indy[train_index], input_data=X_train) # pred here is the prediction of the price at [time + pred horizon] made at [time]
                 y_pred_val = self.custom_single_predict(df_X, single_estimator, inputs_already_transformed=True, index=X_tensor_indy[val_index], input_data=X_val)
                 self.y_pred_list += [y_pred_val]
                 self.y_val_list += [y_val]
 
                 # collect training, validation, and validation additional analysis scores
+                print(datetime.now().strftime("%H:%M:%S") + "- evaluate_results")
                 training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate_results(df_y, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
                 validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate_results(df_y, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
                 training_scores_dict_list += [training_scores_dict_list_new]

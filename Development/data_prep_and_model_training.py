@@ -1135,15 +1135,18 @@ class BlockingTimeSeriesSplit():
 def create_step_responces(df_financial_data, df_sentiment_data_input, pred_output_and_tickers_combos_list, pred_steps_ahead, financial_value_scaling):
     #this method populates each row with the next X output results, this is done so that, each time step can be trained
     #to predict the value of the next X steps
-    df_sentiment_data = df_sentiment_data_input.copy()
+    
     new_col_str = "{}_{}"
     list_of_new_columns = []
     nan_values_replaced = 0
     train_test_split = 1
-    if isinstance(df_sentiment_data, pd.DataFrame):
+    if isinstance(df_sentiment_data_input, pd.DataFrame):
+        df_sentiment_data = copy.copy(df_sentiment_data_input)
         df_sentiment_data.index = pd.to_datetime(df_sentiment_data.index)
         common_indices = df_financial_data.index.intersection(df_sentiment_data.index)
         df_sentiment_data = df_sentiment_data.loc[common_indices]
+    else:
+        df_sentiment_data = df_sentiment_data_input
     data = pd.concat([df_financial_data, df_sentiment_data], axis=1, ignore_index=False)
 
     
@@ -1409,26 +1412,28 @@ class DRSLinRegRNN():
                 X_val = df_X.loc[df_X.index[val_index].values].copy()
                 X_val.loc[:,dropout_cols] = 0
                 y_val = df_y.loc[df_y.index[val_index].values].copy()
-
+                print(datetime.now().strftime("%H:%M:%S") + "- return predictor")
                 
                 # initialising and prepping
                 single_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features)
                 single_estimator.dropout_cols = dropout_cols
                 global_random_state += 1
+                print(datetime.now().strftime("%H:%M:%S") + "- fitting")
                 single_estimator = self.return_single_component_model_fitted_with_early_stopping(single_estimator, X_train, y_train, X_val, y_val)
-                
+                                
                 #record training data, without scaling
-                
                 self.X_train_list += [X_train]
                 self.y_train_list += [y_train]
                 
                 # produce standard training scores
+                print(datetime.now().strftime("%H:%M:%S") + "- testing pred")
                 y_pred_train = self.custom_single_predict(X_train, single_estimator) # pred here is the prediction of the price at [time + pred horizon] made at [time]
                 y_pred_val = self.custom_single_predict(X_val, single_estimator)
                 self.y_pred_list += [y_pred_val]
                 self.y_val_list += [y_val]
 
                 # collect training, validation, and validation additional analysis scores
+                print(datetime.now().strftime("%H:%M:%S") + "- evaluate_results")
                 training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate_results(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
                 validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate_results(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
                 training_scores_dict_list += [training_scores_dict_list_new]
@@ -1448,7 +1453,7 @@ class DRSLinRegRNN():
     def custom_single_predict(self, df_X, single_estimator, output_col_name="prediction_X_ahead"):
 
         index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, scaler=self.scaler_X, dropout_cols=single_estimator.dropout_cols)
-        y_pred_values       = single_estimator.predict(input_data, verbose=1)
+        y_pred_values       = single_estimator.predict(input_data, verbose=0)
         y_pred_values       = pd.DataFrame(y_pred_values, index=index, columns=[output_col_name])
         y_pred_values       = self.inverse_scale_output_according_to_input_scaler(df_X, y_pred_values)
         
