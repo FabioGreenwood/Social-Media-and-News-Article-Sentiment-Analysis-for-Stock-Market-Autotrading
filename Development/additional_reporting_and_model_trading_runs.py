@@ -52,6 +52,8 @@ def return_results_X_min_plus_minus_accuracy(y_preds_input, y_test_input, pred_s
     # variables and checks
     if financial_value_scaling==None:
         raise ValueError("financial_value_scaling must be set")
+    if type(pred_steps_list) == int:
+            pred_steps_list = [pred_steps_list]
     if len(pred_steps_list) > 1:
         raise ValueError("expecting only a length of one")
     
@@ -67,8 +69,7 @@ def return_results_X_min_plus_minus_accuracy(y_preds_input, y_test_input, pred_s
     if len(pred_steps_list) == 1:
         steps_back = pred_steps_list[0]
     
-        if type(pred_steps_list) == int:
-            pred_steps_list = [pred_steps_list]
+        
 
         results_dict["results_bets_with_confidence_proportion"][steps_back] = dict()
         results_dict["results_x_mins_PC"][steps_back]                       = dict()
@@ -90,46 +91,44 @@ def return_results_X_min_plus_minus_accuracy(y_preds_input, y_test_input, pred_s
         y_original_val = y_original_val.loc[merged_df.index]
 
         if financial_value_scaling != "delta_scaled":
-            df_x_values_delta = y_test - y_original_val
-            df_y_values_delta = y_preds - y_original_val
+            df_x_values_delta = y_test.iloc[:,0] - y_original_val.iloc[:,0]
+            df_y_values_delta = y_preds.iloc[:,0] - y_original_val.iloc[:,0]
         else:
-            df_x_values_delta = y_test
-            df_y_values_delta = y_preds
+            df_x_values_delta = y_test.iloc[:,0]
+            df_y_values_delta = y_preds.iloc[:,0]
 
         for confidence_threshold_key in confidences_before_betting_PC:
-
-            #refresh values
             x = df_x_values_delta.copy()
             y = df_y_values_delta.copy()
-            x.columns, y.columns = ["delta_price"], ["delta_price"]
-            # confidence threshold is now taken from the percentile
             confidence_threshold_adjusted = np.percentile(abs(y),confidence_threshold_key * 100)
-
+            #x.columns, y.columns = ["delta_price"], ["delta_price"]
+            
             ## proportion of bets taken
             # filter out bets not confident to make
-            y["delta_price"] = y["delta_price"].apply(lambda y: y if abs(y) > confidence_threshold_adjusted else 0)
-            results_dict["results_bets_with_confidence_proportion"][steps_back][confidence_threshold_key] = max(0,(abs(y["delta_price"]) > 0).sum() / len(y["delta_price"]))
+            y = y.where(abs(y) > confidence_threshold_adjusted, 0)
+            
+            results_dict["results_bets_with_confidence_proportion"][steps_back][confidence_threshold_key] = max(0,(abs(y) > 0).sum() / len(y))
 
             if results_dict["results_bets_with_confidence_proportion"][steps_back][confidence_threshold_key] != 0:
                 ## proportion up/down correctly bet
                 z = x * y
-                results_dict["results_x_mins_PC"][steps_back][confidence_threshold_key] = (z["delta_price"] > 0).sum() / (abs(z["delta_price"]) > 0).sum()
+                results_dict["results_x_mins_PC"][steps_back][confidence_threshold_key] = (z > 0).sum() / (abs(z) > 0).sum()
 
                 ## first scoring method
                 # give one weighting to all accepted bets
                 stake_a = pd.DataFrame()
-                stake_a["delta_price"] = y["delta_price"].apply(lambda y: y/abs(y) if abs(y) > confidence_threshold_adjusted else 0)
+                stake_a = y.apply(lambda y: y/abs(y) if abs(y) > confidence_threshold_adjusted else 0)
                 score_correct = (stake_a*x).sum()
                 score_both = abs(stake_a*x).sum()
-                results_dict["results_x_mins_score"][steps_back][confidence_threshold_key] = score_correct.values[0] / score_both.values[0]
+                results_dict["results_x_mins_score"][steps_back][confidence_threshold_key] = score_correct / score_both
 
                 ## second scoring method FG_action: replace
                 # calc stake in all accepted bets
                 stake_b = pd.DataFrame()
-                stake_b["delta_price"] = y["delta_price"].apply(lambda y: y - 0.5 * confidence_threshold_adjusted if y > confidence_threshold_adjusted else (y + 0.5 * confidence_threshold_adjusted if -y > confidence_threshold_adjusted else 0))
+                stake_b = y.apply(lambda y: y - 0.5 * confidence_threshold_adjusted if y > confidence_threshold_adjusted else (y + 0.5 * confidence_threshold_adjusted if -y > confidence_threshold_adjusted else 0))
                 score_correct = (stake_b*x).sum()
                 score_both = abs(stake_b*x).sum()
-                results_dict["results_x_mins_weighted"][steps_back][confidence_threshold_key] = score_correct.values[0] / score_both.values[0]
+                results_dict["results_x_mins_weighted"][steps_back][confidence_threshold_key] = score_correct / score_both
             else:
                 results_dict["results_x_mins_PC"][steps_back][confidence_threshold_key]         = 0.0
                 results_dict["results_x_mins_score"][steps_back][confidence_threshold_key]      = 0.0
