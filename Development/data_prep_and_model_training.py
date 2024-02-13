@@ -457,20 +457,19 @@ def retrieve_or_generate_sentiment_data(index, temporal_params_dict, fin_inputs_
     #desc
     
     #general parameters
-    company_symbol      = outputs_params_dict["output_symbol_indicators_tuple"][0]
-    time_step_seconds   = temporal_params_dict["time_step_seconds"]
-    topic_model_qty     = senti_inputs_params_dict["topic_qty"]
-    rel_lifetime        = senti_inputs_params_dict["relative_lifetime"]
-    rel_hlflfe          = senti_inputs_params_dict["relative_halflife"]
-    topic_model_alpha   = senti_inputs_params_dict["topic_model_alpha"]
-    tweet_ratio_removed = senti_inputs_params_dict["topic_training_tweet_ratio_removed"]
-    apply_IDF           = senti_inputs_params_dict["apply_IDF"]
-    pred_steps          = outputs_params_dict["pred_steps_ahead"]
+    company_symbol                   = outputs_params_dict["output_symbol_indicators_tuple"][0]
+    time_step_seconds                = temporal_params_dict["time_step_seconds"]
+    topic_model_qty                  = senti_inputs_params_dict["topic_qty"]
+    rel_lifetime                     = senti_inputs_params_dict["relative_lifetime"]
+    rel_hlflfe                       = senti_inputs_params_dict["relative_halflife"]
+    topic_model_alpha                = senti_inputs_params_dict["topic_model_alpha"]
+    tweet_ratio_removed              = senti_inputs_params_dict["topic_training_tweet_ratio_removed"]
+    apply_IDF                        = senti_inputs_params_dict["apply_IDF"]
     enforced_topic_model_nested_list = senti_inputs_params_dict["enforced_topics_dict"]
-    new_combined_stopwords_inc = senti_inputs_params_dict["inc_new_combined_stopwords_list"]
-    topic_weight_square_factor = senti_inputs_params_dict["topic_weight_square_factor"]
-    factor_tweet_attention     = senti_inputs_params_dict["factor_tweet_attention"]
-    factor_topic_volume        = senti_inputs_params_dict["factor_topic_volume"]
+    new_combined_stopwords_inc       = senti_inputs_params_dict["inc_new_combined_stopwords_list"]
+    topic_weight_square_factor       = senti_inputs_params_dict["topic_weight_square_factor"]
+    factor_tweet_attention           = senti_inputs_params_dict["factor_tweet_attention"]
+    factor_topic_volume              = senti_inputs_params_dict["factor_topic_volume"]
     
     #set period start/ends
     if training_or_testing == "training" or training_or_testing == "train":
@@ -512,14 +511,15 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
     num_topics          = senti_inputs_params_dict["topic_qty"]
     topic_model_alpha   = senti_inputs_params_dict["topic_model_alpha"]
     tweet_ratio_removed = senti_inputs_params_dict["topic_training_tweet_ratio_removed"]
-    seconds_per_time_steps  = temporal_params_dict["time_step_seconds"]
     relavance_lifetime      = senti_inputs_params_dict["relative_lifetime"]
     relavance_halflife      = senti_inputs_params_dict["relative_halflife"]
     apply_IDF               = senti_inputs_params_dict["apply_IDF"]
     new_combined_stopwords_inc          = senti_inputs_params_dict["inc_new_combined_stopwords_list"]
     enforced_topic_model_nested_list    = senti_inputs_params_dict["enforced_topics_dict"]
     topic_weight_square_factor          = senti_inputs_params_dict["topic_weight_square_factor"]
-    factor_tweet_attention             = senti_inputs_params_dict["factor_tweet_attention"]
+    factor_tweet_attention              = senti_inputs_params_dict["factor_tweet_attention"]
+    epoch_time                          = datetime(1970, 1, 1)
+    factor_topic_volume                 = senti_inputs_params_dict["factor_topic_volume"]
 
     if training_or_testing == "training" or training_or_testing == "train":
         period_start  = temporal_params_dict["train_period_start"]
@@ -549,20 +549,22 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
         df_annotated_tweets.to_csv(annotated_tweets_location_file)
         print(datetime.now().strftime("%H:%M:%S") + " - generating sentiment data")
     
-    #generate sentiment data from topic model and annotate tweets
-    #index = generate_datetimes(train_period_start, train_period_end, seconds_per_time_steps)
-    #df_sentiment_scores = pd.DataFrame()
-    columns = []
-    for i in range(num_topics):
-        columns = columns + ["~senti_score_t" + str(i)]
-    df_sentiment_scores = pd.DataFrame(index=index)#, columns=columns)
+    # generate output dataFrame
+    columns = ["tweet_cohort_start_post", "tweet_cohort_end_post"]
+    target_columns = []
+    if senti_inputs_params_dict["factor_topic_volume"] != global_exclusively_str:
+        #columns += ["~sent_topic_t{}".format(i) for i in range(num_topics)]
+        target_columns += ["~sent_topic_t{}".format(i) for i in range(num_topics)]
+    if senti_inputs_params_dict["factor_topic_volume"] != False:
+        #columns += ["~sent_topic_W{}".format(i) for i in range(num_topics)]
+        target_columns += ["~sent_topic_W{}".format(i) for i in range(num_topics)]
+    df_sentiment_scores = pd.DataFrame(index=index, columns=columns)
+    df_sentiment_scores["tweet_cohort_start_post"]    = df_sentiment_scores.index
+    df_sentiment_scores["tweet_cohort_end_post"]    = df_sentiment_scores["tweet_cohort_start_post"].apply(lambda datetime: ((datetime - epoch_time)).total_seconds())
+    df_sentiment_scores["tweet_cohort_start_post"]    = df_sentiment_scores["tweet_cohort_start_post"].apply(lambda datetime: ((datetime - epoch_time) - timedelta(seconds=relavance_lifetime)).total_seconds())
+    df_annotated_tweets = df_annotated_tweets.drop(['Unnamed: 0', 'tweet_id', 'writer', 'body', 'comment_num', 'retweet_num', 'like_num'], axis=1)
     
-    #create the initial cohort of tweets to be looked at in a time window
-    epoch_time          = datetime(1970, 1, 1)
-    tweet_cohort_t1 = pd.DataFrame(index=index, columns=["tweet_cohort_start_post", "tweet_cohort_end_post", "tweet_cohort_t1", "tweet_cohort"])
-    tweet_cohort_t1["tweet_cohort_start_post"]  = tweet_cohort_t1.index
-    tweet_cohort_t1["tweet_cohort_end_post"]    = tweet_cohort_t1["tweet_cohort_start_post"].apply(lambda datetime: ((datetime - epoch_time)).total_seconds())
-    tweet_cohort_t1["tweet_cohort_start_post"]  = tweet_cohort_t1["tweet_cohort_start_post"].apply(lambda datetime: ((datetime - epoch_time) - timedelta(seconds=relavance_lifetime)).total_seconds())
+    # prep input data
     if factor_tweet_attention == False:
         df_annotated_tweets["tweet_attention_score"] = 1
     elif factor_tweet_attention == True:
@@ -570,60 +572,37 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
     else:
         raise ValueError("this value must be included")
     
-    def process_row_with_topic_vol(row, df_annotated_tweets=df_annotated_tweets, num_topics=num_topics, relavance_halflife=relavance_halflife):
+    # define internal methods
+    def return_tweet_cohort_from_scratch(tweet_cohort_start_post, tweet_cohort_end_post, df_annotated_tweets=df_annotated_tweets):
+        mask = (df_annotated_tweets["post_date"] >= tweet_cohort_start_post) & (df_annotated_tweets["post_date"] <= tweet_cohort_end_post)
+        tweet_cohort = df_annotated_tweets[mask]
+        return tweet_cohort
+
+    def return_topic_sentiment_and_or_volume(row, df_annotated_tweets, num_topics, relavance_halflife, factor_topic_volume):
+        senti_col_name = "~sent_topic_W{}"
         tweet_cohort_start_post = row["tweet_cohort_start_post"]
         tweet_cohort_end_post = row["tweet_cohort_end_post"]
-        tweet_cohort = return_tweet_cohort_from_scratch(df_annotated_tweets, tweet_cohort_start_post, tweet_cohort_end_post)
-        senti_col_name = "~sent_topic_W{}"
-        time_weight = (0.5 ** ((tweet_cohort["post_date"] - tweet_cohort_start_post) / relavance_halflife)) * tweet_cohort["tweet_attention_score"]
-        
-        weights = tweet_cohort.loc[:,senti_col_name.format(0):"~sent_topic_W{}".format(num_topics-1)]
-        weights.mul(time_weight, axis = 0)
-        weights = weights.sum() / sum(weights.sum())
-        
-        return weights
+        tweet_cohort = return_tweet_cohort_from_scratch(tweet_cohort_start_post, tweet_cohort_end_post)
 
-    def process_row(row):
-        tweet_cohort = row["tweet_cohort"]
-        time_weight = 0.5 ** ((tweet_cohort["post_date"] - row["tweet_cohort_start_post"]) / relavance_halflife)
-        
-        if factor_tweet_attention:
-            time_weight *= tweet_cohort["tweet_attention_score"]
-        
+        topic_weights = []
         senti_scores = []
-        for topic_num in range(num_topics):
-            times_weight_multipled_topic_weight = time_weight * tweet_cohort[f"~sent_topic_W{topic_num}"]
-            score_numer = np.sum(times_weight_multipled_topic_weight * tweet_cohort["~sent_overall"] * tweet_cohort["tweet_attention_score"])
-            score_denom = np.sum(times_weight_multipled_topic_weight * tweet_cohort["tweet_attention_score"])
-            senti_scores.append(score_numer / score_denom)
-        return senti_scores
-    
-    def return_tweet_cohort_from_scratch_2(row, df_annotated_tweets=df_annotated_tweets):
-        return return_tweet_cohort_from_scratch(df_annotated_tweets, row["tweet_cohort_start_post"], row["tweet_cohort_end_post"])
+        time_weight = (0.5 ** ((tweet_cohort["post_date"] - tweet_cohort_start_post) / relavance_halflife)) * tweet_cohort["tweet_attention_score"]
 
-    # generate values
-    tweet_cohort_t1["tweet_cohort"] = tweet_cohort_t1.apply(return_tweet_cohort_from_scratch_2, axis=1)
-
-    if senti_inputs_params_dict["factor_topic_volume"] != global_exclusively_str:
-        df_sentiment_scores = tweet_cohort_t1.apply(process_row, axis=1, result_type='expand')
-        df_sentiment_scores.columns = columns
-    else:
-        df_sentiment_scores = pd.DataFrame(index=tweet_cohort_t1.index)
-    
-    if senti_inputs_params_dict["factor_topic_volume"] != False:
-        #tweet_cohort_start_posts = tweet_cohort_t1["tweet_cohort_start_post"]
-        #tweet_cohort_end_posts = tweet_cohort_t1["tweet_cohort_end_post"]
-        #tweet_cohorts = [return_tweet_cohort_from_scratch(df_annotated_tweets, start_post, end_post) for start_post, end_post in zip(tweet_cohort_start_posts, tweet_cohort_end_posts)]
+        weights = tweet_cohort.loc[:,senti_col_name.format(0):senti_col_name.format(num_topics-1)].mul(time_weight, axis=0)
         
-        senti_col_names = ["~sent_topic_W{}".format(i) for i in range(num_topics)]
+
+        if factor_topic_volume:
+            topic_weights = weights.sum() / sum(weights.sum())
+    
+        if factor_topic_volume != global_exclusively_str:
         
-        tweet_cohort_t1["tweet_cohort"] = tweet_cohort_t1.apply(return_tweet_cohort_from_scratch_2, axis=1)
-        tweet_cohort_t1[senti_col_names] = None
+            score_numer = weights.mul(tweet_cohort["~sent_overall"] * tweet_cohort["tweet_attention_score"], axis=0)
+            score_denom = weights.mul(tweet_cohort["tweet_attention_score"], axis=0)
+            senti_scores = score_numer.sum() / score_denom.sum().sum()
+        
+        return pd.Series(list(senti_scores.values) + list(topic_weights.values)) #list(senti_scores.values) + list(topic_weights.values)
 
-        tweet_cohort_t1[senti_col_names] = tweet_cohort_t1.apply(process_row_with_topic_vol, axis=1)
-
-        df_sentiment_scores = pd.concat([df_sentiment_scores, tweet_cohort_t1[senti_col_names]],ignore_index=False, axis=1)
-
+    df_sentiment_scores[target_columns] = df_sentiment_scores.apply(lambda row: return_topic_sentiment_and_or_volume(row, df_annotated_tweets, num_topics, relavance_halflife, factor_topic_volume), axis=1)
     return df_sentiment_scores
 
 def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, repeat_timer=10, training_or_testing="training", hardcode_location_for_topic_model="", k_fold_textual_sources=None):
@@ -1090,14 +1069,6 @@ def sent_to_words(sentences):
     for sentence in sentences:
         yield(gensim.utils.simple_preprocess(str(sentence), deacc=True))
 
-def return_tweet_cohort_from_scratch(df_annotated_tweets_temp, tweet_cohort_start, tweet_cohort_end):
-    mask = (df_annotated_tweets_temp["post_date"] >= tweet_cohort_start) & (df_annotated_tweets_temp["post_date"] <= tweet_cohort_end)
-    tweet_cohort = df_annotated_tweets_temp[mask]
-    return tweet_cohort
-
-#def return_single_topic_sentiment_vector_overtime(df_annotated_tweets_temp):
-#    seconds_per_time_steps
-#    relavance_lifetime
 
 
 def update_tweet_cohort(df_annotated_tweets_temp, tweet_cohort_start, tweet_cohort_end):
