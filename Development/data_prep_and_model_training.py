@@ -587,22 +587,20 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
         topic_weights = []
         senti_scores = []
         time_weight = (0.5 ** ((tweet_cohort["post_date"] - tweet_cohort_start_post) / relavance_halflife)) * tweet_cohort["tweet_attention_score"]
-
-        weights = tweet_cohort.loc[:,senti_col_name.format(0):senti_col_name.format(num_topics-1)].mul(time_weight, axis=0)
+        topic_weights = tweet_cohort.loc[:,senti_col_name.format(0):senti_col_name.format(num_topics-1)].mul(time_weight, axis=0)
         
-
         if factor_topic_volume:
-            topic_weights = weights.sum() / sum(weights.sum())
+            topic_scores = topic_weights.sum() / time_weight.sum()
     
         if factor_topic_volume != global_exclusively_str:
+            score_numer = topic_weights.mul(tweet_cohort["~sent_overall"], axis=0)
+            score_denom = topic_weights
+            senti_scores = score_numer.sum() / score_denom.sum()
         
-            score_numer = weights.mul(tweet_cohort["~sent_overall"] * tweet_cohort["tweet_attention_score"], axis=0)
-            score_denom = weights.mul(tweet_cohort["tweet_attention_score"], axis=0)
-            senti_scores = score_numer.sum() / score_denom.sum().sum()
-        
-        return pd.Series(list(senti_scores.values) + list(topic_weights.values)) #list(senti_scores.values) + list(topic_weights.values)
+        return pd.Series(list(senti_scores.values) + list(topic_scores.values)) #list(senti_scores.values) + list(topic_weights.values)
 
     df_sentiment_scores[target_columns] = df_sentiment_scores.apply(lambda row: return_topic_sentiment_and_or_volume(row, df_annotated_tweets, num_topics, relavance_halflife, factor_topic_volume), axis=1)
+    df_sentiment_scores = df_sentiment_scores[target_columns]
     return df_sentiment_scores
 
 def generate_annotated_tweets(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, repeat_timer=10, training_or_testing="training", hardcode_location_for_topic_model="", k_fold_textual_sources=None):
