@@ -61,7 +61,7 @@ default_fin_inputs_params_dict      = {
     "index_col_str"     : "datetime",
     #"historical_file"   : "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\data\\financial data\\tiingo\\aapl.csv",
     "historical_file"   : os.path.join(global_general_folder,r"data/financial_data/firstratedata/AAPL_full_5min_adjsplit.txt"),
-    "financial_value_scaling" : None # None, "day_scaled", "delta_scaled"
+    "financial_value_scaling" : "day_scaled" # None, "day_scaled", "delta_scaled"
 }
 default_senti_inputs_params_dict    = {
     "topic_qty"             : 7,
@@ -258,8 +258,8 @@ def return_scenario_name_str(topic_qty, pred_steps, ratio_removed):
         output = "no_sentiment_steps_"
     else:
         raise ValueError("topic_qty value of: " + str(topic_qty) + " not recognised")
-    if not pred_steps in [1, 3, 5, 15]:
-        raise ValueError("double check value " + str(pred_steps) + " desired for pred steps input")
+    #if not pred_steps in [1, 3, 5, 15]:
+    #    raise ValueError("double check value " + str(pred_steps) + " desired for pred steps input")
     
     valstr = "{0:e}".format(ratio_removed)
     epos = valstr.rfind('e')
@@ -750,12 +750,6 @@ now = datetime.now()
 model_start_time = now.strftime(global_strptime_str_filename)
     
 design_space_dict = {
-    "fin_inputs_params_dict" : {
-        "financial_value_scaling" : {
-            #0 : None,
-            1 : "day_scaled",
-            2: "delta_scaled"}
-    },
     "senti_inputs_params_dict" : {
         "topic_qty" : [5, 9, 13, 17, 25],
         "topic_model_alpha" : [0.3, 0.7, 1, 2, 3, 5, 7, 13],
@@ -777,7 +771,7 @@ design_space_dict = {
         "general_adjusting_square_factor" : [3, 2, 1, 0],
         "estimator__alpha"                : [1e-11, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-4], 
         "lookbacks"                       : [8, 10, 15, 20, 25, 50],
-        "early_stopping" : [5, 7, 9, 12]
+        "early_stopping" : [0, 5, 7, 9, 12]
         },
         
     "string_key" : {}
@@ -785,36 +779,31 @@ design_space_dict = {
 
 
 
+
 global_run_count = 0
 
 init_doe = [
-    [1, 9,  1,   720,   0, 2, 0, 0, 4, 3, 1.00E-09, 10, 7],   # 0
-    [1, 25, 2,   25200, 0, 4, 0, 0, 4, 3, 1.00E-08, 15, 7],   # 1
-    [1, 25, 13,  900,   1, 2, 0, 0, 4, 1, 1.00E-07, 10, 7],   # 2
-    [1, 25, 13,  25200, 1, 2, 0, 0, 4, 1, 1.00E-07, 10, 7],   # 3
-    [1, 25, 3,   7200,  1, 2, 0, 0, 2, 0, 1.00E-06, 10, 12],  # 4
-    [1, 25, 13,  900,   0, 2, 0, 0, 0, 0, 1.00E-05, 8,  12],  # 5
-    [1, 25, 2,   7200,  0, 4, 0, 0, 4, 1, 1.00E-05, 10, 5],   # 6
-    [1, 13, 2,   7200,  1, 1, 0, 0, 2, 1, 1.00E-05, 25, 9],   # 7
-    [1, 25, 2,   25200, 0, 4, 0, 0, 2, 3, 1.00E-11, 30, 5],   # 8
-    [1, 17, 7,   900,   1, 2, 0, 0, 5, 2, 1.00E-06, 20, 5],   # 9
-    [1, 17, 3,   720,   0, 4, 0, 0, 0, 0, 1.00E-08, 8,  9],   # 10
-    [1, 25, 0.3, 25200, 1, 2, 0, 0, 2, 0, 1.00E-04, 40, 7],   # 11
-    [1, 25, 2,   7200,  0, 4, 0, 0, 4, 1, 1.00E-04, 10, 5],   # 12
-    [1, 9,  13,  7200,  1, 2, 0, 0, 2, 0, 1.00E-04, 20, 7],   # 13
-    [1, 17, 0.7, 180,   0, 1, 0, 0, 2, 3, 1.00E-04, 8,  12],  # 14
-    [1, 5,  0.7, 7200,  1, 4, 0, 2, 0, 2, 1.00E-10, 40, 5],   # 15
-    [1, 9,  0.3, 25200, 0, 1, 1, 2, 3, 3, 1.00E-04, 20, 7],   # 16
-    [1, 5,  7,   900,   1, 4, 1, 2, 5, 2, 1.00E-09, 10, 7],   # 17
-    [1, 9,  7,   180,   1, 2, 1, 2, 5, 1, 1.00E-04, 8,  5],   # 18
-    [1, 5,  0.3, 25200, 0, 1, 0, 1, 1, 2, 1.00E-07, 10, 9],   # 19
-    [1, 17, 7,   180,   0, 1, 1, 2, 3, 2, 1.00E-10, 10, 5],   # 20
-    [1, 5,  5,   900,   1, 4, 1, 1, 3, 0, 1.00E-09, 25, 5],   # 21
-    [1, 9,  5,   180,   0, 4, 0, 1, 1, 2, 1.00E-06, 8,  7],   # 22
-    [1, 9,  7,   180,   0, 4, 1, 2, 0, 2, 1.00E-04, 10, 9],   # 23
-    [1, 5,  2,   25200, 1, 4, 0, 1, 2, 1, 1.00E-05, 25, 9],   # 24
-    [1, 25, 0.3, 25200, 1, 2, 1, 2, 4, 3, 1.00E-10, 15, 7],   # 25
-    [1, 9,  13,  900,   0, 2, 1, 1, 5, 3, 1.00E-10, 15, 12]   # 26
+    [25, 13,  7200,  0, 4, 0, 0, 5, 1, 0.0001, 10, 7],
+    [13, 3,   7200,  0, 2, 0, 0, 4, 0, 1e-11,  8,  9],
+    [13, 7,   180,   1, 1, 1, 0, 4, 3, 1e-09,  25, 0],
+    [25, 13,  7200,  0, 1, 1, 1, 2, 1, 1e-06,  10, 5],
+    [13, 2,   900,   1, 4, 0, 0, 0, 0, 1e-10,  8,  12],
+    [9,  13,  900,   0, 1, 1, 2, 5, 0, 1e-08,  8,  0],
+    [17, 3,   25200, 1, 1, 1, 1, 4, 0, 0.0001, 15, 12],
+    [25, 7,   25200, 0, 4, 1, 2, 2, 3, 1e-09,  15, 9],
+    [17, 7,   7200,  0, 4, 1, 2, 3, 1, 1e-05,  8,  0],
+    [5,  5,   25200, 1, 4, 1, 0, 3, 3, 1e-10,  15, 7],
+    [17, 0.7, 900,   1, 2, 1, 1, 2, 3, 1e-07,  50, 5],
+    [9,  2,   7200,  1, 4, 1, 0, 4, 0, 1e-11,  15, 5],
+    [17, 7,   900,   1, 2, 1, 1, 5, 2, 1e-06, 20, 5],
+    [17, 13,  900,   0, 4, 0, 1, 4, 1, 1e-07,  50, 9],
+    [5,  0.3, 25200, 1, 4, 1, 2, 5, 2, 1e-09,  8,  0],
+    [5,  13,  900,   0, 1, 1, 1, 4, 0, 1e-05,  20, 0],
+    [17, 2,   7200,  0, 2, 1, 2, 0, 2, 0.0001, 8,  7],
+    [13, 13,  900,   1, 2, 0, 0, 3, 0, 1e-05,  50, 9],
+    [13, 13,  900,   0, 1, 1, 1, 1, 0, 1e-05,  10, 5],
+    [25, 0.7, 900,   0, 2, 1, 2, 5, 1, 1e-05,  25, 7],
+    [5,  0.3, 900,   1, 4, 0, 0, 3, 0, 1e-08,  8,  9]
     ]
 
 
@@ -832,30 +821,34 @@ checklist for restarting the experiment
 2. the excels in [\outputs\]
 """
 
-## SETTING THE RUN VARIABLES, READ ABOVE CHECK LIST
-
-# definition of different scenarios is set by this dict, to access a different scenario, please change the scenario variable
+## SETTING THE RUN VARIABLES, READ ABOVE CHECK LISTdefinition of different scenarios is set by this dict, to access a different scenario, please change the scenario variable
 
 # scenario parameters: topic_qty, pred_steps
+
 
 
 removal_ratio = int(1e0)
 scenario_dict = {
         #0 : {"topics" : None, "pred_steps" : 15},
-        #1 : {"topics" : 1, "pred_steps" : 15},
-        #2 : {"topics" : 0, "pred_steps" : 15},
-        3 : {"topics" : None, "pred_steps" : 5},
-        4 : {"topics" : 1, "pred_steps" : 5},
-        5 : {"topics" : 0, "pred_steps" : 5},
-        6 : {"topics" : None, "pred_steps" : 3},
-        #7 : {"topics" : 1, "pred_steps" : 3},
-        #8 : {"topics" : 0, "pred_steps" : 3},
+        #1 : {"topics" : 1, "pred_steps"    : 15},
+        #2 : {"topics" : 0, "pred_steps"    : 15},
+        3 : {"topics" : None, "pred_steps" : 6},
+        4 : {"topics" : 1, "pred_steps"    : 6},
+        5 : {"topics" : 0, "pred_steps"    : 6},
+        #6 : {"topics" : None, "pred_steps" : 3},
+        #7 : {"topics" : 1, "pred_steps"    : 3},
+        #8 : {"topics" : 0, "pred_steps"    : 3},
         9 : {"topics" : None, "pred_steps" : 1},
-        10: {"topics" : 1, "pred_steps" : 1},
-        11: {"topics" : 0, "pred_steps" : 1},
+        10: {"topics" : 1, "pred_steps"    : 1},
+        11: {"topics" : 0, "pred_steps"    : 1},
     }
+#shard = 5
+loop = [10]#[5,11]#[3, 4]#
+#init_doe = init_doe[shard::6]
+reverse_DoE = False
+if reverse_DoE == True:
+    init_doe.reverse()
 
-loop = [6]#[5,11]#[3, 4]#
 print("shard: {}".format(str(loop)))
 enable_GPU = False
 if enable_GPU == False:
@@ -911,7 +904,16 @@ for scenario_ID in loop:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = scenario_name_str + "run20_{}.csv".format(str(scenario_ID))
+    if reverse_DoE == True:
+        final_str = "_reversed"
+    else:
+        final_str = ""
+
+    run_name_str = "run30_{}{}.csv".format(str(scenario_ID),final_str)
+
+
+    #run_name_str = "DoE_Gen_{}.csv".format(str(scenario_ID))
+    scenario_name_str = scenario_name_str + run_name_str
 
 
     if __name__ == '__main__':
@@ -927,7 +929,7 @@ for scenario_ID in loop:
             inverse_for_minimise_vec = inverse_for_minimise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=os.path.join(global_general_folder,r"outputs/run20_{}.csv".format(str(scenario_ID)))
+            global_record_path=os.path.join(global_general_folder,r"outputs/{}".format(run_name_str))
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
 
