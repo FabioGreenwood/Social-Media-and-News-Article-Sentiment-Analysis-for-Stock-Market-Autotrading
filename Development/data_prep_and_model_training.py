@@ -562,7 +562,6 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
     df_sentiment_scores["tweet_cohort_start_post"]    = df_sentiment_scores.index
     df_sentiment_scores["tweet_cohort_end_post"]    = df_sentiment_scores["tweet_cohort_start_post"].apply(lambda datetime: ((datetime - epoch_time)).total_seconds())
     df_sentiment_scores["tweet_cohort_start_post"]    = df_sentiment_scores["tweet_cohort_start_post"].apply(lambda datetime: ((datetime - epoch_time) - timedelta(seconds=relavance_lifetime)).total_seconds())
-    df_annotated_tweets = df_annotated_tweets.drop(['Unnamed: 0', 'tweet_id', 'writer', 'body', 'comment_num', 'retweet_num', 'like_num'], axis=1)
     
     # prep input data
     if factor_tweet_attention == False:
@@ -571,7 +570,9 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
         df_annotated_tweets["tweet_attention_score"] = (0.2 + (df_annotated_tweets["comment_num"] + 0.2) * (df_annotated_tweets["retweet_num"] + 0.2) * (df_annotated_tweets["like_num"] + 0.2))
     else:
         raise ValueError("this value must be included")
+    df_annotated_tweets = df_annotated_tweets.drop(['Unnamed: 0', 'tweet_id', 'writer', 'body', 'comment_num', 'retweet_num', 'like_num'], axis=1)
     
+
     # define internal methods
     def return_tweet_cohort_from_scratch(tweet_cohort_start_post, tweet_cohort_end_post, df_annotated_tweets=df_annotated_tweets):
         mask = (df_annotated_tweets["post_date"] >= tweet_cohort_start_post) & (df_annotated_tweets["post_date"] <= tweet_cohort_end_post)
@@ -591,13 +592,15 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
         
         if factor_topic_volume:
             topic_scores = topic_weights.sum() / time_weight.sum()
+            topic_scores = list(topic_scores.values)
     
         if factor_topic_volume != global_exclusively_str:
             score_numer = topic_weights.mul(tweet_cohort["~sent_overall"], axis=0)
             score_denom = topic_weights
             senti_scores = score_numer.sum() / score_denom.sum()
+            senti_scores = list(senti_scores.values)
         
-        return pd.Series(list(senti_scores.values) + list(topic_scores.values)) #list(senti_scores.values) + list(topic_weights.values)
+        return senti_scores + topic_scores #list(senti_scores.values) + list(topic_weights.values)
 
     df_sentiment_scores[target_columns] = df_sentiment_scores.apply(lambda row: return_topic_sentiment_and_or_volume(row, df_annotated_tweets, num_topics, relavance_halflife, factor_topic_volume), axis=1)
     df_sentiment_scores = df_sentiment_scores[target_columns]
@@ -1300,7 +1303,7 @@ class DRSLinRegRNN():
             history = model.fit(X, Y, epochs=self.model_hyper_params["epochs"], validation_data=(X_val, Y_val), callbacks=[early_stopping], verbose=verbose)
         else:
             history = model.fit(X, Y, epochs=self.model_hyper_params["epochs"], validation_data=(X_val, Y_val), verbose=verbose)
-        print(datetime.now().strftime("%H:%M:%S") + " - fit complete")
+        #print(datetime.now().strftime("%H:%M:%S") + " - fit complete")
         # Train the model with early stopping
         
         
@@ -1345,9 +1348,7 @@ class DRSLinRegRNN():
 
 
                     # collect training, validation, and validation additional analysis scores
-                    print(datetime.now().strftime("%H:%M:%S") + "- evaluate_results validation")
                     training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate_results(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"], self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
-                    print(datetime.now().strftime("%H:%M:%S") + "- evaluate_results validation")
                     validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate_results(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"], self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
                     training_scores_dict_list += [training_scores_dict_list_new]
                     validation_scores_dict_list += [validation_scores_dict_list_new]
@@ -1396,13 +1397,13 @@ class DRSLinRegRNN():
                 X_val = df_X.loc[df_X.index[val_index].values].copy()
                 X_val.loc[:,dropout_cols] = 0
                 y_val = df_y.loc[df_y.index[val_index].values].copy()
-                print(datetime.now().strftime("%H:%M:%S") + "- return predictor")
+                #print(datetime.now().strftime("%H:%M:%S") + "- return predictor")
                 
                 # initialising and prepping
                 single_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features)
                 single_estimator.dropout_cols = dropout_cols
                 global_random_state += 1
-                print(datetime.now().strftime("%H:%M:%S") + "- fitting")
+                #print(datetime.now().strftime("%H:%M:%S") + "- fitting")
                 single_estimator = self.return_single_component_model_fitted_with_early_stopping(single_estimator, X_train, y_train, X_val, y_val)
                                 
                 #record training data, without scaling
@@ -1410,15 +1411,12 @@ class DRSLinRegRNN():
                 self.y_train_list += [y_train]
                 
                 # produce standard training scores
-                print(datetime.now().strftime("%H:%M:%S") + "- evaluate_results validation")
                 y_pred_train = self.custom_single_predict(X_train, single_estimator) # pred here is the prediction of the price at [time + pred horizon] made at [time]
-                print(datetime.now().strftime("%H:%M:%S") + "- evaluate_results validation")
                 y_pred_val = self.custom_single_predict(X_val, single_estimator)
                 self.y_pred_list += [y_pred_val]
                 self.y_val_list += [y_val]
 
                 # collect training, validation, and validation additional analysis scores
-                print(datetime.now().strftime("%H:%M:%S") + "- evaluate_results")
                 training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate_results(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
                 validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate_results(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
                 training_scores_dict_list += [training_scores_dict_list_new]
@@ -1445,7 +1443,7 @@ class DRSLinRegRNN():
         return y_pred_values
         
     def evaluate_results(self, y_test_input, y_pred_input, outputs_params_dict, reporting_dict, financial_value_scaling):
-        print(datetime.now().strftime("%H:%M:%S") + "- evaluate_results - prep results")
+        #print(datetime.now().strftime("%H:%M:%S") + " - evaluate_results")
         pred_steps_value              = outputs_params_dict["pred_steps_ahead"]
         confidences_before_betting_PC = reporting_dict["confidence_thresholds"]
         seconds_per_time_steps        = self.input_dict["temporal_params_dict"]["time_step_seconds"]
@@ -1457,9 +1455,7 @@ class DRSLinRegRNN():
         merged_df = pd.merge(y_test, y_pred, left_index=True, right_index=True, how='inner')
         y_test = y_test.loc[merged_df.index]
         y_pred = y_pred.loc[merged_df.index]
-        print(datetime.now().strftime("%H:%M:%S") + "- evaluate_results - trad results")
         traditional_scores_dict_list = {"r2": r2_score(y_test, y_pred), "mse": mean_squared_error(y_test, y_pred), "mae": mean_absolute_error(y_test, y_pred)}
-        print(datetime.now().strftime("%H:%M:%S") + "- evaluate_results - custom results")
         additional_results_dict_list = FG_additional_reporting.return_results_X_min_plus_minus_accuracy(y_pred, y_test, pred_steps_value, confidences_before_betting_PC=confidences_before_betting_PC, financial_value_scaling=financial_value_scaling, seconds_per_time_steps=seconds_per_time_steps)
         return traditional_scores_dict_list, additional_results_dict_list
         
