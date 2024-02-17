@@ -701,7 +701,7 @@ def experiment_manager(
             
     
     # continue optimisation
-    bo = GPyOpt.methods.BayesianOptimization(f=PLACEHOLDER_objective_function, domain=bounds, initial_design_numdata=0)
+    bo = GPyOpt.methods.BayesianOptimization(f=PLACEHOLDER_objective_function, domain=bounds, initial_design_numdata=0, maximize=True)
     continue_optimisation = True
     if type(initial_doe_size_or_DoE) in [list, dict]:
         overall_max_runs = len(initial_doe_size_or_DoE) + max_iter
@@ -843,7 +843,7 @@ scenario_dict = {
         11: {"topics" : 0, "pred_steps"    : 1},
     }
 #shard = 5
-loop = [10]#[5,11]#[3, 4]#
+loop = [11]
 #init_doe = init_doe[shard::6]
 reverse_DoE = False
 if reverse_DoE == True:
@@ -868,7 +868,8 @@ for scenario_ID in loop:
     # editing topic quantity values for scenario, 2 lines
     topic_qty = scenario_dict[scenario_ID]["topics"]
     if isinstance(init_doe, list) and topic_qty != None:
-            for i in range(len(init_doe)): init_doe[i][index_of_topic_qty] = topic_qty; init_doe[i][index_of_factor_topic_volume] = 0
+            for i in range(len(init_doe)): 
+                init_doe[i][index_of_topic_qty] = topic_qty; init_doe[i][index_of_factor_topic_volume] = 0
             design_space_dict["senti_inputs_params_dict"]["topic_qty"] = [topic_qty]
             default_input_dict["senti_inputs_params_dict"]["topic_qty"] = topic_qty
             design_space_dict["senti_inputs_params_dict"]["factor_topic_volume"] = [0]
@@ -909,7 +910,7 @@ for scenario_ID in loop:
     else:
         final_str = ""
 
-    run_name_str = "run30_{}{}.csv".format(str(scenario_ID),final_str)
+    run_name_str = "run31_{}{}.csv".format(str(scenario_ID),final_str)
 
 
     #run_name_str = "DoE_Gen_{}.csv".format(str(scenario_ID))
@@ -923,7 +924,7 @@ for scenario_ID in loop:
             scenario_name_str,
             design_space_dict,
             initial_doe_size_or_DoE=init_doe,
-            max_iter=0,
+            max_iter=10,
             model_start_time = model_start_time,
             force_restart_run = False,
             inverse_for_minimise_vec = inverse_for_minimise_vec,
