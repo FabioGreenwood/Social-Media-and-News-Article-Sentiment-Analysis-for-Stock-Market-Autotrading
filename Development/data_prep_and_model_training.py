@@ -585,12 +585,12 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
         tweet_cohort_end_post = row["tweet_cohort_end_post"]
         tweet_cohort = return_tweet_cohort_from_scratch(tweet_cohort_start_post, tweet_cohort_end_post)
 
-        topic_weights = []
+        topic_scores = []
         senti_scores = []
         time_weight = (0.5 ** ((tweet_cohort["post_date"] - tweet_cohort_start_post) / relavance_halflife)) * tweet_cohort["tweet_attention_score"]
         topic_weights = tweet_cohort.loc[:,senti_col_name.format(0):senti_col_name.format(num_topics-1)].mul(time_weight, axis=0)
         
-        if factor_topic_volume:
+        if factor_topic_volume != False:
             topic_scores = topic_weights.sum() / time_weight.sum()
             topic_scores = list(topic_scores.values)
     
@@ -600,7 +600,10 @@ def generate_sentiment_data(index, temporal_params_dict, fin_inputs_params_dict,
             senti_scores = score_numer.sum() / score_denom.sum()
             senti_scores = list(senti_scores.values)
         
-        return senti_scores + topic_scores #list(senti_scores.values) + list(topic_weights.values)
+        if len(senti_scores + topic_scores) % num_topics != 0:
+            raise ValueError("gggg")
+
+        return pd.Series(senti_scores + topic_scores, index=target_columns) #list(senti_scores.values) + list(topic_weights.values)
 
     df_sentiment_scores[target_columns] = df_sentiment_scores.apply(lambda row: return_topic_sentiment_and_or_volume(row, df_annotated_tweets, num_topics, relavance_halflife, factor_topic_volume), axis=1)
     df_sentiment_scores = df_sentiment_scores[target_columns]
