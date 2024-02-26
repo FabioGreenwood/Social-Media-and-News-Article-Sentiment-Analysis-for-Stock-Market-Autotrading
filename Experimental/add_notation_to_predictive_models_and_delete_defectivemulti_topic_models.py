@@ -9,7 +9,7 @@ These functions are controlled by booleans and the deletion functality is double
 """
 
 
-target_dir = r"C:\Users\Public\fabio_uni_work\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\precalculated_assets\predictive_model"
+target_dir = r"D:\project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\precalculated_assets\predictive_model"
 
 add_notation = True
 delete_defective_multi_topic_folders = False

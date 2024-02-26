@@ -843,7 +843,8 @@ scenario_dict = {
         11: {"topics" : 0, "pred_steps"    : 1},
     }
 #shard = 5
-loop = [11]
+#loop = [3, 4, 9, 10]
+loop = [3]
 #init_doe = init_doe[shard::6]
 reverse_DoE = False
 if reverse_DoE == True:
@@ -910,7 +911,7 @@ for scenario_ID in loop:
     else:
         final_str = ""
 
-    run_name_str = "run31_{}{}.csv".format(str(scenario_ID),final_str)
+    run_name_str = "run32_{}{}.csv".format(str(scenario_ID),final_str)
 
 
     #run_name_str = "DoE_Gen_{}.csv".format(str(scenario_ID))
@@ -924,7 +925,7 @@ for scenario_ID in loop:
             scenario_name_str,
             design_space_dict,
             initial_doe_size_or_DoE=init_doe,
-            max_iter=10,
+            max_iter=7,
             model_start_time = model_start_time,
             force_restart_run = False,
             inverse_for_minimise_vec = inverse_for_minimise_vec,

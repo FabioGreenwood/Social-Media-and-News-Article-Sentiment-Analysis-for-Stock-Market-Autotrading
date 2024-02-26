@@ -1291,7 +1291,7 @@ class DRSLinRegRNN():
 
 
     def return_single_component_model_fitted_with_early_stopping(self, model, X_input, Y_input, X_val_input, Y_val_input):
-        verbose = 0
+        verbose = 1
         X, Y, X_val, Y_val = copy.copy(X_input), copy.copy(Y_input), copy.copy(X_val_input), copy.copy(Y_val_input)
         
 
