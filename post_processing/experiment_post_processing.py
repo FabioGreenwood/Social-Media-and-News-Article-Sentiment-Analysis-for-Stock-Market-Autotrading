@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import fnmatch
 import matplotlib.pyplot as plt
 from itertools import product
 import openpyxl
@@ -9,6 +10,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import plotly.express as px
 import plotly.graph_objects as go
+import math
 
 
 #%% parameters
@@ -180,7 +182,7 @@ def return_pareto_table_and_max_ids(df_results, output_tables_dict_single, max_i
     return df_output, max_ids_and_vals_dict
     
 
-def update_excel(df, start_cell, excel_file_path):
+def update_excel(df, start_cell, excel_file_path, pop_table_labels=False, table_name="Blank Name"):
     try:
         workbook = openpyxl.load_workbook(excel_file_path)
     except FileNotFoundError:
@@ -190,12 +192,42 @@ def update_excel(df, start_cell, excel_file_path):
         for col_num, value in enumerate(row):
             cell = sheet.cell(row=row_num + sheet[start_cell].row, column=col_num + sheet[start_cell].column)
             cell.value = value
+    if pop_table_labels==True:
+        table_name = table_name.replace(" (", "\n(")
+        cell = sheet.cell(row=sheet[start_cell].row - 2, column=sheet[start_cell].column)
+        cell.value = table_name
+        for i_col in range(len(df.columns)):
+            if math.isnan(df.iloc[0, i_col]) == False:
+                cell = sheet.cell(row=sheet[start_cell].row - 1, column=sheet[start_cell].column + i_col)
+                cell.value = df.columns[i_col]
+    
     workbook.save(excel_file_path)
+
 
 def convert_table_time_value_from_timesteps_to_mins(df, mins_per_timestep=5):
     df["Time Steps (Mins)"] = mins_per_timestep * df["Time Steps (Mins)"]
     return df
 
+def trim_and_new_line_long_variable_names(input):
+    # this method returns a reduced version of the string or strings entered, optionally with new line characters.
+    if isinstance(df_results_filtered.columns, pd.core.indexes.base.Index):
+        input = list(input)
+    elif not isinstance(input, list):
+        input = [input]
+    
+    stopwords = ["params", "dict", "dicts", "inputs", "hyper", "x_mins", "sX"]
+    replacement_pairs = [("validation", "val"), ("testing", "test"), ("temporal", "temp"), ("reporting", "report")]
+    for i in range(len(input)):
+        var = input[i]
+        #remove stopwords
+        for word in stopwords:
+            var = var.replace(word, "")
+        for pair in replacement_pairs:
+            var = var.replace(pair[0], pair[1])
+        while "__" in var:
+            var = var.replace("__", "_")
+        input[i] = var
+    return input
 
 #%% main line
 
@@ -385,7 +417,7 @@ for name in output_tables_dict:
     df = convert_table_time_value_from_timesteps_to_mins(df)
     df.to_csv(outputs_folder_file_path + "\\" + name + ".csv")
     #save_table(df, generate_image_name(target_output_name), folder, colour_bool)
-    update_excel(df, output_tables_dict[name]["top_left_cell"], overall_results_file)
+    update_excel(df, output_tables_dict[name]["top_left_cell"], overall_results_file, pop_table_labels=False, table_name=name)
     
     final_output_tables_list[name] = df
 print("complete tables")
@@ -399,7 +431,7 @@ pred_steps_list     = pred_steps_list
 
 for pred_steps in pred_steps_list:
     df_results_filtered = df_results[df_results["pred_steps"]==pred_steps]
-    df_results_filtered['category'] = df_results_filtered['run_name'].apply(lambda x: next((cat for cat in substring_categories if cat in x), 'Other'))
+    df_results_filtered.loc[:,'category'] = df_results_filtered['run_name'].apply(lambda x: next((cat for cat in substring_categories if cat in x), 'Other'))
     df_results_filtered = df_results_filtered[["local_ID", 'category', "validation_mae", "testing_mae", "validation_x_mins_weighted_sX_c0.9", "testing_x_mins_weighted_sX_c0.9"]]
     df_results_filtered[["local_ID", "validation_mae", "testing_mae", "validation_x_mins_weighted_sX_c0.9", "testing_x_mins_weighted_sX_c0.9"]] = df_results_filtered[["local_ID", "validation_mae", "testing_mae", "validation_x_mins_weighted_sX_c0.9", "testing_x_mins_weighted_sX_c0.9"]].astype(float)
 
@@ -425,22 +457,25 @@ for pred_steps in pred_steps_list:
     outputs_folder = outputs_folder_file_path + "\\pairplot_subplots"
     os.makedirs(outputs_folder, exist_ok=True)
 
-    for i in df_results_filtered.columns[1:]:
-        for j in df_results_filtered.columns[1:]:
+    for i in df_results_filtered.columns[2:]:
+        for j in df_results_filtered.columns[2:]:
             for cat in [None] + substring_categories:
-                if cat == None:
-                    df_results_filtered_2 = df_results_filtered
-                    naming_suffix = f'_{pred_steps*5}mins'
-                else:
-                    df_results_filtered_2 = df_results_filtered[df_results_filtered["category"] == cat]
-                    naming_suffix = f'_{pred_steps*5}mins_{cat}_only'
-                plt.figure(figsize=(8, 6))
-                for results_subset in ["Full", "DoE_only"]:
+                for results_subset in ["Full", "DoE_only", "optim_only"]:
+                    if cat == None:
+                        df_results_filtered_2 = df_results_filtered
+                        naming_suffix = f'_{pred_steps*5}mins'
+                    else:
+                        df_results_filtered_2 = df_results_filtered[df_results_filtered["category"] == cat]
+                        naming_suffix = f'_{pred_steps*5}mins_{cat}_only'
+                    plt.figure(figsize=(8, 6))
                     if results_subset == "Full":
                         df_results_filtered_3 = df_results_filtered_2
                     elif results_subset == "DoE_only":
                         df_results_filtered_3 = df_results_filtered_2[df_results_filtered_2["local_ID"]<=DoE_ID_cut_off]
                         naming_suffix += "_DoEonly"
+                    elif results_subset == "optim_only":
+                        df_results_filtered_3 = df_results_filtered_2[df_results_filtered_2["local_ID"]>DoE_ID_cut_off]
+                        naming_suffix += "_optim_only"
                     else:
                         raise ValueError("error found")
 
@@ -451,7 +486,8 @@ for pred_steps in pred_steps_list:
                         plt.savefig(os.path.join(outputs_folder, f'densityplot_{i}_vs_{j}{naming_suffix}.png'))
                     else:
                         sub_pairplot = sns.scatterplot(df_results_filtered_3, x=i, y=j, hue='category', palette=palette, style="category")#"marker="+")#, plot_kws=dict(marker="+", linewidth=1))
-                        sub_pairplot.set_title(f'Scatter Plot of {i} vs {j}{naming_suffix}')
+                        temp_title = trim_and_new_line_long_variable_names([f'Scatter Plot of {i} vs {j}{naming_suffix}'])
+                        sub_pairplot.set_title(temp_title)
                         #standarised lims between the same charts
                         x0, x1, y0, y1 = min(df_results_filtered[i]), max(df_results_filtered[i]), min(df_results_filtered[j]), max(df_results_filtered[j])
                         xr, yr = x1-x0, y1-y0
@@ -468,9 +504,40 @@ for pred_steps in pred_steps_list:
                     fig = px.parallel_coordinates(df_results_filtered_3, color="testing_x_mins_weighted_sX_c0.9", color_continuous_scale=px.colors.diverging.RdBu)
                     fig.write_html("C:/Users/Public/fabio_uni_work/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/human_readable_results/parallel_axis_{}{}.html".format(cat, naming_suffix))
 
+# create design parameter parallel plots
 
+design_params_columns = ["local_ID", "run_name", "pred_steps"] + fnmatch.filter(df_results.columns, "*param*") + ["validation_x_mins_weighted_sX_c0.9", "testing_x_mins_weighted_sX_c0.9"]
+design_table_folder_name = "parallel_axis_design_tables"
+df_results_filtered = df_results[design_params_columns]
+df_results_filtered['category'] = df_results_filtered['run_name'].apply(lambda x: next((cat for cat in substring_categories if cat in x), 'Other'))
 
+for pred_steps in pred_steps_list:
+    for cat in [None] + substring_categories:
+        print("dddddd")
+        df_designs_filtered_2 = df_results_filtered.copy()
+        df_designs_filtered_2 = df_designs_filtered_2[df_designs_filtered_2["pred_steps"]==pred_steps]
+        if cat == None:
+            naming_suffix = f'_{pred_steps*5}mins'
+        else:
+            df_designs_filtered_2 = df_designs_filtered_2[df_designs_filtered_2["category"] == cat]
+            naming_suffix = f'_{pred_steps*5}mins_{cat}_only'
+        df_designs_filtered_2.columns = trim_and_new_line_long_variable_names(df_designs_filtered_2.columns)
+        df_designs_filtered_2 = df_designs_filtered_2.drop("category", axis=1)
+        fig = go.Figure()
+        fig = px.parallel_coordinates(df_designs_filtered_2) #fig = px.parallel_coordinates(df_designs_filtered_2, color=df_designs_filtered_2.columns[-1], color_continuous_scale=px.colors.diverging.RdBu)
+        fig.write_html(os.path.join(outputs_folder_file_path, "parallel_axis_design_tables", f'para_axis {naming_suffix}.html'))
+        
+        
+        # # create a pairplot
+        # palette = {'multi_topic': 'blue', 'no_topics': 'green', 'no_sentiment': 'orange', 'Other': 'gray'}
+        # # Create a scatter plot using Seaborn
+        # plt.figure(figsize=(10, 6))
+        # pairplot = sns.pairplot(df_results_filtered, hue='category', palette=palette, plot_kws=dict(marker="+", linewidth=1))
+        # plt.suptitle(f'pairplot {5*pred_steps} mins')
+        # # Add legend
+        # pairplot.add_legend(title='Categories')
 
+            
 print("complete all plots")
 
 
@@ -481,3 +548,9 @@ print("complete all plots")
 
 
 
+
+
+
+
+
+# %%
