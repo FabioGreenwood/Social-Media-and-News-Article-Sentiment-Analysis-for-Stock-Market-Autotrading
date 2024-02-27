@@ -84,13 +84,14 @@ move_contents(predictor_folder_path, temp_store_folder, folders_to_exclude_list=
 folders = list_folders(temp_store_folder)
 folders.sort()
 for folder in folders:
-    i+=1
+    #i+=1
     predictor_folder_path_original = os.path.join(temp_store_folder, folder)
-    with open(os.path.join(predictor_folder_path_original, "input_dict.pkl")) as file:
+    with open(os.path.join(predictor_folder_path_original, "input_dict.pkl"), "rb") as file:
         input_dict = pickle.load(file)
-    predictor_name_new = FG_model_training.return_predictor_name(input_dict)
-    
-    predictor_folder_path_new = os.path.join(predictor_folder_path, predictor_name_new)
+    predictor_name_new = FG_model_training.return_predictor_name(FG_model_training.return_input_dict(temporal_params_dict = input_dict["temporal_params_dict"], fin_inputs_params_dict = input_dict["fin_inputs_params_dict"], senti_inputs_params_dict = input_dict["senti_inputs_params_dict"], outputs_params_dict = input_dict["outputs_params_dict"], model_hyper_params = input_dict["model_hyper_params"], reporting_dict = input_dict["reporting_dict"]))
+    predictor_name_new = FG_model_training.custom_hash(predictor_name_new)
+    predictor_folder_path_new = os.path.join(predictor_folder_path,
+    predictor_name_new)
     print("changing:{} to {}".format(folder, predictor_name_new))
     shutil.move(predictor_folder_path_original, predictor_folder_path_new)
     

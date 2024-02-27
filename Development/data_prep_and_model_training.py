@@ -178,20 +178,19 @@ def return_annotated_tweets_name(company_symbol, train_period_start, train_perio
     if topic_model_qty == 1 or topic_model_qty == 0:
         topic_weight_square_factor, topic_model_alpha = "NA", "NA"
     name = company_symbol + "_ps" + train_period_start.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_pe" + train_period_end.strftime(global_strptime_str_filename).replace(":","").replace(" ","_") + "_twsf" + str(topic_weight_square_factor) + "_"
-    if topic_model_qty > 1:
-        name = name + return_topic_model_name(topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc)
-    else:
-        name = name + "_noTopicModel"
+    name = name + return_topic_model_name(topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc)
     return name
 
 def return_sentiment_data_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe, factor_tweet_attention, factor_topic_volume):
     global global_strptime_str, global_strptime_str_filename
     name = return_annotated_tweets_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor)
-    name = name + "_ts_sec" + str(time_step_seconds) + "_r_lt" + str(rel_lifetime) + "_r_hl" + str(rel_hlflfe)
-    if factor_tweet_attention == True:
-        name = name + "_factor_tweet_attentionTRUE"
-    if factor_topic_volume != False:
-        name = name + "_topicVol" + str(factor_topic_volume)
+    name = name + "_ts_sec" + str(time_step_seconds)
+    if topic_model_qty > 0:
+        name += "_r_lt" + str(rel_lifetime) + "_r_hl" + str(int(rel_hlflfe))
+        if factor_tweet_attention == True:
+            name = name + "_factor_tweet_attentionTRUE"
+        if factor_topic_volume != False:
+            name = name + "_topicVol" + str(factor_topic_volume)
 
     return name
 
