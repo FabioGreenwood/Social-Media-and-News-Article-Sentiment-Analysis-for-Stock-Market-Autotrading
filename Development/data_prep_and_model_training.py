@@ -1122,6 +1122,16 @@ class BlockingTimeSeriesSplit():
             mid = int(1.0 * (stop - start)) + start
             yield indices[start: mid], indices[mid + margin: stop]
 
+def save_input_printout_notepad(input_dict, target_dir, model_name):
+    text = ""
+    for key in input_dict.keys():
+        text += " -- " + key + "\n"
+        for subkey in input_dict[key].keys():
+            text += " - " + subkey + ": " + str(input_dict[key][subkey]) + "\n"
+        text += "\n"
+    with open(os.path.join(target_dir, "inputs_{}.txt".format(model_name)), 'w') as file:
+        file.write(text)
+
 def create_step_responces(df_financial_data, df_sentiment_data_input, pred_output_and_tickers_combos_list, pred_steps_ahead, financial_value_scaling):
     #this method populates each row with the next X output results, this is done so that, each time step can be trained
     #to predict the value of the next X steps
@@ -1513,6 +1523,8 @@ class DRSLinRegRNN():
                 additional_assets_dict[attr] = getattr(self, attr)
         with open(os.path.join(folder_path,"additional_assets.pkl"), "wb") as file:
                 pickle.dump(additional_assets_dict, file)
+        # write the inputs dicts in a text file
+        save_input_printout_notepad(self.input_dict, folder_path, model_name)
         self.save_training_data(folder_path)
         
     def save_training_data(self, folder_path):
