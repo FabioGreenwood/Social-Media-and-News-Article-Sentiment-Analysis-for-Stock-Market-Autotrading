@@ -1234,6 +1234,14 @@ class DRSLinRegRNN():
         self.input_dict           = input_dict
         self.base_estimator       = base_estimator
         self.estimators_          = []
+        self.scaler_X             = None
+        self.X_train_list         = []
+        self.y_train_list         = []
+        self.y_pred_list          = []
+        self.y_val_list           = []
+        self.training_scores_dict_list       = []
+        self.validation_scores_dict_list     = []
+        self.additional_validation_dict_list = []
         if hash_name == None:
             raise ValueError("models must be named during creation now")
         else:
@@ -1376,63 +1384,67 @@ class DRSLinRegRNN():
         global global_random_state
         global_random_state = 42
         # variables
-        training_scores_dict_list, validation_scores_dict_list, additional_validation_dict_list = [], [], []
         kf = KFold(n_splits=self.K_fold_splits, shuffle=False)
 
         print(datetime.now().strftime("%H:%M:%S") + " - training model")
 
-        scaler_X = MinMaxScaler()
-        self.scaler_X = scaler_X.fit(df_X)
-        self.X_train_list = []
-        self.y_train_list = []
-        self.y_pred_list = []
-        self.y_val_list = []
-        del scaler_X
-        for train_index, val_index in kf.split(df_X):
-            count += 1
-            print(datetime.now().strftime("%H:%M:%S") + "-" + str(count))
-            for i_random in range(self.n_estimators_per_time_series_blocking):
-                n_features = df_X.shape[1]
-                dropout_cols = return_columns_to_remove(columns_list=df_X.columns, model=self)
+        if self.scaler_X == None:
+            scaler_X = MinMaxScaler()
+            self.scaler_X = scaler_X.fit(df_X)
+            del scaler_X
 
-                # data prep
-                X_train = df_X.loc[df_X.index[train_index].values].copy()
-                X_train.loc[:,dropout_cols] = 0
-                y_train = df_y.loc[df_y.index[train_index].values].copy()
 
-                X_val = df_X.loc[df_X.index[val_index].values].copy()
-                X_val.loc[:,dropout_cols] = 0
-                y_val = df_y.loc[df_y.index[val_index].values].copy()
-                #print(datetime.now().strftime("%H:%M:%S") + "- return predictor")
-                
-                # initialising and prepping
-                single_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features)
-                single_estimator.dropout_cols = dropout_cols
-                global_random_state += 1
-                #print(datetime.now().strftime("%H:%M:%S") + "- fitting")
-                single_estimator = self.return_single_component_model_fitted_with_early_stopping(single_estimator, X_train, y_train, X_val, y_val)
-                                
-                #record training data, without scaling
-                self.X_train_list += [X_train]
-                self.y_train_list += [y_train]
-                
-                # produce standard training scores
-                y_pred_train = self.custom_single_predict(X_train, single_estimator) # pred here is the prediction of the price at [time + pred horizon] made at [time]
-                y_pred_val = self.custom_single_predict(X_val, single_estimator)
-                self.y_pred_list += [y_pred_val]
-                self.y_val_list += [y_val]
+        
+        kf_split = list(kf.split(df_X))
+        while len(self.estimators_) < self.K_fold_splits * self.n_estimators_per_time_series_blocking:
+        
+        #for train_index, val_index in kf.split(df_X):
+        #for i_random in range(self.n_estimators_per_time_series_blocking):
+            print(datetime.now().strftime("%H:%M:%S") + "-" + str(len(self.estimators_)))
+            train_index, val_index = kf_split[len(self.estimators_)%self.K_fold_splits]
+            
+            n_features = df_X.shape[1]
+            dropout_cols = return_columns_to_remove(columns_list=df_X.columns, model=self)
 
-                # collect training, validation, and validation additional analysis scores
-                training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate_results(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
-                validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate_results(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
-                training_scores_dict_list += [training_scores_dict_list_new]
-                validation_scores_dict_list += [validation_scores_dict_list_new]
-                additional_validation_dict_list += [additional_validation_dict_list_new]
-                self.estimators_ = self.estimators_ + [single_estimator]
+            # data prep
+            X_train = df_X.loc[df_X.index[train_index].values].copy()
+            X_train.loc[:,dropout_cols] = 0
+            y_train = df_y.loc[df_y.index[train_index].values].copy()
 
-        training_scores_dict = average_list_of_identical_dicts(training_scores_dict_list)
-        validation_scores_dict = average_list_of_identical_dicts(validation_scores_dict_list)
-        additional_validation_dict = average_list_of_identical_dicts(additional_validation_dict_list)
+            X_val = df_X.loc[df_X.index[val_index].values].copy()
+            X_val.loc[:,dropout_cols] = 0
+            y_val = df_y.loc[df_y.index[val_index].values].copy()
+            #print(datetime.now().strftime("%H:%M:%S") + "- return predictor")
+            
+            # initialising and prepping
+            single_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features)
+            single_estimator.dropout_cols = dropout_cols
+            global_random_state += 1
+            #print(datetime.now().strftime("%H:%M:%S") + "- fitting")
+            single_estimator = self.return_single_component_model_fitted_with_early_stopping(single_estimator, X_train, y_train, X_val, y_val)
+                            
+            #record training data, without scaling
+            self.X_train_list += [X_train]
+            self.y_train_list += [y_train]
+            
+            # produce standard training scores
+            y_pred_train = self.custom_single_predict(X_train, single_estimator) # pred here is the prediction of the price at [time + pred horizon] made at [time]
+            y_pred_val = self.custom_single_predict(X_val, single_estimator)
+            self.y_pred_list += [y_pred_val]
+            self.y_val_list += [y_val]
+
+            # collect training, validation, and validation additional analysis scores
+            training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate_results(y_train, y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
+            validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate_results(y_val, y_pred_val, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
+            self.training_scores_dict_list += [training_scores_dict_list_new]
+            self.validation_scores_dict_list += [validation_scores_dict_list_new]
+            self.additional_validation_dict_list += [additional_validation_dict_list_new]
+            self.estimators_ = self.estimators_ + [single_estimator]
+            self.save()
+
+        training_scores_dict = average_list_of_identical_dicts(self.training_scores_dict_list)
+        validation_scores_dict = average_list_of_identical_dicts(self.validation_scores_dict_list)
+        additional_validation_dict = average_list_of_identical_dicts(self.additional_validation_dict_list)
         self.training_scores_dict       = training_scores_dict
         self.validation_scores_dict     = validation_scores_dict
         self.additional_validation_dict = additional_validation_dict
@@ -1496,13 +1508,10 @@ class DRSLinRegRNN():
         dropout_cols_dict = {}
         for i, single_estimator in enumerate(self.estimators_):
             dropout_cols_dict[i] = single_estimator.dropout_cols
-        additional_assets_dict = {
-            "scaler_X" : self.scaler_X,
-            "training_scores_dict"        : self.training_scores_dict,
-            "validation_scores_dict"      : self.validation_scores_dict,
-            "additional_validation_dict"  : self.additional_validation_dict,
-            "dropout_cols"                : dropout_cols_dict
-            }
+        additional_assets_dict = {"dropout_cols" : dropout_cols_dict}
+        for attr in ["scaler_X", "training_scores_dict", "validation_scores_dict", "additional_validation_dict", "X_train_list", "y_train_list", "y_pred_list", "y_val_list", "training_scores_dict_list", "validation_scores_dict_list", "additional_validation_dict_list"]:
+            if hasattr(self, attr) == True:
+                additional_assets_dict[attr] = getattr(self, attr)
         with open(os.path.join(folder_path,"additional_assets.pkl"), "wb") as file:
                 pickle.dump(additional_assets_dict, file)
         self.save_training_data(folder_path)
@@ -1588,11 +1597,9 @@ class DRSLinRegRNN():
                 self.estimators_ += [single_estimator]
 
         # load additional factors
-        for attr in ["scaler_X", "training_scores_dict", "validation_scores_dict", "additional_validation_dict"]:
+        for attr in ["scaler_X", "training_scores_dict", "validation_scores_dict", "additional_validation_dict", "X_train_list", "y_train_list", "y_pred_list", "y_val_list", "training_scores_dict_list", "validation_scores_dict_list", "additional_validation_dict_list"]:
             if attr in additional_assets_dict.keys():
                 setattr(self, attr, additional_assets_dict[attr])
-
-        
 
 
 
@@ -1725,28 +1732,19 @@ def generate_testing_scores(predictor, input_dict, return_time_series=False):
 
 #%% main support methods
 
-def retrieve_model_and_training_scores(predictor_location_folder_path, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict, only_return_viability=False):
+def retrieve_model(predictor_location_folder_path, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict):
     #predictor_location_file = "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\precalculated_assets\\predictive_model\\aapl_ps04_06_18_000000_pe01_09_20_000000_ts_sec300_tm_qty7_r_lt3600_r_hl3600_tm_alpha1_IDF-True_t_ratio_r100000.pred"
     input_dict = return_input_dict(temporal_params_dict = temporal_params_dict, fin_inputs_params_dict = fin_inputs_params_dict, senti_inputs_params_dict = senti_inputs_params_dict, outputs_params_dict = outputs_params_dict, model_hyper_params = model_hyper_params, reporting_dict = reporting_dict)
-    if only_return_viability == True:
-        return load_RNN_predictor(input_dict, predictor_location_folder_path, only_return_viability=only_return_viability)
     
-    model = load_RNN_predictor(input_dict, predictor_location_folder_path)
+    # check model is the same
+    model_matches = load_RNN_predictor(input_dict, predictor_location_folder_path, only_return_viability=True)
+    if model_matches == False:
+        raise ValueError("model does match")
+    else:
+        print("model match correct")
+        model = load_RNN_predictor(input_dict, predictor_location_folder_path)
     
-
-    print("loading predictor: ", predictor_location_folder_path)
-    df_financial_data = import_financial_data(
-        target_file_path          = fin_inputs_params_dict["historical_file"], 
-        input_cols_to_include_list  = fin_inputs_params_dict["cols_list"],
-        temporal_params_dict = temporal_params_dict, training_or_testing="training")
-    #training_score = edit_scores_csv(predictor_name_entry, "training", model_hyper_params["testing_scoring"], mode="load")
-    df_financial_data = retrieve_or_generate_then_populate_technical_indicators(df_financial_data, fin_inputs_params_dict["fin_indi"], fin_inputs_params_dict["fin_match"]["Doji"], fin_inputs_params_dict["historical_file"], fin_inputs_params_dict["financial_value_scaling"])
-    df_sentiment_data = retrieve_or_generate_sentiment_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training")
-    
-    X_train, y_train   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"], financial_value_scaling=fin_inputs_params_dict["financial_value_scaling"])
-    model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.evaluate_ensemble(X_train, y_train, outputs_params_dict["pred_steps_ahead"], confidences_before_betting_PC=reporting_dict["confidence_thresholds"], financial_value_scaling=fin_inputs_params_dict["financial_value_scaling"])
-    
-    return model, training_scores_dict, validation_scores_dict, additional_validation_dict
+    return model
 
 def generate_model_and_validation_scores(temporal_params_dict,
     fin_inputs_params_dict,
@@ -1759,7 +1757,7 @@ def generate_model_and_validation_scores(temporal_params_dict,
     
     
     #general parameters
-    global global_index_cols_list, global_input_cols_to_include_list
+    global global_index_cols_list, global_input_cols_to_include_list, global_financial_history_folder_path, global_precalculated_assets_locations_dict
     input_dict = return_input_dict(temporal_params_dict = temporal_params_dict, fin_inputs_params_dict = fin_inputs_params_dict, senti_inputs_params_dict = senti_inputs_params_dict, outputs_params_dict = outputs_params_dict, model_hyper_params = model_hyper_params, reporting_dict = reporting_dict)
     #stock market data prep
     print(datetime.now().strftime("%H:%M:%S") + " - importing and prepping financial data")
@@ -1779,7 +1777,14 @@ def generate_model_and_validation_scores(temporal_params_dict,
         
     #model training - create regressors
     X_train, y_train   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"], financial_value_scaling=fin_inputs_params_dict["financial_value_scaling"])
-    model              = initiate_model(input_dict, hash_name = hash_name)
+    # reload old completed or semi-completed model if it already exists
+    predictor_folder_location_string = global_precalculated_assets_locations_dict["root"] + global_precalculated_assets_locations_dict["predictive_model"]
+    predictor_name = return_predictor_name(return_input_dict(temporal_params_dict = temporal_params_dict, fin_inputs_params_dict = fin_inputs_params_dict, senti_inputs_params_dict = senti_inputs_params_dict, outputs_params_dict = outputs_params_dict, model_hyper_params = model_hyper_params, reporting_dict = reporting_dict))
+    predictor_location_folder_path = predictor_folder_location_string + custom_hash(predictor_name) + "//"
+    if os.path.exists(predictor_location_folder_path):
+        model = retrieve_model(predictor_location_folder_path, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict)
+    else:
+        model = initiate_model(input_dict, hash_name = custom_hash(predictor_name))
     model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.fit_ensemble(X_train, y_train)
     #report timings
     print(datetime.now().strftime("%H:%M:%S") + " - complete generating model")
@@ -1826,14 +1831,8 @@ def retrieve_or_generate_model_and_training_scores(temporal_params_dict, fin_inp
     predictor_name = return_predictor_name(return_input_dict(temporal_params_dict = temporal_params_dict, fin_inputs_params_dict = fin_inputs_params_dict, senti_inputs_params_dict = senti_inputs_params_dict, outputs_params_dict = outputs_params_dict, model_hyper_params = model_hyper_params, reporting_dict = reporting_dict))
     predictor_location_folder_path = predictor_folder_location_string + custom_hash(predictor_name) + "//"
     print(str(temporal_params_dict["train_period_end"]) + "_____" + str(temporal_params_dict["test_period_start"])+ "_____" + str(temporal_params_dict["test_period_end"]))
-    if os.path.exists(predictor_location_folder_path):
-        model_matches = retrieve_model_and_training_scores(predictor_location_folder_path, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict, only_return_viability=True)    
-        if model_matches == True:
-            predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = retrieve_model_and_training_scores(predictor_location_folder_path, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict)
-    else:
-        print(datetime.now().strftime("%H:%M:%S") + " - generating model and testing scores")
-        predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = generate_model_and_validation_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict, hash_name=custom_hash(predictor_name))
-        predictor.save()
+    predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = generate_model_and_validation_scores(temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict)
+    predictor.save()
     return predictor, training_scores_dict, validation_scores_dict, additional_validation_dict
 
 if __name__ == '__main__':
