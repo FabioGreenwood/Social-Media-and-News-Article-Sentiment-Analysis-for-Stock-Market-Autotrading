@@ -94,7 +94,7 @@ def compare_design_dict_to_df(design_params_list, df, design_space_dict=design_s
         else:
             return 0
     else:
-        print("short design found")
+        #print("short design found")
         return 0
 
 
@@ -119,9 +119,8 @@ def return_keys_within_2_level_dict(input_dict):
     return output_list
 
 # collect dfs
-
-folder_path = 'C:/Users/Public/fabio_uni_work/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/precalculated_assets/experiment_records'
-folder_path = 'C:/Users/Public/fabio_uni_work/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/outputs'
+folder_path = 'D:/project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/precalculated_assets/experiment_records'
+folder_path = 'D:/project/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/outputs'
 file_suffix = '.csv'
 list_dataframes = read_csvs_in_folder(folder_path, file_suffix)
 
@@ -135,4 +134,6 @@ for design_ID in range(len(list_of_design_inputs)):
         count_implicit += compare_design_dict_to_df(list_of_design_inputs[design_ID], list_dataframes[df], mode = "implict")
         if compare_design_dict_to_df(list_of_design_inputs[design_ID], list_dataframes[df], mode = "implict")>0:
             history += [df]
+
+    history = []
     print("ID:{} explict:{} implicit:{} history:{}".format(design_ID, count_explict, count_implicit, str(history)))

@@ -691,7 +691,6 @@ def experiment_manager(
         if not "testing_" + testing_measure in design_history_dict[ID].keys() or design_history_dict[ID]["testing_" + testing_measure] == None:
             #print(return_keys_within_2_level_dict(design_space_dict))
             print(str(design_history_dict[ID]["X"]) + " running ID:" + str(ID))
-
             design_history_dict[ID] = run_experiment_and_return_updated_design_history_dict(design_history_dict[ID], experiment_requester, model_testing_method, testing_measure="mae", confidences_before_betting_PC=default_input_dict["reporting_dict"]["confidence_thresholds"])
             # save
             df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
