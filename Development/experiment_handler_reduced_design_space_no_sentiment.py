@@ -802,7 +802,18 @@ init_doe = [
     [0, 3, 0, 1e-05,  50, 9],
     [0, 1, 0, 1e-05,  10, 5],
     [0, 5, 1, 1e-05,  25, 7],
-    [0, 3, 0, 1e-08,  8,  9]
+    [0, 3, 0, 1e-08,  8,  9],
+    [0, 3, 0, 1.00E-08, 8, 9],
+    [0, 2, 3, 1.00E-11, 15, 9],
+    [0, 5, 1, 1.00E-11, 8,  0],
+    [0, 2, 1, 1.00E-06, 10, 5],
+    [0, 1, 1, 1.00E-05, 10, 5],
+    [0, 1, 1, 1.00E-05, 10, 5],
+    [0, 0, 2, 0.0001,   15, 7],
+    [0, 1, 2, 0.0001,   15, 7],
+    [0, 0, 3, 1.00E-05, 15, 7],
+    [0, 0, 2, 0.0001, 	15, 9],
+    [0, 0, 2, 1.00E-05, 15, 7]
     ]
 
 
@@ -909,7 +920,7 @@ for scenario_ID in loop:
     else:
         final_str = ""
 
-    run_name_str = "run31reducedDesignDimension_noSentiment_{}{}.csv".format(str(scenario_ID),final_str)
+    run_name_str = "run31reducedDesignDimension_noSentiment_2_{}{}.csv".format(str(scenario_ID),final_str)
 
 
     #run_name_str = "DoE_Gen_{}.csv".format(str(scenario_ID))
