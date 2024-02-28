@@ -1394,23 +1394,27 @@ class DRSLinRegRNN():
         global_random_state = 42
         # variables
         kf = KFold(n_splits=self.K_fold_splits, shuffle=False)
-
         print(datetime.now().strftime("%H:%M:%S") + " - training model")
+
+        # sense check
+        if not len(self.training_scores_dict_list) == len(self.validation_scores_dict_list) == len(self.additional_validation_dict_list) == len(self.y_pred_list) == len(self.y_val_list):
+            raise ValueError("these values should be the same, there is an error in the repopulation of metadata")
 
         if self.scaler_X == None:
             scaler_X = MinMaxScaler()
             self.scaler_X = scaler_X.fit(df_X)
             del scaler_X
 
-
-        
         kf_split = list(kf.split(df_X))
-        while len(self.estimators_) < self.K_fold_splits * self.n_estimators_per_time_series_blocking:
         
-        #for train_index, val_index in kf.split(df_X):
-        #for i_random in range(self.n_estimators_per_time_series_blocking):
-            print(datetime.now().strftime("%H:%M:%S") + "-" + str(len(self.estimators_)))
-            train_index, val_index = kf_split[len(self.estimators_)%self.K_fold_splits]
+        if len(self.estimators_) == len(self.training_scores_dict_list):
+            repopulating_training_metadata = False
+        else:
+            repopulating_training_metadata = True
+
+        while (len(self.estimators_) < self.K_fold_splits * self.n_estimators_per_time_series_blocking) or (repopulating_training_metadata == True):
+            print(datetime.now().strftime("%H:%M:%S") + "-" + str(len(self.training_scores_dict_list))) # here self.training_scores_dict_list is used as a count as it is possible to fewer of these than self.estimators if this method is being used to repopulate meta data onto the object
+            train_index, val_index = kf_split[len(self.training_scores_dict_list)%self.K_fold_splits]
             
             n_features = df_X.shape[1]
             dropout_cols = return_columns_to_remove(columns_list=df_X.columns, model=self)
@@ -1426,12 +1430,15 @@ class DRSLinRegRNN():
             #print(datetime.now().strftime("%H:%M:%S") + "- return predictor")
             
             # initialising and prepping
-            single_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features)
-            single_estimator.dropout_cols = dropout_cols
-            global_random_state += 1
-            #print(datetime.now().strftime("%H:%M:%S") + "- fitting")
-            single_estimator = self.return_single_component_model_fitted_with_early_stopping(single_estimator, X_train, y_train, X_val, y_val)
-                            
+            if repopulating_training_metadata == False: # in this case the amount of meta data equals the number of submodels, therefore training can resume
+                single_estimator = return_RNN_ensamble_estimator(self.model_hyper_params, global_random_state, n_features)
+                single_estimator.dropout_cols = dropout_cols
+                global_random_state += 1
+                #print(datetime.now().strftime("%H:%M:%S") + "- fitting")
+                single_estimator = self.return_single_component_model_fitted_with_early_stopping(single_estimator, X_train, y_train, X_val, y_val)
+            else: # otherwise we have a scenario where we are just retraining previous models
+                single_estimator = self.estimators_[len(self.training_scores_dict_list)]
+
             #record training data, without scaling
             self.X_train_list += [X_train]
             self.y_train_list += [y_train]
@@ -1448,8 +1455,13 @@ class DRSLinRegRNN():
             self.training_scores_dict_list += [training_scores_dict_list_new]
             self.validation_scores_dict_list += [validation_scores_dict_list_new]
             self.additional_validation_dict_list += [additional_validation_dict_list_new]
-            self.estimators_ = self.estimators_ + [single_estimator]
+
+            if repopulating_training_metadata == False: # if this is a repopulating run there shouldn't be re addition of the estimator
+                self.estimators_ = self.estimators_ + [single_estimator]
             self.save()
+            # remove repopulating tag if relevent 
+            if len(self.estimators_) == len(self.training_scores_dict_list):
+                repopulating_training_metadata = False 
 
         training_scores_dict = average_list_of_identical_dicts(self.training_scores_dict_list)
         validation_scores_dict = average_list_of_identical_dicts(self.validation_scores_dict_list)
@@ -1611,6 +1623,7 @@ class DRSLinRegRNN():
         for attr in ["scaler_X", "training_scores_dict", "validation_scores_dict", "additional_validation_dict", "X_train_list", "y_train_list", "y_pred_list", "y_val_list", "training_scores_dict_list", "validation_scores_dict_list", "additional_validation_dict_list"]:
             if attr in additional_assets_dict.keys():
                 setattr(self, attr, additional_assets_dict[attr])
+        print("hello")
 
 
 
