@@ -166,7 +166,7 @@ def return_topic_mode_seed_hash(enforced_topic_model_nested_list):
     
 def return_topic_model_name(topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc):
     if int(topic_model_qty) > 1:
-        file_string = "tm_qty" + str(topic_model_qty) + "_tm_alpha" + str(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed) + return_topic_mode_seed_hash(enforced_topic_model_nested_list) + "_newStops" + str({True: 1, False: 0}[new_combined_stopwords_inc])
+        file_string = "tm_qty" + str(topic_model_qty) + "_tm_alpha" + "{}".format(topic_model_alpha) + "_IDF-" + str(apply_IDF) + "_t_ratio_r" + str(tweet_ratio_removed) + return_topic_mode_seed_hash(enforced_topic_model_nested_list) + "_newStops" + str({True: 1, False: 0}[new_combined_stopwords_inc])
     elif int(topic_model_qty) == 1:
         file_string = "single_topic"
     elif int(topic_model_qty) == 0:
