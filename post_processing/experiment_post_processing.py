@@ -28,6 +28,9 @@ optimisation_cut_off = 26
 # importing of data
 results_csv_file_home_path  = "C:\\Users\\Public\\fabio_uni_work\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\human_readable_results\\240220_export_a"
 results_csv_name_list       = ["run32_3.csv", "run32_4.csv", "run32_5.csv", "run32_9.csv", "run32_10.csv", "run32_11.csv"]
+#results_csv_file_home_path  = "C:\\Users\\Public\\fabio_uni_work\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\human_readable_results\\240228_export_reduced_dimension"
+#results_csv_name_list       = ["run31reducedDesignDimension_noSentiment_5.csv", "run31reducedDesignDimension_noSentiment_11.csv"]
+
 
 always_up_down_csv_file_path= "C:\\Users\\Public\\fabio_uni_work\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\precalculated_assets\\always_up_down_results\\always_up_down.csv"
 df_always_up_down_results   = pd.read_csv(always_up_down_csv_file_path) #FG_fix
