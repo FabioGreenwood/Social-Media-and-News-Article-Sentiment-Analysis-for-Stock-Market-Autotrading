@@ -441,6 +441,52 @@ def run_experiment_and_return_updated_design_history_dict(design_history_dict_si
         
     return design_history_dict_single
 
+def trim_design_space_and_DoE(scope_indicator, DoE, design_space, design_space_scope):
+    if isinstance(scope_indicator,dict):
+        scope_indicator = scope_indicator["topics"]
+    
+    #check that the design_space variable, fits within the design_space_scope variable
+    global full, no_topics, no_sentiment
+    for key in design_space:
+        for subkey in design_space[key]:
+            if not subkey in design_space_scope[key].keys():
+                raise ValueError ("[{}][{}] missing from design space scope doc")
+    index = 0
+    del_indexes = []
+    #establish the markers for deletion
+    if scope_indicator in [full, None]:
+        del_indicators = []
+    elif scope_indicator in [no_topics, 1]:
+        del_indicators = [full]
+    elif scope_indicator in [no_sentiment, 0]:
+        del_indicators = [full, no_topics]
+    else:
+        raise ValueError("scope indicator {}, not found".format(scope_indicator))
+    
+    for key in design_space:
+        list_subkeys = copy.copy(list(design_space[key].keys())) 
+        for subkey in list_subkeys:
+            if design_space_scope[key][subkey] in del_indicators and not subkey in ["topic_qty", "factor_topic_volume"]:
+                # delete values
+                del design_space[key][subkey]
+                # trim DoE if possible
+                if isinstance(DoE, list):
+                    for i in range(len(DoE)):
+                        del DoE[i][index]
+            index += 1
+
+
+
+    
+    return DoE, design_space
+        
+
+
+
+
+
+
+
 
 
 #%% Module - Experiment Handler
@@ -772,11 +818,28 @@ design_space_dict = {
         "estimator__alpha"                : [1e-11, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-4], 
         "lookbacks"                       : [8, 10, 15, 20, 25, 50],
         "early_stopping" : [0, 5, 7, 9, 12]
-        },
-        
-    "string_key" : {}
+        }
 }
 
+full, no_topics, no_sentiment = "full", "no_topics", "no_sentiment"
+design_space_scope_dict = {
+        "senti_inputs_params_dict" : {
+        "topic_qty" : full,
+        "topic_model_alpha" : full,
+        "relative_halflife" : no_topics,
+        "apply_IDF" : no_topics,
+        "topic_weight_square_factor" : full,
+        "factor_tweet_attention" : no_topics,
+        "factor_topic_volume" : no_topics
+    },
+    "model_hyper_params" : {
+        "estimator__hidden_layer_sizes"   : no_sentiment,
+        "general_adjusting_square_factor" : no_sentiment,
+        "estimator__alpha"                : no_sentiment,
+        "lookbacks"                       : no_sentiment,
+        "early_stopping"                  : no_sentiment
+        }
+}
 
 
 
@@ -805,6 +868,9 @@ init_doe = [
     [25, 0.7, 900,   0, 2, 1, 2, 5, 1, 1e-05,  25, 7],
     [5,  0.3, 900,   1, 4, 0, 0, 3, 0, 1e-08,  8,  9]
     ]
+
+
+
 
 
 
@@ -842,9 +908,12 @@ scenario_dict = {
         10: {"topics" : 1, "pred_steps"    : 1},
         11: {"topics" : 0, "pred_steps"    : 1},
     }
-#shard = 5
-#loop = [3, 4, 9, 10]
-loop = [3]
+loop = [4]
+
+init_doe, design_space_dict = trim_design_space_and_DoE(scenario_dict[loop[0]], init_doe, design_space_dict, design_space_scope_dict)
+
+
+
 #init_doe = init_doe[shard::6]
 reverse_DoE = False
 if reverse_DoE == True:
@@ -863,17 +932,19 @@ if loop == None:
 
 for scenario_ID in loop:
 
-    index_of_topic_qty = return_keys_within_2_level_dict(design_space_dict).index("senti_inputs_params_dict_topic_qty")
-    index_of_factor_topic_volume = return_keys_within_2_level_dict(design_space_dict).index("senti_inputs_params_dict_factor_topic_volume")
+    DoE, new_design_space_dict = trim_design_space_and_DoE(scenario_dict[scenario_ID], init_doe, design_space_dict, design_space_scope_dict)
+
+    index_of_topic_qty = return_keys_within_2_level_dict(new_design_space_dict).index("senti_inputs_params_dict_topic_qty")
+    index_of_factor_topic_volume = return_keys_within_2_level_dict(new_design_space_dict).index("senti_inputs_params_dict_factor_topic_volume")
 
     # editing topic quantity values for scenario, 2 lines
     topic_qty = scenario_dict[scenario_ID]["topics"]
-    if isinstance(init_doe, list) and topic_qty != None:
-            for i in range(len(init_doe)): 
-                init_doe[i][index_of_topic_qty] = topic_qty; init_doe[i][index_of_factor_topic_volume] = 0
-            design_space_dict["senti_inputs_params_dict"]["topic_qty"] = [topic_qty]
+    if isinstance(DoE, list) and topic_qty != None:
+            for i in range(len(DoE)): 
+                DoE[i][index_of_topic_qty] = topic_qty; DoE[i][index_of_factor_topic_volume] = 0
+            new_design_space_dict["senti_inputs_params_dict"]["topic_qty"] = [topic_qty]
             default_input_dict["senti_inputs_params_dict"]["topic_qty"] = topic_qty
-            design_space_dict["senti_inputs_params_dict"]["factor_topic_volume"] = [0]
+            new_design_space_dict["senti_inputs_params_dict"]["factor_topic_volume"] = [0]
             default_input_dict["senti_inputs_params_dict"]["factor_topic_volume"] = 0
             
 
@@ -888,15 +959,12 @@ for scenario_ID in loop:
     confidence_scoring_measure_tuple_2 = ("validation","results_x_mins_PC",pred_steps,0.9)
     confidence_scoring_measure_tuple_3 = ("validation","results_x_mins_score",pred_steps,0.9)
 
+    #optim_scores_vec = ["validation_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2, confidence_scoring_measure_tuple_3]
+    #inverse_for_minimise_vec = [True, False, False, False]
+    #optim_scores_vec = ["validation_" + testing_measure]
+    #inverse_for_minimise_vec = [True]
 
-    optim_scores_vec = ["validation_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2, confidence_scoring_measure_tuple_3]
-
-    inverse_for_minimise_vec = [True, False, False, False]
-
-    optim_scores_vec = ["validation_" + testing_measure]
-    inverse_for_minimise_vec = [True]
     optim_scores_vec = [confidence_scoring_measure_tuple_1]
-
     inverse_for_minimise_vec = [False]
 
     #what around to ensure that single topic sentiment data in more used in the model
@@ -911,7 +979,7 @@ for scenario_ID in loop:
     else:
         final_str = ""
 
-    run_name_str = "run32_{}{}.csv".format(str(scenario_ID),final_str)
+    run_name_str = "test_h_{}{}.csv".format(str(scenario_ID),final_str)
 
 
     #run_name_str = "DoE_Gen_{}.csv".format(str(scenario_ID))
@@ -923,8 +991,8 @@ for scenario_ID in loop:
         print("running scenario " + str(scenario_ID) + ": " + scenario_name_str + " - " + datetime.now().strftime("%H:%M:%S"))
         experiment_manager(
             scenario_name_str,
-            design_space_dict,
-            initial_doe_size_or_DoE=init_doe,
+            new_design_space_dict,
+            initial_doe_size_or_DoE=DoE,
             max_iter=7,
             model_start_time = model_start_time,
             force_restart_run = False,
