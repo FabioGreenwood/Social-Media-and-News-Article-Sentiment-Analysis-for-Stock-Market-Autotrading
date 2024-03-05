@@ -910,8 +910,6 @@ scenario_dict = {
     }
 loop = [5]
 
-init_doe, design_space_dict = trim_design_space_and_DoE(scenario_dict[loop[0]], init_doe, design_space_dict, design_space_scope_dict)
-
 
 
 #init_doe = init_doe[shard::6]
