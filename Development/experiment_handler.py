@@ -908,7 +908,7 @@ scenario_dict = {
         10: {"topics" : 1, "pred_steps"    : 1},
         11: {"topics" : 0, "pred_steps"    : 1},
     }
-loop = [4]
+loop = [5]
 
 
 
@@ -977,7 +977,7 @@ for scenario_ID in loop:
     else:
         final_str = ""
 
-    run_name_str = "test_h_{}{}.csv".format(str(scenario_ID),final_str)
+    run_name_str = "test_i_{}{}.csv".format(str(scenario_ID),final_str)
 
 
     #run_name_str = "DoE_Gen_{}.csv".format(str(scenario_ID))
