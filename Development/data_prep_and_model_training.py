@@ -1308,7 +1308,7 @@ class DRSLinRegRNN():
 
 
     def return_single_component_model_fitted_with_early_stopping(self, model, X_input, Y_input, X_val_input, Y_val_input):
-        verbose = 1
+        verbose = 0
         X, Y, X_val, Y_val = copy.copy(X_input), copy.copy(Y_input), copy.copy(X_val_input), copy.copy(Y_val_input)
         
 
@@ -1463,9 +1463,9 @@ class DRSLinRegRNN():
             if len(self.estimators_) == len(self.training_scores_dict_list):
                 repopulating_training_metadata = False 
 
-        training_scores_dict = average_list_of_identical_dicts(self.training_scores_dict_list)
-        validation_scores_dict = average_list_of_identical_dicts(self.validation_scores_dict_list)
-        additional_validation_dict = average_list_of_identical_dicts(self.additional_validation_dict_list)
+        training_scores_dict            = average_list_of_identical_dicts(self.training_scores_dict_list)
+        validation_scores_dict          = average_list_of_identical_dicts(self.validation_scores_dict_list)
+        additional_validation_dict      = average_list_of_identical_dicts(self.additional_validation_dict_list)
         self.training_scores_dict       = training_scores_dict
         self.validation_scores_dict     = validation_scores_dict
         self.additional_validation_dict = additional_validation_dict
@@ -1798,7 +1798,7 @@ def generate_model_and_validation_scores(temporal_params_dict,
         df_sentiment_data = retrieve_or_generate_sentiment_data(df_financial_data.index, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, training_or_testing="training")
     elif senti_inputs_params_dict["topic_qty"] == 0:
         df_sentiment_data = None
-        
+    
     #model training - create regressors
     X_train, y_train   = create_step_responces(df_financial_data, df_sentiment_data, pred_output_and_tickers_combos_list = outputs_params_dict["output_symbol_indicators_tuple"], pred_steps_ahead=outputs_params_dict["pred_steps_ahead"], financial_value_scaling=fin_inputs_params_dict["financial_value_scaling"])
     # reload old completed or semi-completed model if it already exists

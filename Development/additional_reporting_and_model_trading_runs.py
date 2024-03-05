@@ -101,7 +101,7 @@ def return_results_X_min_plus_minus_accuracy(y_preds_input, y_test_input, pred_s
             x = df_x_values_delta.copy()
             y = df_y_values_delta.copy()
             confidence_threshold_adjusted = np.percentile(abs(y),confidence_threshold_key * 100)
-            #x.columns, y.columns = ["delta_price"], ["delta_price"]
+            #x.columns, y.columns = ["delta_price"], ["delta_price"]0
             
             ## proportion of bets taken
             # filter out bets not confident to make
