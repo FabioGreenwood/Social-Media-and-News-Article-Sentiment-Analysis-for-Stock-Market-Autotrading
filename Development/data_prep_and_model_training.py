@@ -1309,7 +1309,7 @@ class DRSLinRegRNN():
 
 
     def return_single_component_model_fitted_with_early_stopping(self, model, X_input, Y_input, X_val_input, Y_val_input):
-        verbose = 0
+        verbose = 1
         X, Y, X_val, Y_val = copy.copy(X_input), copy.copy(Y_input), copy.copy(X_val_input), copy.copy(Y_val_input)
         
 
@@ -1474,7 +1474,7 @@ class DRSLinRegRNN():
 
         index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, scaler=self.scaler_X, dropout_cols=single_estimator.dropout_cols)
         y_pred_values       = single_estimator.predict(input_data, verbose=1)
-        y_pred_values       = pd.DataFrame(y_pred_values, index=index, columns=[output_col_name])
+        y_pred_values       = pd.DataFrame(y_pred_values, index=index[-y_pred_values.shape[0]:], columns=[output_col_name])
         y_pred_values       = self.inverse_scale_output_according_to_input_scaler(df_X, y_pred_values)
         
         return y_pred_values
