@@ -381,7 +381,8 @@ def rescale_financial_data_if_needed(df_fin_data, format):
     
     if format == "day_scaled" or format == "delta_scaled":
         #determine the distance between days
-        df_fin_data['normalizing_column'] = df_fin_data.groupby(df_fin_data.index.day)['£_open'].transform(lambda x: x.iloc[0])
+        #df_fin_data['normalizing_column'] = df_fin_data.groupby(df_fin_data.index.day)['£_open'].transform(lambda x: x.iloc[0])
+        df_fin_data['normalizing_column'] = df_fin_data.groupby(df_fin_data.index.strftime('%y-%m-%d'))['£_open'].transform(lambda x: x.iloc[0])
         df_fin_data['normalizing_column'] = df_fin_data['normalizing_column'].astype(float)
         for col in df_fin_data.columns:
             if not col == "normalizing_column" and not  col == "£_volume":
@@ -1475,7 +1476,7 @@ class DRSLinRegRNN():
     def custom_single_predict(self, df_X, single_estimator, output_col_name="prediction_X_ahead"):
 
         index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, scaler=self.scaler_X, dropout_cols=single_estimator.dropout_cols)
-        y_pred_values       = single_estimator.predict(input_data, verbose=0)
+        y_pred_values       = single_estimator.predict(input_data, verbose=1)
         y_pred_values       = pd.DataFrame(y_pred_values, index=index, columns=[output_col_name])
         y_pred_values       = self.inverse_scale_output_according_to_input_scaler(df_X, y_pred_values)
         
