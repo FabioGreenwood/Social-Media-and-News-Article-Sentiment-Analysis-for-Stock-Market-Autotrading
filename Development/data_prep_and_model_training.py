@@ -1315,10 +1315,12 @@ class DRSLinRegRNN():
 
         X_indy, X = return_lookback_appropriate_index_andor_data(X, self.lookbacks, scaler=self.scaler_X, dropout_cols=model.dropout_cols)
         Y = self.scale_output_according_to_input_scaler(X_input, Y, prediction_col_in_input="£_close")
-        Y_indy, Y = return_lookback_appropriate_index_andor_data(Y, self.lookbacks, scaler=None)
+        #Y_indy, Y = return_lookback_appropriate_index_andor_data(Y, self.lookbacks, scaler=None)
+        Y = Y.loc[X_indy].values
         X_indy_val, X_val = return_lookback_appropriate_index_andor_data(X_val, self.lookbacks, scaler=self.scaler_X, dropout_cols=model.dropout_cols)
         Y_val = self.scale_output_according_to_input_scaler(X_val_input, Y_val, prediction_col_in_input="£_close")
-        Y_indy_val, Y_val = return_lookback_appropriate_index_andor_data(Y_val, self.lookbacks, scaler=None)
+        #Y_indy_val, Y_val = return_lookback_appropriate_index_andor_data(Y_val, self.lookbacks, scaler=None)
+        Y_val = Y_val.loc[X_indy_val].values
         #X_indy, X, Y_indy, Y                 = self.align_X_and_Y_for_fitting(X_indy, X, Y_indy, Y, 0)
         #X_indy_val, X_val, Y_indy_val, Y_val = self.align_X_and_Y_for_fitting(X_indy_val, X_val, Y_indy_val, Y_val, 0)
 
@@ -1400,11 +1402,6 @@ class DRSLinRegRNN():
         # sense check
         if not len(self.training_scores_dict_list) == len(self.validation_scores_dict_list) == len(self.additional_validation_dict_list) == len(self.y_pred_list) == len(self.y_val_list):
             raise ValueError("these values should be the same, there is an error in the repopulation of metadata")
-
-        if self.scaler_X == None:
-            scaler_X = MinMaxScaler()
-            self.scaler_X = scaler_X.fit(df_X)
-            del scaler_X
 
         kf_split = list(kf.split(df_X))
         
@@ -1771,8 +1768,18 @@ def retrieve_model(predictor_location_folder_path, temporal_params_dict, fin_inp
     
     return model
 
+def pop_scaler_if_required(model, df_X):
+    # in this example the scaler is only required for the X input, as there is a custom function down the road that scales the output according to the input scalr
+    # this is because both the input and output share a value: "£_open"
+    if model.scaler_X == None:
+        scaler_X = MinMaxScaler()
+        model.scaler_X = scaler_X.fit(df_X)
+        del scaler_X
+    return model
+
+
 def generate_model_and_validation_scores(temporal_params_dict,
-    fin_inputs_params_dict,
+    fin_inputs_params_dict, 
     senti_inputs_params_dict,
     outputs_params_dict,
     model_hyper_params,
@@ -1810,6 +1817,7 @@ def generate_model_and_validation_scores(temporal_params_dict,
         model = retrieve_model(predictor_location_folder_path, temporal_params_dict, fin_inputs_params_dict, senti_inputs_params_dict, outputs_params_dict, model_hyper_params, reporting_dict)
     else:
         model = initiate_model(input_dict, hash_name = custom_hash(predictor_name))
+    model = pop_scaler_if_required(model, X_train)
     model, training_scores_dict, validation_scores_dict, additional_validation_dict = model.fit_ensemble(X_train, y_train)
     #report timings
     print(datetime.now().strftime("%H:%M:%S") + " - complete generating model")
