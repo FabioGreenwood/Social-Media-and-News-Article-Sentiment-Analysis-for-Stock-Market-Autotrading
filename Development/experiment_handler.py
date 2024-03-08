@@ -462,22 +462,20 @@ def trim_design_space_and_DoE(scope_indicator, DoE, design_space, design_space_s
         del_indicators = [full, no_topics]
     else:
         raise ValueError("scope indicator {}, not found".format(scope_indicator))
-    
+    del_indexes_list = []
     for key in design_space:
         list_subkeys = copy.copy(list(design_space[key].keys())) 
         for subkey in list_subkeys:
             if design_space_scope[key][subkey] in del_indicators and not subkey in ["topic_qty", "factor_topic_volume"]:
                 # delete values
+                del_indexes_list += [index]
                 del design_space[key][subkey]
-                # trim DoE if possible
-                if isinstance(DoE, list):
-                    for i in range(len(DoE)):
-                        del DoE[i][index]
             index += 1
+    del_indexes_list.reverse()
+    for del_index in del_indexes_list:
+        for design_ID in range(len(DoE)):
+            del DoE[design_ID][del_index]
 
-
-
-    
     return DoE, design_space
         
 
