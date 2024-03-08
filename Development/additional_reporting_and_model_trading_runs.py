@@ -106,7 +106,7 @@ def return_results_X_min_plus_minus_accuracy(y_preds_input, y_test_input, pred_s
             ## proportion of bets taken
             # filter out bets not confident to make
             y = y.where(abs(y) > confidence_threshold_adjusted, 0)
-            
+            ""
             results_dict["results_bets_with_confidence_proportion"][steps_back][confidence_threshold_key] = max(0,(abs(y) > 0).sum() / len(y))
 
             if results_dict["results_bets_with_confidence_proportion"][steps_back][confidence_threshold_key] != 0:
