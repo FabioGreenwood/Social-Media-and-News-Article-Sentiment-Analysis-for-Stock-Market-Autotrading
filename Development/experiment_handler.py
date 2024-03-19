@@ -839,31 +839,29 @@ design_space_scope_dict = {
         }
 }
 
-
-
 global_run_count = 0
 
 init_doe = [
-    [25, 7,     25200,  0, 1, 1, 2, 3, 2, 1e-11,  10, 5],
-    [17, 1,     7200,   0, 1, 1, 0, 5, 1, 0.0001, 25, 9],
-    [13, 5,     7200,   0, 2, 0, 1, 2, 1, 1e-06,  10, 7],
-    [17, 7,     25200,  0, 4, 0, 1, 3, 2, 1e-06,  20, 9],
-    [5,  0.7,   900,    1, 2, 0, 0, 5, 2, 1e-09,  8,  9],
-    [17, 7,     25200,  0, 1, 1, 2, 3, 2, 1e-11,  15, 9],
-    [9,  0.3,   180,    1, 1, 0, 1, 5, 1, 1e-05,  8,  5],
-    [9,  13,    25200,  1, 2, 1, 2, 4, 1, 0.0001, 8,  7],
-    [9,  3,     25200,  1, 1, 0, 1, 5, 1, 1e-05,  15, 5],
-    [5,  13,    25200,  1, 4, 0, 2, 5, 1, 1e-08,  20, 5],
-    [25, 3,     25200,  1, 1, 0, 2, 4, 3, 0.0001, 15, 7],
-    [9,  5,     180,    0, 4, 1, 1, 4, 3, 1e-08,  15, 9],
-    [13, 13,    180,    1, 1, 1, 0, 0, 3, 1e-07,  20, 12],
-    [13, 2,     7200,   0, 1, 0, 0, 5, 1, 1e-11,  50, 12],
-    [5,  2,     180,    0, 2, 1, 1, 3, 3, 1e-07,  8,  7],
-    [9,  0.3,   900,    1, 2, 1, 2, 1, 1, 0.0001, 20, 12],
-    [25, 0.7,   7200,   0, 1, 1, 2, 4, 3, 1e-11,  20, 0],
-    [5,  2,     25200,  0, 1, 0, 1, 1, 2, 0.0001, 50, 7],
-    [17, 7,     7200,   1, 1, 0, 0, 5, 1, 1e-07,  25, 9],
-    [25, 1,     900,    0, 2, 1, 1, 4, 3, 0.0001, 25, 0]
+    [25, 7,   25200, 0, 1, 1, 2, 3, 2, 1e-11,  10, 5],
+    [17, 1,   7200,  0, 1, 1, 0, 5, 1, 0.0001, 25, 9],
+    [13, 5,   7200,  0, 2, 0, 1, 2, 1, 1e-06,  10, 7],
+    [17, 7,   25200, 0, 4, 0, 1, 3, 2, 1e-06,  20, 9],
+    [5,  0.7, 900,   1, 2, 0, 0, 5, 2, 1e-09,  8,  9],
+    [17, 7,   25200, 0, 1, 1, 2, 3, 2, 1e-11,  15, 9],
+    [9,  0.3, 180,   1, 1, 0, 1, 5, 1, 1e-05,  8,  5],
+    [9,  13,  25200, 1, 2, 1, 2, 4, 1, 0.0001, 8,  7],
+    [9,  3,   25200, 1, 1, 0, 1, 5, 1, 1e-05,  15, 5],
+    [5,  13,  25200, 1, 4, 0, 2, 5, 1, 1e-08,  20, 5],
+    [25, 3,   25200, 1, 1, 0, 2, 4, 3, 0.0001, 15, 7],
+    [9,  5,   180,   0, 4, 1, 1, 4, 3, 1e-08,  15, 9],
+    [13, 13,  180,   1, 1, 1, 0, 0, 3, 1e-07,  20, 12],
+    [13, 2,   7200,  0, 1, 0, 0, 5, 1, 1e-11,  50, 12],
+    [5,  2,   180,   0, 2, 1, 1, 3, 3, 1e-07,  8,  7],
+    [9,  0.3, 900,   1, 2, 1, 2, 1, 1, 0.0001, 20, 12],
+    [25, 0.7, 7200,  0, 1, 1, 2, 4, 3, 1e-11,  20, 0],
+    [5,  2,   25200, 0, 1, 0, 1, 1, 2, 0.0001, 50, 7],
+    [17, 7,   7200,  1, 1, 0, 0, 5, 1, 1e-07,  25, 9],
+    [25, 1,   900,   0, 2, 1, 1, 4, 3, 0.0001, 25, 0]
     ]
 
 
@@ -898,16 +896,17 @@ scenario_dict = {
         #7 : {"topics" : 1, "pred_steps"    : 3},
         #8 : {"topics" : 0, "pred_steps"    : 3},
         9 : {"topics" : None, "pred_steps" : 1},
-        10: {"topics" : 1, "pred_steps"    : 1},
+        10: {"topics" : 1, "pred_steps"    : 1},  
         11: {"topics" : 0, "pred_steps"    : 1},
     }
-loop = [5]
-reverse_DoE = True
-
+loop = [9]
+reverse_DoE = False
+max_iter = 7
 
 #init_doe = init_doe[shard::6]
 if reverse_DoE == True:
     init_doe.reverse()
+    #max_iter = 0
 
 print("shard: {}".format(str(loop)))
 enable_GPU = False
@@ -954,8 +953,8 @@ for scenario_ID in loop:
     #optim_scores_vec = ["validation_" + testing_measure]
     #inverse_for_minimise_vec = [True]
 
-    optim_scores_vec = [confidence_scoring_measure_tuple_1]
-    inverse_for_minimise_vec = [False]
+    optim_scores_vec = ["validation_" + testing_measure]
+    inverse_for_minimise_vec = [True]
 
     #what around to ensure that single topic sentiment data in more used in the model
     if default_senti_inputs_params_dict["topic_qty"] == 1:
@@ -983,7 +982,7 @@ for scenario_ID in loop:
             scenario_name_str,
             new_design_space_dict,
             initial_doe_size_or_DoE=DoE,
-            max_iter=7,
+            max_iter=max_iter,
             model_start_time = model_start_time,
             force_restart_run = False,
             inverse_for_minimise_vec = inverse_for_minimise_vec,
