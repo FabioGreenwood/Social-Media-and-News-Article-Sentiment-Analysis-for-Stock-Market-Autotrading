@@ -380,19 +380,24 @@ def define_DoE(bounds, DoE_size):
             DoE = np.hstack((DoE, values_for_params))
     return DoE
 
-def return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, inverse_for_minimise, objective_function_name="testing_mae"):
+def return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, inverse_for_maximise, objective_function_name="testing_mae", DoE=2):
     # please note this has been converted to a multi-objective function, it will cycle through the objective_function_name variable if list
     # this functionality can be removed by entering a non-iterable as objective_function_name
     output_X, output_Y = [], []
-    
+
+    if isinstance(DoE, list):
+        DoE_len = len(DoE)
+    else:
+        DoE_len = DoE
+
     if type(objective_function_name) == list:
-        if not type(inverse_for_minimise) == list or not len(inverse_for_minimise) == len(objective_function_name):
-            raise ValueError("if objective_function_name is a list, then inverse_for_minimise must also be a list of the same length")
-        temp_index = len(design_history_dict) % len(objective_function_name)
+        if not type(inverse_for_maximise) == list or not len(inverse_for_maximise) == len(objective_function_name):
+            raise ValueError("if objective_function_name is a list, then inverse_for_maximise must also be a list of the same length")
+        temp_index = (len(design_history_dict) - DoE_len) % len(objective_function_name)
         objective_function_name = objective_function_name[temp_index]
-        inverse_for_minimise    = inverse_for_minimise[temp_index]
+        inverse_for_maximise    = inverse_for_maximise[temp_index]
     
-    if inverse_for_minimise == True:
+    if inverse_for_maximise == True:
         coff = -1
     else:
         coff = 1
@@ -731,7 +736,7 @@ def experiment_manager(
     for ID in range(find_largest_number(design_history_dict.keys()) + 1):
         design_history_dict[ID]["X"] = convert_floats_to_int_if_whole(design_history_dict[ID]["X"])#[:len(design_history_dict[ID-1]["X"])]
         # only run value if testing measure missing
-        if design_history_dict[ID]["testing_" + testing_measure] == None:
+        if design_history_dict[ID]["testing_" + testing_measure] == None: #not "testing_" + testing_measure in design_history_dict[ID].keys() or 
             #print(return_keys_within_2_level_dict(design_space_dict))
             print(str(design_history_dict[ID]["X"]) + " running ID:" + str(ID))
             design_history_dict[ID] = run_experiment_and_return_updated_design_history_dict(design_history_dict[ID], experiment_requester, model_testing_method, testing_measure="mae", confidences_before_betting_PC=default_input_dict["reporting_dict"]["confidence_thresholds"])
@@ -755,7 +760,7 @@ def experiment_manager(
         continue_optimisation = False
     
     while continue_optimisation == True:
-        X, Y = return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, inverse_for_minimise=inverse_for_maximise_vec, objective_function_name=optim_scores_vec)
+        X, Y = return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, inverse_for_maximise=inverse_for_maximise_vec, objective_function_name=optim_scores_vec, DoE=DoE)
         bo.X = np.array(X)
         bo.Y = np.array(Y).reshape(-1,1)
         bo.run_optimization()
@@ -769,11 +774,15 @@ def experiment_manager(
             x_next = bo.acquisition.optimize()
             x_next = x_next[0][0]
         x_next = check_if_experiment_already_ran_if_so_return_random_unique_design(x_next, design_history_dict, bounds)
-        # save and run design
+        # save selected run parameters in case of interuption, design is continued later
         ID = find_largest_number(design_history_dict.keys()) + 1
         design_history_dict[ID] = dict()
         design_history_dict[ID]["X"] = convert_floats_to_int_if_whole(list(x_next))#[:len(design_history_dict[ID-1]["X"])]
         print(str(design_history_dict[ID]["X"]) + " running ID:" + str(ID))
+        design_history_dict[ID]["testing_" + testing_measure] = None
+        df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
+        save_designs_record_csv_and_dict(list_of_save_locations, df_designs_record=df_designs_record, design_history_dict=design_history_dict, optim_run_name=optim_run_name)
+        # run design
         design_history_dict[ID] = run_experiment_and_return_updated_design_history_dict(design_history_dict[ID], experiment_requester, model_testing_method, testing_measure="mae", confidences_before_betting_PC=default_input_dict["reporting_dict"]["confidence_thresholds"])
         # save
         df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
@@ -952,8 +961,8 @@ for scenario_ID in loop:
     #optim_scores_vec = ["validation_" + testing_measure]
     #inverse_for_maximise_vec = [False]
 
-    optim_scores_vec = ["validation_" + testing_measure]
-    inverse_for_maximise_vec = [False]
+    optim_scores_vec = ["validation_" + testing_measure, confidence_scoring_measure_tuple_1]
+    inverse_for_maximise_vec = [False, True]
 
     #what around to ensure that single topic sentiment data in more used in the model
     if default_senti_inputs_params_dict["topic_qty"] == 1:
