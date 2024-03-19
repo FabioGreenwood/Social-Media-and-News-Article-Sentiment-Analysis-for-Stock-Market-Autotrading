@@ -11,23 +11,27 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 import plotly.graph_objects as go
 import math
+import datetime
 
 
 #%% parameters
 # parameters
 
 confidences_list            = [0, 0.2, 0.5, 0.7, 0.9]
+#pred_steps_list             = [1, 6]
 pred_steps_list             = [1, 6]
 model_type_designator_list  = {"Full" : "multi_topic", "No Topics" : "no_topics", "No Sentiment" : "no_sentiment"}
 df_columns                  = ["Time Steps (Mins)", "Confidence"] + list(model_type_designator_list.keys()) + ["Bet Up Every Time", "Bet Down Every Time"]
 target_columns_string_dict  = {"bets_proportion" : "bets_with_confidence_proportion_sX_c{}", "precision" : "x_mins_PC_sX_c{}", "score" : "x_mins_score_sX_c{}", "weighted_score" : "x_mins_weighted_sX_c{}"}
 up_down_outputs_cols_to_records_cols_dict = {"Bet Up Every Time" : "up", "Bet Down Every Time" : "down"}
 DoE_ID_cut_off = 20
-optimisation_cut_off = 26
+optimisation_cut_off = 37
 
 # importing of data
-results_csv_file_home_path  = "C:\\Users\\Public\\fabio_uni_work\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\human_readable_results\\240220_export_a"
-results_csv_name_list       = ["run32_3.csv", "run32_4.csv", "run32_5.csv", "run32_9.csv", "run32_10.csv", "run32_11.csv"]
+#results_csv_file_home_path  = "C:\\Users\\Public\\fabio_uni_work\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\human_readable_results\\240302_export"
+results_csv_file_home_path  = "C:\\Users\\Public\\fabio_uni_work\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\human_readable_results\\output_quick_export"
+#results_csv_name_list       = ["run50_3.csv", "run50_4.csv", "run50_5.csv", "run50_9.csv", "run50_10.csv", "run50_11.csv"]
+results_csv_name_list       = ["test_50_3.csv", "test_50_4.csv", "test_50_5.csv", "test_50_9.csv", "test_50_10.csv", "test_50_11.csv"]
 #results_csv_file_home_path  = "C:\\Users\\Public\\fabio_uni_work\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\human_readable_results\\240228_export_reduced_dimension"
 #results_csv_name_list       = ["run31reducedDesignDimension_noSentiment_5.csv", "run31reducedDesignDimension_noSentiment_11.csv"]
 
@@ -61,7 +65,7 @@ for i, input_string in enumerate(cols_strings_ori):
     
 
 #%% methods
-print("start")
+print("start - " + datetime.datetime.now().strftime("%H:%M:%S"))
 def to_scientific_notation(number, sf):
     number = float(number)
     format_string = "{{:.{}e}}".format(sf)
@@ -402,6 +406,7 @@ df_results = pd.DataFrame()
 for results_file in results_csv_name_list:
     df_temp = pd.read_csv(os.path.join(results_csv_file_home_path, results_file))
     df_temp = df_temp[df_temp["local_ID"]<=optimisation_cut_off]
+    #df_temp = df_temp[df_temp["testing_mae"]>=0.2]
     df_results = pd.concat([df_results, df_temp], axis=0)
 df_results = df_results.dropna(subset=['experiment_timestamp'])
 df_results = df_results.reset_index(drop=True)
@@ -439,8 +444,10 @@ for pred_steps in pred_steps_list:
     df_results_filtered[["local_ID", "validation_mae", "testing_mae", "validation_x_mins_weighted_sX_c0.9", "testing_x_mins_weighted_sX_c0.9"]] = df_results_filtered[["local_ID", "validation_mae", "testing_mae", "validation_x_mins_weighted_sX_c0.9", "testing_x_mins_weighted_sX_c0.9"]].astype(float)
 
     # Set the color palette for the categories
-    palette = {'multi_topic': 'blue', 'no_topics': 'green', 'no_sentiment': 'orange', 'Other': 'gray'}
-
+    palette = {'multi_topic': 'blue', 'no_topics': 'green', 'no_sentiment': 'orange', 'Other': 'gray',
+               'multi_topic - DoE': 'blue', 'no_topics - DoE': 'green', 'no_sentiment - DoE': 'orange',
+               'multi_topic - optimisation': 'black', 'no_topics - optimisation': 'black', 'no_sentiment - optimisation': 'black'
+               }
     # Create a scatter plot using Seaborn
     plt.figure(figsize=(10, 6))
     pairplot = sns.pairplot(df_results_filtered, hue='category', palette=palette, plot_kws=dict(marker="+", linewidth=1))
@@ -454,7 +461,7 @@ for pred_steps in pred_steps_list:
 
     # Save the overall pairplot
     pairplot.savefig(os.path.join(outputs_folder_file_path, f'pairplot {5*pred_steps} mins.png'))
-
+    plt.close()
 
     # Save each subplot separately
     outputs_folder = outputs_folder_file_path + "\\pairplot_subplots"
@@ -463,60 +470,56 @@ for pred_steps in pred_steps_list:
     for i in df_results_filtered.columns[2:]:
         for j in df_results_filtered.columns[2:]:
             for cat in [None] + substring_categories:
-                for results_subset in ["Full", "DoE_only", "optim_only"]:
-                    if cat == None:
-                        df_results_filtered_2 = df_results_filtered
-                        naming_suffix = f'_{pred_steps*5}mins'
-                    else:
-                        df_results_filtered_2 = df_results_filtered[df_results_filtered["category"] == cat]
-                        naming_suffix = f'_{pred_steps*5}mins_{cat}_only'
-                    plt.figure(figsize=(8, 6))
-                    if results_subset == "Full":
-                        df_results_filtered_3 = df_results_filtered_2
-                    elif results_subset == "DoE_only":
-                        df_results_filtered_3 = df_results_filtered_2[df_results_filtered_2["local_ID"]<=DoE_ID_cut_off]
-                        naming_suffix += "_DoEonly"
-                    elif results_subset == "optim_only":
-                        df_results_filtered_3 = df_results_filtered_2[df_results_filtered_2["local_ID"]>DoE_ID_cut_off]
-                        naming_suffix += "_optim_only"
-                    else:
-                        raise ValueError("error found")
+                #for results_subset in ["Full", "DoE_only", "optim_only"]:
+                if cat == None:
+                    df_results_filtered_3 = df_results_filtered.copy()
+                    naming_suffix = f'_{pred_steps*5}mins'
+                else:
+                    df_results_filtered_3 = df_results_filtered[df_results_filtered["category"] == cat]
+                    naming_suffix = f'_{pred_steps*5}mins_{cat}_only'
+                plt.figure(figsize=(8, 6))
+                
 
-                    df_results_filtered_3 = df_results_filtered_3.drop("local_ID", axis=1)
-                    if i == j:
-                        sub_pairplot = sns.displot(df_results_filtered_3, x=i, hue='category', palette=palette, kind="kde", fill=True)#, plot_kws=dict(marker="+", linewidth=1))
-                        plt.suptitle("{} density{}".format(i, naming_suffix))
-                        plt.savefig(os.path.join(outputs_folder, f'densityplot_{i}_vs_{j}{naming_suffix}.png'))
-                    else:
-                        sub_pairplot = sns.scatterplot(df_results_filtered_3, x=i, y=j, hue='category', palette=palette, style="category")#"marker="+")#, plot_kws=dict(marker="+", linewidth=1))
-                        temp_title = trim_and_new_line_long_variable_names([f'Scatter Plot of {i} vs {j}{naming_suffix}'])
-                        sub_pairplot.set_title(temp_title)
-                        #standarised lims between the same charts
-                        x0, x1, y0, y1 = min(df_results_filtered[i]), max(df_results_filtered[i]), min(df_results_filtered[j]), max(df_results_filtered[j])
-                        xr, yr = x1-x0, y1-y0
-                        x0, x1, y0, y1 = x0-xr*0.05, x1+xr*0.05, y0-yr*0.05, y1+yr*0.05
-                        sub_pairplot.set(xlim=(x0,x1), ylim=(y0,y1))  # Adjust the limits as needed
-                        sub_pairplot.legend(loc='upper left', bbox_to_anchor=(1, 1))
-                        plt.savefig(os.path.join(outputs_folder, f'scatterplot_{i}_vs_{j}{naming_suffix}.png'), bbox_inches='tight')
-                    plt.close()
+                #df_results_filtered_3 = df_results_filtered_3.drop("local_ID", axis=1)
+                
+                if i == j:
+                    sub_pairplot = sns.displot(df_results_filtered_3, x=i, hue='category', palette=palette, kind="kde", fill=True)#, plot_kws=dict(marker="+", linewidth=1))
+                    plt.suptitle("{} density{}".format(i, naming_suffix))
+                    plt.savefig(os.path.join(outputs_folder, f'densityplot_{i}_vs_{j}{naming_suffix}.png'))
+                else:
+                    if cat != None:
+                        df_results_filtered_3.loc[:,"category"] = df_results_filtered_3.apply(lambda row: row["category"] + (" - DoE" if row["local_ID"] <= DoE_ID_cut_off else " - optimisation"), axis=1)
+                    sub_pairplot = sns.scatterplot(data=df_results_filtered_3, x=i, y=j, hue='category', palette=palette, style="category", markers=["+", "x"], linewidths=1)#"marker="+")#, plot_kws=dict(marker="+", linewidth=1))
+                    #sub_pairplot = sns.scatterplot(data=df_results_filtered_3, x=i, y=j, hue='category', palette=palette, style="category", markers=["+"], legend="brief")
 
-                    # do the parallel axis for the category/pred steps combo
-                    # https://plotly.com/python/parallel-coordinates-plot/
+                    temp_title = trim_and_new_line_long_variable_names([f'Scatter Plot of {i} vs {j}{naming_suffix}'])
+                    sub_pairplot.set_title(temp_title)
+                    #standarised lims between the same charts
+                    x0, x1, y0, y1 = min(df_results_filtered[i]), max(df_results_filtered[i]), min(df_results_filtered[j]), max(df_results_filtered[j])
+                    xr, yr = x1-x0, y1-y0
+                    x0, x1, y0, y1 = x0-xr*0.05, x1+xr*0.05, y0-yr*0.05, y1+yr*0.05
+                    sub_pairplot.set(xlim=(x0,x1), ylim=(y0,y1))  # Adjust the limits as needed
+                    sub_pairplot.legend(loc='upper left', bbox_to_anchor=(1, 1))
+                    plt.savefig(os.path.join(outputs_folder, f'scatterplot_{i}_vs_{j}{naming_suffix}.png'), bbox_inches='tight')
+                plt.close()
 
-                    fig = go.Figure()
-                    fig = px.parallel_coordinates(df_results_filtered_3, color="testing_x_mins_weighted_sX_c0.9", color_continuous_scale=px.colors.diverging.RdBu)
-                    fig.write_html("C:/Users/Public/fabio_uni_work/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/human_readable_results/parallel_axis_{}{}.html".format(cat, naming_suffix))
+                # do the parallel axis for the category/pred steps combo
+                # https://plotly.com/python/parallel-coordinates-plot/
+
+                fig = go.Figure()
+                fig = px.parallel_coordinates(df_results_filtered_3, color="testing_x_mins_weighted_sX_c0.9", color_continuous_scale=px.colors.diverging.RdBu)
+                fig.write_html("C:/Users/Public/fabio_uni_work/Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading/human_readable_results/parallel_axis_{}{}.html".format(cat, naming_suffix))
 
 # create design parameter parallel plots
 
-design_params_columns = ["local_ID", "run_name", "pred_steps"] + fnmatch.filter(df_results.columns, "*param*") + ["validation_x_mins_weighted_sX_c0.9", "testing_x_mins_weighted_sX_c0.9"]
+design_params_columns = ["local_ID", "run_name", "pred_steps"] + fnmatch.filter(df_results.columns, "*param*") + ["training_mae", "validation_mae", "testing_mae", "validation_x_mins_weighted_sX_c0.9", "testing_x_mins_weighted_sX_c0.9"]
 design_table_folder_name = "parallel_axis_design_tables"
 df_results_filtered = df_results[design_params_columns]
 df_results_filtered['category'] = df_results_filtered['run_name'].apply(lambda x: next((cat for cat in substring_categories if cat in x), 'Other'))
 
 for pred_steps in pred_steps_list:
     for cat in [None] + substring_categories:
-        print("dddddd")
+        print("dddddd"  + datetime.datetime.now().strftime("%H:%M:%S"))
         df_designs_filtered_2 = df_results_filtered.copy()
         df_designs_filtered_2 = df_designs_filtered_2[df_designs_filtered_2["pred_steps"]==pred_steps]
         if cat == None:
@@ -530,6 +533,13 @@ for pred_steps in pred_steps_list:
         fig = px.parallel_coordinates(df_designs_filtered_2) #fig = px.parallel_coordinates(df_designs_filtered_2, color=df_designs_filtered_2.columns[-1], color_continuous_scale=px.colors.diverging.RdBu)
         fig.write_html(os.path.join(outputs_folder_file_path, "parallel_axis_design_tables", f'para_axis {naming_suffix}.html'))
         
+        plt.figure(figsize=(10, 6))
+        pairplot = sns.pairplot(df_results_filtered, hue='category', palette=palette, plot_kws=dict(marker="+", linewidth=1))
+        plt.suptitle(f'pairplot design {5*pred_steps} mins {cat}')
+        # Add legend
+        pairplot.add_legend(title='Categories')
+        pairplot.savefig(os.path.join(outputs_folder_file_path, "pairplots", f'pairplot {5*pred_steps} mins.png'))
+        plt.close()
         
         # # create a pairplot
         # palette = {'multi_topic': 'blue', 'no_topics': 'green', 'no_sentiment': 'orange', 'Other': 'gray'}
@@ -541,7 +551,7 @@ for pred_steps in pred_steps_list:
         # pairplot.add_legend(title='Categories')
 
             
-print("complete all plots")
+print("complete all plots"  + datetime.datetime.now().strftime("%H:%M:%S"))
 
 
 
