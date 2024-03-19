@@ -519,7 +519,7 @@ def trim_string_from_substring(string, substring="_params_"):
     x = string.find(substring) + len(substring)
     return string[x:]
 
-def print_desired_scores(design_history, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_minimise_vec, optim_run_name):
+def print_desired_scores(design_history, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_maximise_vec, optim_run_name):
     # this method produces the desired output at the end of a run, informing the user of:
     # number of design runs, last score, best scores of each high-lighted score and best run with each score in question
     # last score info
@@ -549,7 +549,7 @@ def print_desired_scores(design_history, df_designs_record, design_space_dict, o
     print(output_string_3[:-2])
     # pareto designs
     print("pareto designs")
-    for objective, polarity in zip(optim_scores_vec, inverse_for_minimise_vec):
+    for objective, polarity in zip(optim_scores_vec, inverse_for_maximise_vec):
         if type(objective) == str:
             temp_str = objective
         else:
@@ -656,10 +656,9 @@ def experiment_manager(
     max_iter=0,
     optimisation_method=None,
     default_input_dict = default_input_dict,
-    minimise=True,
     force_restart_run = False,
     testing_measure = "mae",
-    inverse_for_minimise_vec = None,
+    inverse_for_maximise_vec = None,
     optim_scores_vec = None,
     global_record_path=""
     ):
@@ -739,13 +738,13 @@ def experiment_manager(
             # save
             df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
             save_designs_record_csv_and_dict(list_of_save_locations, df_designs_record=df_designs_record, design_history_dict=design_history_dict, optim_run_name=optim_run_name)
-            print_desired_scores(design_history_dict, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_minimise_vec, optim_run_name)
+            print_desired_scores(design_history_dict, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_maximise_vec, optim_run_name)
         update_global_record(pred_steps, df_designs_record, experi_params_list, optim_run_name, global_record_path)
             
             
     
     # continue optimisation
-    bo = GPyOpt.methods.BayesianOptimization(f=PLACEHOLDER_objective_function, domain=bounds, initial_design_numdata=0, maximize=True)
+    bo = GPyOpt.methods.BayesianOptimization(f=PLACEHOLDER_objective_function, domain=bounds, initial_design_numdata=0)
     continue_optimisation = True
     if type(initial_doe_size_or_DoE) in [list, dict]:
         overall_max_runs = len(initial_doe_size_or_DoE) + max_iter
@@ -756,7 +755,7 @@ def experiment_manager(
         continue_optimisation = False
     
     while continue_optimisation == True:
-        X, Y = return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, inverse_for_minimise=inverse_for_minimise_vec, objective_function_name=optim_scores_vec)
+        X, Y = return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, inverse_for_minimise=inverse_for_maximise_vec, objective_function_name=optim_scores_vec)
         bo.X = np.array(X)
         bo.Y = np.array(Y).reshape(-1,1)
         bo.run_optimization()
@@ -779,7 +778,7 @@ def experiment_manager(
         # save
         df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
         save_designs_record_csv_and_dict(list_of_save_locations, df_designs_record=df_designs_record, design_history_dict=design_history_dict, optim_run_name=optim_run_name)
-        print_desired_scores(design_history_dict, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_minimise_vec, optim_run_name)
+        print_desired_scores(design_history_dict, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_maximise_vec, optim_run_name)
         # check loop
         
         if len(df_designs_record.index) >= overall_max_runs:
@@ -949,12 +948,12 @@ for scenario_ID in loop:
     confidence_scoring_measure_tuple_3 = ("validation","results_x_mins_score",pred_steps,0.9)
 
     #optim_scores_vec = ["validation_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2, confidence_scoring_measure_tuple_3]
-    #inverse_for_minimise_vec = [True, False, False, False]
+    #inverse_for_maximise_vec = [False, True, True, True]
     #optim_scores_vec = ["validation_" + testing_measure]
-    #inverse_for_minimise_vec = [True]
+    #inverse_for_maximise_vec = [False]
 
     optim_scores_vec = ["validation_" + testing_measure]
-    inverse_for_minimise_vec = [True]
+    inverse_for_maximise_vec = [False]
 
     #what around to ensure that single topic sentiment data in more used in the model
     if default_senti_inputs_params_dict["topic_qty"] == 1:
@@ -985,7 +984,7 @@ for scenario_ID in loop:
             max_iter=max_iter,
             model_start_time = model_start_time,
             force_restart_run = False,
-            inverse_for_minimise_vec = inverse_for_minimise_vec,
+            inverse_for_maximise_vec = inverse_for_maximise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
             global_record_path=os.path.join(global_general_folder,r"outputs/{}".format(run_name_str))
