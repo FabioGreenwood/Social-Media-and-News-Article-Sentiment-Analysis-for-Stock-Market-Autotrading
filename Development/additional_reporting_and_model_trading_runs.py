@@ -119,7 +119,7 @@ def return_results_X_min_plus_minus_accuracy(y_preds_input, y_test_input, pred_s
                 stake_a = pd.DataFrame()
                 stake_a = y.apply(lambda y: y/abs(y) if abs(y) > confidence_threshold_adjusted else 0)
                 score_correct = (stake_a*x).sum()
-                score_both = abs(stake_a*x).sum()
+                score_both = abs(stake_a).sum()
                 results_dict["results_x_mins_score"][steps_back][confidence_threshold_key] = score_correct / score_both
 
                 ## second scoring method FG_action: replace
@@ -127,7 +127,7 @@ def return_results_X_min_plus_minus_accuracy(y_preds_input, y_test_input, pred_s
                 stake_b = pd.DataFrame()
                 stake_b = y.apply(lambda y: y - 0.5 * confidence_threshold_adjusted if y > confidence_threshold_adjusted else (y + 0.5 * confidence_threshold_adjusted if -y > confidence_threshold_adjusted else 0))
                 score_correct = (stake_b*x).sum()
-                score_both = abs(stake_b*x).sum()
+                score_both = abs(stake_b).sum()
                 results_dict["results_x_mins_weighted"][steps_back][confidence_threshold_key] = score_correct / score_both
             else:
                 results_dict["results_x_mins_PC"][steps_back][confidence_threshold_key]         = 0.0
