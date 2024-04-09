@@ -210,23 +210,21 @@ def return_predictor_name(input_dict):
     rel_lifetime        = input_dict["senti_inputs_params_dict"]["relative_lifetime"]
     rel_hlflfe          = input_dict["senti_inputs_params_dict"]["relative_halflife"]
     pred_steps_ahead    = input_dict["outputs_params_dict"]["pred_steps_ahead"]
-    estm_alpha          = input_dict["model_hyper_params"]["estimator__alpha"] # 
+    estm_alpha          = input_dict["model_hyper_params"]["estimator__alpha"]
     general_adjusting_square_factor   = input_dict["model_hyper_params"]["general_adjusting_square_factor"]
     lookbacks                         = input_dict["model_hyper_params"]["lookbacks"]
     batch_ratio                       = input_dict["model_hyper_params"]["batch_ratio"]
-    epochs                            = input_dict["model_hyper_params"]["epochs"]
     financial_value_scaling           = input_dict["fin_inputs_params_dict"]["financial_value_scaling"]
     factor_tweet_attention            = input_dict["senti_inputs_params_dict"]["factor_tweet_attention"]
     factor_topic_volume               = input_dict["senti_inputs_params_dict"]["factor_topic_volume"]
-    early_stopping                    = input_dict["model_hyper_params"]["early_stopping"]
 
     name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe, factor_tweet_attention, factor_topic_volume)
     predictor_hash = ""
     if not financial_value_scaling == None:
         predictor_hash += "_" + str(financial_value_scaling)
-    predictor_hash += "_" + str(input_dict["model_hyper_params"]["n_estimators_per_time_series_blocking"]) + "_" + str(input_dict["model_hyper_params"]["testing_scoring"]) + "_" + str(estm_alpha) + "_" + str(input_dict["model_hyper_params"]["estimator__activation"]) + "_" + str(input_dict["model_hyper_params"]["cohort_retention_rate_dict"]) + "_" + str(general_adjusting_square_factor) + "_" + str(epochs) + "_" + str(lookbacks) + "_" + str(input_dict["model_hyper_params"]["shuffle_fit"]) + "_" + str(input_dict["model_hyper_params"]["K_fold_splits"]) + "_" + str(pred_steps_ahead) + "_" + str(estm_alpha) + "_" + str(general_adjusting_square_factor) + "_" + str(lookbacks) + "_" + str(batch_ratio) + "_" + str(input_dict["model_hyper_params"]["scaler_cat"]) + "_" + str(input_dict["model_hyper_params"]["estimator__hidden_layer_sizes"])
-    if early_stopping != 3 or input_dict["model_hyper_params"]["learning_rate"] != 0.001 or input_dict["model_hyper_params"]["testing_scoring"] != "mae" or epochs != 1:
-        predictor_hash += "_" + str(early_stopping) + "_" + str(input_dict["model_hyper_params"]["learning_rate"]) + "_" + str(input_dict["model_hyper_params"]["testing_scoring"])  + "_" + str(epochs)
+    predictor_hash += "_" + str(input_dict["model_hyper_params"]["n_estimators_per_time_series_blocking"]) + "_" + str(input_dict["model_hyper_params"]["testing_scoring"]) + "_" + str(input_dict["model_hyper_params"]["estimator__alpha"]) + "_" + str(input_dict["model_hyper_params"]["estimator__activation"]) + "_" + str(input_dict["model_hyper_params"]["cohort_retention_rate_dict"]) + "_" + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + "_" + str(input_dict["model_hyper_params"]["epochs"]) + "_" + str(input_dict["model_hyper_params"]["lookbacks"]) + "_" + str(input_dict["model_hyper_params"]["shuffle_fit"]) + "_" + str(input_dict["model_hyper_params"]["K_fold_splits"]) + "_" + str(pred_steps_ahead) + "_" + str(input_dict["model_hyper_params"]["estimator__alpha"]) + "_" + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + "_" + str(input_dict["model_hyper_params"]["lookbacks"]) + "_" + str(input_dict["model_hyper_params"]["batch_ratio"]) + "_" + str(input_dict["model_hyper_params"]["scaler_cat"]) + "_" + str(input_dict["model_hyper_params"]["estimator__hidden_layer_sizes"])
+    if input_dict["model_hyper_params"]["early_stopping"] != 3 or input_dict["model_hyper_params"]["learning_rate"] != 0.001 or input_dict["model_hyper_params"]["testing_scoring"] != "mae" or input_dict["model_hyper_params"]["epochs"] != 1:
+        predictor_hash += "_" + str(input_dict["model_hyper_params"]["early_stopping"]) + "_" + str(input_dict["model_hyper_params"]["learning_rate"]) + "_" + str(input_dict["model_hyper_params"]["testing_scoring"])  + "_" + str(input_dict["model_hyper_params"]["epochs"])
     name = name + predictor_hash
     return str(name)
     
@@ -1393,6 +1391,37 @@ class DRSLinRegRNN():
 
         return self, training_scores_dict, validation_scores_dict, additional_validation_dict
 
+    def regenerate_validation_scores(self, df_X, df_y):
+        global_random_state = 42
+        # variables
+        kf = KFold(n_splits=self.K_fold_splits, shuffle=False)
+        kf_split = list(kf.split(df_X))
+        print(datetime.now().strftime("%H:%M:%S") + " - revalidating model")
+        
+        #reset values
+        self.training_scores_dict_list       = []
+        self.validation_scores_dict_list     = []
+        self.additional_validation_dict_list = []
+                
+        for i in range(self.K_fold_splits * self.n_estimators_per_time_series_blocking):
+            single_estimator = self.estimators_[i]
+            y_pred_train = self.custom_single_predict(self.X_train_list[i], single_estimator)
+            training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate_results(self.y_train_list[i], y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
+            validation_scores_dict_list_new, additional_validation_dict_list_new    = self.evaluate_results(self.y_val_list[i], self.y_pred_list[i], self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
+            self.training_scores_dict_list += [training_scores_dict_list_new]
+            self.validation_scores_dict_list += [validation_scores_dict_list_new]
+            self.additional_validation_dict_list += [additional_validation_dict_list_new]
+
+        training_scores_dict            = average_list_of_identical_dicts(self.training_scores_dict_list)
+        validation_scores_dict          = average_list_of_identical_dicts(self.validation_scores_dict_list)
+        additional_validation_dict      = average_list_of_identical_dicts(self.additional_validation_dict_list)
+        self.training_scores_dict       = training_scores_dict
+        self.validation_scores_dict     = validation_scores_dict
+        self.additional_validation_dict = additional_validation_dict
+        self.save()
+        return self, training_scores_dict, validation_scores_dict, additional_validation_dict
+
+
     def fit_ensemble(self, df_X, df_y):
         count = 0
         global global_random_state
@@ -1404,7 +1433,7 @@ class DRSLinRegRNN():
         # sense check
         if not len(self.training_scores_dict_list) == len(self.validation_scores_dict_list) == len(self.additional_validation_dict_list) == len(self.y_pred_list) == len(self.y_val_list):
             raise ValueError("these values should be the same, there is an error in the repopulation of metadata")
-
+        
         kf_split = list(kf.split(df_X))
         
         if len(self.estimators_) == len(self.training_scores_dict_list):
@@ -1469,7 +1498,7 @@ class DRSLinRegRNN():
         self.training_scores_dict       = training_scores_dict
         self.validation_scores_dict     = validation_scores_dict
         self.additional_validation_dict = additional_validation_dict
-
+        self.save()
         return self, training_scores_dict, validation_scores_dict, additional_validation_dict
 
     def custom_single_predict(self, df_X, single_estimator, output_col_name="prediction_X_ahead"):
