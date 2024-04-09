@@ -904,16 +904,20 @@ scenario_dict = {
         #7 : {"topics" : 1, "pred_steps"    : 3},
         #8 : {"topics" : 0, "pred_steps"    : 3},
         9 : {"topics" : None, "pred_steps" : 1},
-        10: {"topics" : 1, "pred_steps"    : 1},  
+        10: {"topics" : 1, "pred_steps"    : 1},
         11: {"topics" : 0, "pred_steps"    : 1},
     }
-loop = [9]
+#loop = [3,11]
+#loop = [4,10]
+loop = [5]
 reverse_DoE = False
-max_iter = 7
+max_iter = 0
 
 #init_doe = init_doe[shard::6]
 if reverse_DoE == True:
     init_doe.reverse()
+    init_doe = [init_doe[1], init_doe[2]]
+    max_iter = 0
     #max_iter = 0
 
 print("shard: {}".format(str(loop)))
@@ -976,7 +980,7 @@ for scenario_ID in loop:
     else:
         final_str = ""
 
-    run_name_str = "test_50_{}{}.csv".format(str(scenario_ID),final_str)
+    run_name_str = "run_60_{}{}.csv".format(str(scenario_ID),final_str)
 
 
     #run_name_str = "DoE_Gen_{}.csv".format(str(scenario_ID))
