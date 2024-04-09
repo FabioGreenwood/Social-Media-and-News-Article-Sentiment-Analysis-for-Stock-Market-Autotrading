@@ -6,8 +6,10 @@ import os
 from config import global_strptime_str, global_strptime_str_filename, global_exclusively_str, global_precalculated_assets_locations_dict, global_financial_history_folder_path, global_error_str_1, global_financial_history_folder_path, global_df_stocks_list_file, global_random_state, global_strptime_str_2, global_index_cols_list, global_input_cols_to_include_list, global_start_time, global_financial_history_folder_path
 
 list_of_model_subfolder_names = ["dfb17d5b073d46354f34c02da10684d793cc50b63e88d66a49b556a63a1688a2", "d8e5d23702377334027cc07da486827f7782c696543f586ac961acc9f3bb7136", "964981d6af03bc93f33ebd47ecac7b2783d0b41a2a0fa9afa4d4b3b1bd28c1c6", "57421bcb640295ee7090731f98cb541426ab0ed8c7f67172856c65832b0eaed5", "0629ef5162363d1bac9a316d846d250f780e5e20eefadffaf2dff92c4535d742", "13d56f6d8d8b5e2707a1ec817a441b1a330c8780b28b2972c2ae146105ee9403", "1ed5697ebc3809a5aac3bda996fb74cfd6481a8f621bb285fb3c52c13a9d56f6"]
-folder_location = "C:\\Users\\Public\\fabio_uni_work\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\precalculated_assets\\predictive_model\\"
+folder_location = "D:\\project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\precalculated_assets\\predictive_model\\"
+shard = 0
 count = 0
+list_of_model_subfolder_names = list_of_model_subfolder_names[shard::6]
 
 def update_tracker_notepad_file(folder_path, work_completed=False):
     #this function checks of the folder has a tracker notepad file inside and edits the files and reports back accordingly
@@ -21,15 +23,15 @@ def update_tracker_notepad_file(folder_path, work_completed=False):
         for file in files:
             if file.startswith(work_started_substring) or file.startswith(work_completed_substring):
                 return True    
-        with open(os.path.join(folder_path, f'{work_started_substring}{datetime.now().strftime("%Y%m%d %H%M%S")}'), 'w') as f:
+        with open(os.path.join(folder_path, f'{work_started_substring}{datetime.now().strftime("%Y%m%d_%H%M%S")}'), 'w') as f:
             f.write("BLANK FILE")
         return False
     elif work_completed==True:
         files = os.listdir(folder_path)
         for file in files:
             if file.startswith(work_started_substring):
-                os.remove(file)
-                with open(os.path.join(folder_path, f'{work_completed_substring}{datetime.now().strftime("%Y%m%d %H%M%S")}'), 'w') as f:
+                os.remove(os.path.join(folder_path,str(file)))
+                with open(os.path.join(folder_path, f'{work_completed_substring}{datetime.now().strftime("%Y%m%d_%H%M%S")}'), 'w') as f:
                     f.write("BLANK FILE")
                 return True
                 
@@ -55,8 +57,8 @@ for folder_name in list_of_model_subfolder_names:
         reporting_dict           = input_dict["reporting_dict"]
 
         df_financial_data = FG_model_training.import_financial_data(
-            #target_file_path          = fin_inputs_params_dict["historical_file"], 
-            target_file_path          = "C:\\Users\\Public\\fabio_uni_work\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\data\\financial_data\\firstratedata\\AAPL_full_5min_adjsplit.txt",
+            target_file_path          = fin_inputs_params_dict["historical_file"], 
+            #target_file_path          = "C:\\Users\\Public\\fabio_uni_work\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\data\\financial_data\\firstratedata\\AAPL_full_5min_adjsplit.txt",
             input_cols_to_include_list  = fin_inputs_params_dict["cols_list"],
             temporal_params_dict = temporal_params_dict, training_or_testing="training")
         print(datetime.now().strftime("%H:%M:%S") + " - populate_technical_indicators")
