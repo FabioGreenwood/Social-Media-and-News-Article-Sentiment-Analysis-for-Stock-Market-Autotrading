@@ -210,21 +210,23 @@ def return_predictor_name(input_dict):
     rel_lifetime        = input_dict["senti_inputs_params_dict"]["relative_lifetime"]
     rel_hlflfe          = input_dict["senti_inputs_params_dict"]["relative_halflife"]
     pred_steps_ahead    = input_dict["outputs_params_dict"]["pred_steps_ahead"]
-    estm_alpha          = input_dict["model_hyper_params"]["estimator__alpha"]
+    estm_alpha          = input_dict["model_hyper_params"]["estimator__alpha"] # 
     general_adjusting_square_factor   = input_dict["model_hyper_params"]["general_adjusting_square_factor"]
     lookbacks                         = input_dict["model_hyper_params"]["lookbacks"]
     batch_ratio                       = input_dict["model_hyper_params"]["batch_ratio"]
+    epochs                            = input_dict["model_hyper_params"]["epochs"]
     financial_value_scaling           = input_dict["fin_inputs_params_dict"]["financial_value_scaling"]
     factor_tweet_attention            = input_dict["senti_inputs_params_dict"]["factor_tweet_attention"]
     factor_topic_volume               = input_dict["senti_inputs_params_dict"]["factor_topic_volume"]
+    early_stopping                    = input_dict["model_hyper_params"]["early_stopping"]
 
     name = return_sentiment_data_name(company_symbol, train_period_start, train_period_end, topic_model_qty, topic_model_alpha, apply_IDF, tweet_ratio_removed, enforced_topic_model_nested_list, new_combined_stopwords_inc, topic_weight_square_factor, time_step_seconds, rel_lifetime, rel_hlflfe, factor_tweet_attention, factor_topic_volume)
     predictor_hash = ""
     if not financial_value_scaling == None:
         predictor_hash += "_" + str(financial_value_scaling)
-    predictor_hash += "_" + str(input_dict["model_hyper_params"]["n_estimators_per_time_series_blocking"]) + "_" + str(input_dict["model_hyper_params"]["testing_scoring"]) + "_" + str(input_dict["model_hyper_params"]["estimator__alpha"]) + "_" + str(input_dict["model_hyper_params"]["estimator__activation"]) + "_" + str(input_dict["model_hyper_params"]["cohort_retention_rate_dict"]) + "_" + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + "_" + str(input_dict["model_hyper_params"]["epochs"]) + "_" + str(input_dict["model_hyper_params"]["lookbacks"]) + "_" + str(input_dict["model_hyper_params"]["shuffle_fit"]) + "_" + str(input_dict["model_hyper_params"]["K_fold_splits"]) + "_" + str(pred_steps_ahead) + "_" + str(input_dict["model_hyper_params"]["estimator__alpha"]) + "_" + str(input_dict["model_hyper_params"]["general_adjusting_square_factor"]) + "_" + str(input_dict["model_hyper_params"]["lookbacks"]) + "_" + str(input_dict["model_hyper_params"]["batch_ratio"]) + "_" + str(input_dict["model_hyper_params"]["scaler_cat"]) + "_" + str(input_dict["model_hyper_params"]["estimator__hidden_layer_sizes"])
-    if input_dict["model_hyper_params"]["early_stopping"] != 3 or input_dict["model_hyper_params"]["learning_rate"] != 0.001 or input_dict["model_hyper_params"]["testing_scoring"] != "mae" or input_dict["model_hyper_params"]["epochs"] != 1:
-        predictor_hash += "_" + str(input_dict["model_hyper_params"]["early_stopping"]) + "_" + str(input_dict["model_hyper_params"]["learning_rate"]) + "_" + str(input_dict["model_hyper_params"]["testing_scoring"])  + "_" + str(input_dict["model_hyper_params"]["epochs"])
+    predictor_hash += "_" + str(input_dict["model_hyper_params"]["n_estimators_per_time_series_blocking"]) + "_" + str(input_dict["model_hyper_params"]["testing_scoring"]) + "_" + str(estm_alpha) + "_" + str(input_dict["model_hyper_params"]["estimator__activation"]) + "_" + str(input_dict["model_hyper_params"]["cohort_retention_rate_dict"]) + "_" + str(general_adjusting_square_factor) + "_" + str(epochs) + "_" + str(lookbacks) + "_" + str(input_dict["model_hyper_params"]["shuffle_fit"]) + "_" + str(input_dict["model_hyper_params"]["K_fold_splits"]) + "_" + str(pred_steps_ahead) + "_" + str(estm_alpha) + "_" + str(general_adjusting_square_factor) + "_" + str(lookbacks) + "_" + str(batch_ratio) + "_" + str(input_dict["model_hyper_params"]["scaler_cat"]) + "_" + str(input_dict["model_hyper_params"]["estimator__hidden_layer_sizes"])
+    if early_stopping != 3 or input_dict["model_hyper_params"]["learning_rate"] != 0.001 or input_dict["model_hyper_params"]["testing_scoring"] != "mae" or epochs != 1:
+        predictor_hash += "_" + str(early_stopping) + "_" + str(input_dict["model_hyper_params"]["learning_rate"]) + "_" + str(input_dict["model_hyper_params"]["testing_scoring"])  + "_" + str(epochs)
     name = name + predictor_hash
     return str(name)
     
