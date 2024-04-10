@@ -1411,13 +1411,13 @@ class DRSLinRegRNN():
             self.training_scores_dict_list += [training_scores_dict_list_new]
             self.validation_scores_dict_list += [validation_scores_dict_list_new]
             self.additional_validation_dict_list += [additional_validation_dict_list_new]
-        if self.K_fold_splits * self.n_estimators_per_time_series_blocking == len(self.estimators_):
-            training_scores_dict            = average_list_of_identical_dicts(self.training_scores_dict_list)
-            validation_scores_dict          = average_list_of_identical_dicts(self.validation_scores_dict_list)
-            additional_validation_dict      = average_list_of_identical_dicts(self.additional_validation_dict_list)
-            self.training_scores_dict       = training_scores_dict
-            self.validation_scores_dict     = validation_scores_dict
-            self.additional_validation_dict = additional_validation_dict
+    
+        training_scores_dict            = average_list_of_identical_dicts(self.training_scores_dict_list)
+        validation_scores_dict          = average_list_of_identical_dicts(self.validation_scores_dict_list)
+        additional_validation_dict      = average_list_of_identical_dicts(self.additional_validation_dict_list)
+        self.training_scores_dict       = training_scores_dict
+        self.validation_scores_dict     = validation_scores_dict
+        self.additional_validation_dict = additional_validation_dict
         self.save()
         return self, training_scores_dict, validation_scores_dict, additional_validation_dict
 
