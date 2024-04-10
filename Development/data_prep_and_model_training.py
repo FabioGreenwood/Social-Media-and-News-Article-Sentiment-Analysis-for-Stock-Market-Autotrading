@@ -1403,7 +1403,7 @@ class DRSLinRegRNN():
         self.validation_scores_dict_list     = []
         self.additional_validation_dict_list = []
                 
-        for i in range(self.K_fold_splits * self.n_estimators_per_time_series_blocking):
+        for i in range(len(self.estimators_)):
             single_estimator = self.estimators_[i]
             y_pred_train = self.custom_single_predict(self.X_train_list[i], single_estimator)
             training_scores_dict_list_new, additional_training_dict_list_new        = self.evaluate_results(self.y_train_list[i], y_pred_train, self.input_dict["outputs_params_dict"], self.input_dict["reporting_dict"],self.input_dict["fin_inputs_params_dict"]["financial_value_scaling"])
@@ -1411,13 +1411,13 @@ class DRSLinRegRNN():
             self.training_scores_dict_list += [training_scores_dict_list_new]
             self.validation_scores_dict_list += [validation_scores_dict_list_new]
             self.additional_validation_dict_list += [additional_validation_dict_list_new]
-
-        training_scores_dict            = average_list_of_identical_dicts(self.training_scores_dict_list)
-        validation_scores_dict          = average_list_of_identical_dicts(self.validation_scores_dict_list)
-        additional_validation_dict      = average_list_of_identical_dicts(self.additional_validation_dict_list)
-        self.training_scores_dict       = training_scores_dict
-        self.validation_scores_dict     = validation_scores_dict
-        self.additional_validation_dict = additional_validation_dict
+        if self.K_fold_splits * self.n_estimators_per_time_series_blocking == len(self.estimators_):
+            training_scores_dict            = average_list_of_identical_dicts(self.training_scores_dict_list)
+            validation_scores_dict          = average_list_of_identical_dicts(self.validation_scores_dict_list)
+            additional_validation_dict      = average_list_of_identical_dicts(self.additional_validation_dict_list)
+            self.training_scores_dict       = training_scores_dict
+            self.validation_scores_dict     = validation_scores_dict
+            self.additional_validation_dict = additional_validation_dict
         self.save()
         return self, training_scores_dict, validation_scores_dict, additional_validation_dict
 
