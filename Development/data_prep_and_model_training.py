@@ -1504,7 +1504,7 @@ class DRSLinRegRNN():
     def custom_single_predict(self, df_X, single_estimator, output_col_name="prediction_X_ahead"):
 
         index, input_data   = return_lookback_appropriate_index_andor_data(df_X, self.lookbacks, scaler=self.scaler_X, dropout_cols=single_estimator.dropout_cols)
-        y_pred_values       = single_estimator.predict(input_data, verbose=1)
+        y_pred_values       = single_estimator.predict(input_data, verbose=0)
         y_pred_values       = pd.DataFrame(y_pred_values, index=index[-y_pred_values.shape[0]:], columns=[output_col_name])
         y_pred_values       = self.inverse_scale_output_according_to_input_scaler(df_X, y_pred_values)
         

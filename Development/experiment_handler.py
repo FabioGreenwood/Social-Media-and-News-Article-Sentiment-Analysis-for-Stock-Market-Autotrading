@@ -904,11 +904,13 @@ scenario_dict = {
         10: {"topics" : 1, "pred_steps"    : 1},
         11: {"topics" : 0, "pred_steps"    : 1},
     }
-#loop = [3,11]
-#loop = [4,10]
-loop = [3]
+
+loop = [3, 11]
+loop = [4, 10]
+#loop = [9, 5]
+        
 reverse_DoE = False
-max_iter = 0
+max_iter = 16
 
 #init_doe = init_doe[shard::6]
 if reverse_DoE == True:
@@ -941,7 +943,7 @@ for scenario_ID in loop:
             for i in range(len(DoE)): 
                 DoE[i][index_of_topic_qty] = topic_qty; DoE[i][index_of_factor_topic_volume] = 0
             new_design_space_dict["senti_inputs_params_dict"]["topic_qty"] = [topic_qty]
-            default_input_dict["senti_inputs_params_dict"]["topic_qty"] = topic_qty
+            default_input_dict["senti_inputs_params_dict"]["topic_qty"] = topic_qty;0 
             new_design_space_dict["senti_inputs_params_dict"]["factor_topic_volume"] = [0]
             default_input_dict["senti_inputs_params_dict"]["factor_topic_volume"] = 0
             
@@ -977,7 +979,7 @@ for scenario_ID in loop:
     else:
         final_str = ""
 
-    run_name_str = "run_60_{}{}.csv".format(str(scenario_ID),final_str)
+    run_name_str = "run_61_{}{}.csv".format(str(scenario_ID),final_str)
 
 
     #run_name_str = "DoE_Gen_{}.csv".format(str(scenario_ID))
@@ -1000,11 +1002,3 @@ for scenario_ID in loop:
             global_record_path=os.path.join(global_general_folder,r"outputs/{}".format(run_name_str))
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
-
-
-
-
-
-
-
-
