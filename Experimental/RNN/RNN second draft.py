@@ -11,6 +11,8 @@ import matplotlib as plt
 import copy
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+
 
 
 
@@ -34,8 +36,13 @@ df_y = df_X["£_close"].shift(-pred_steps)
 df_X = df_X[:-pred_steps]
 df_y = df_y[:-pred_steps]
 
+# Normalize the data
+scaler_X = MinMaxScaler()
+scaler_y = MinMaxScaler()
 
-keras.utils.timeseries_dataset_from_array
+df_X_normalized = scaler_X.fit_transform(df_X)
+df_y_normalized = scaler_y.fit_transform(df_y.values.reshape(-1, 1))
+
 
 
 sequence_length = 10
@@ -44,20 +51,13 @@ batch_size = 32
 
 
 training_generator = tf.keras.preprocessing.sequence.TimeseriesGenerator(
-        df_X.values,
-        df_y.values,
+        df_X_normalized,
+        df_y_normalized,
         sequence_length,
         batch_size=1,
         shuffle=False
     )
 
-datetime_generator = tf.keras.preprocessing.sequence.TimeseriesGenerator(
-        df_X.index.values,
-        df_y.values,
-        sequence_length,
-        batch_size=1,
-        shuffle=False
-    )
 
 ## remove sequences that straddle a day
 #for id in range(len(training_generator)):
@@ -65,9 +65,9 @@ datetime_generator = tf.keras.preprocessing.sequence.TimeseriesGenerator(
 #        training_generator[id] = None, None
 
 model = Sequential([
-    LSTM(units=50, activation='linear', return_sequences=True, input_shape=input_shape),
-    LSTM(units=50, activation='linear', return_sequences=True),
-    LSTM(units=50, activation='linear'),
+    LSTM(units=50, activation='relu', return_sequences=True, input_shape=input_shape),
+    LSTM(units=50, activation='relu', return_sequences=True),
+    LSTM(units=50, activation='relu'),
     Dense(units=1, activation='linear')
 ])
 model.compile(optimizer='adam', loss='mae')
@@ -75,15 +75,9 @@ model.fit(training_generator, epochs=5)
 
 #training 
 train_predictions = model.predict(training_generator)
-predicted_values = train_predictions.reshape(-1)[:-pred_steps]
-
-"""# manual training check
-train_predictions_manually_generated_input = df_X.iloc[-10:,:].values.reshape((1, sequence_length, df_X.shape[1]))
-train_predictions_2 = model.predict(train_predictions_manually_generated_input)
-"""
+predicted_values = scaler_y.inverse_transform(train_predictions).reshape(-1)[:-pred_steps]
 
 # "validate" the model
-#validation_dataset = timeseries_dataset_from_array(df_X.values, df_y.values, sequence_length=1, sampling_rate=1, shuffle=False)
 training_score = model.evaluate(training_generator)
 print("Validation Loss:", training_score)
 
@@ -93,11 +87,9 @@ print("Validation Loss:", training_score)
 # Extract the true y values for the chosen sequence
 true_values = list(df_y.iloc[:].values.flatten())[sequence_length+pred_steps:]
 
-
 print("r2 loss:", str(r2_score(true_values, predicted_values)))
 print("mse loss:", str(mean_squared_error(true_values, predicted_values)))
 print("mae loss:", str(mean_absolute_error(true_values, predicted_values)))
-
 
 # Create a time axis for plotting
 time_steps = np.arange(len(predicted_values))
