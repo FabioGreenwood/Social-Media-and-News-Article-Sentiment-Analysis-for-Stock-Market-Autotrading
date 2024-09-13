@@ -3,7 +3,7 @@
 
 This is the source code for my master’s thesis.
 
-# Intro
+## Intro
 The project was to do some A/B testing on the potential profitability improvements to a stock trading bot with and without both:
  - sentiment analysis of twitter data
  - sentiment analysis of twitter data with topic clustering
@@ -14,10 +14,10 @@ To do this the model had to work with three scopes:
  - no-sentiment (financial data only)
 On top of this each model scope was also optimising its own hyperparameters. At the end the top ("optimal") parameter from each of the 3 scopes, were reran in their originating scenario and the other scenarios, multiple times. This was to produce a set of linked pairs for paired t-testing. This was done for a 5-mins and 30-mins prediction horizon.
 
-# Limitations
+## Limitations
 Halfway through the project, Mr Musk’s famous takeover of twitter happened. Along with a change in the free student accessibility to live twitter data. This meant that Kaggle data had to be used, blocking me mimicking the technique used by Weng at al (see thesis section 4.4), to track the sentiment of a larger number of individual users on twitter as induvial features. Which was the original intent of the project. That with potentially creating a live system.
 
-# Detailed Info
+## Detailed Info
 The following sections of the Fabio_James_Greenwood_MSc_Thesis.pdf will provide more information about:
  - The basic system overview -> 1.4 and 1.5
  - The conclusion -> 1.9
