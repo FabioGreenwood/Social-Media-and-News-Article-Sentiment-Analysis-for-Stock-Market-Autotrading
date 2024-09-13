@@ -12,16 +12,21 @@ import copy
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
+import os
+from datetime import datetime
 
+# parameters
+master_folder_path = r"C:\Users\Public\fabio_uni_work\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading"
+example_input_path = os.path.join(master_folder_path, "example_input.csv")
+date_format = '%d/%m/%Y %H:%M'
 
 
 
 # Example multivariate time series data (replace this with your actual time series)
 # Assuming two features in the time series
 
-
 # Create random multivariate time series data
-df_X = pd.read_csv(r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\precalculated_assets\example_input.csv")
+df_X = pd.read_csv(example_input_path)
 df_X.set_index(df_X.columns[0], inplace=True)
 #df_y = pd.read_csv(r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\precalculated_assets\example_output.csv")
 #df_y.set_index(df_y.columns[0], inplace=True)
@@ -44,7 +49,6 @@ df_X_normalized = scaler_X.fit_transform(df_X)
 df_y_normalized = scaler_y.fit_transform(df_y.values.reshape(-1, 1))
 
 
-
 sequence_length = 10
 input_shape = (sequence_length, df_X.shape[1])
 batch_size = 32
@@ -58,11 +62,57 @@ training_generator = tf.keras.preprocessing.sequence.TimeseriesGenerator(
         shuffle=False
     )
 
+datetime_generator = tf.keras.preprocessing.sequence.TimeseriesGenerator(
+        df_X.index,
+        df_y_normalized,
+        sequence_length,
+        batch_size=1,
+        shuffle=False
+    )
+
 
 ## remove sequences that straddle a day
 #for id in range(len(training_generator)):
 #    if not datetime_generator[id][0][0][0][:10] == datetime_generator[id][0][0][-1][:10]:
 #        training_generator[id] = None, None
+
+
+
+
+def return_filtered_batches_that_dont_cross_two_days(training_generator, datetime_generator):
+    mask, new_data, new_targets = [], np.empty((0,training_generator.data.shape[1])), np.empty((0,training_generator.targets.shape[1]))
+    for batch_x, output in datetime_generator:
+        if datetime.strptime(batch_x[0][0], date_format).day == datetime.strptime(batch_x[0][-1], date_format).day:
+            mask += [True]
+        else:
+            mask += [False]
+    for data_n, target_n, Bool_n in zip(training_generator.data, training_generator.targets, mask):
+        if Bool_n == True:
+            new_data    = np.append(new_data, [data_n], axis=0)
+            new_targets = np.append(new_targets, [target_n], axis=0)
+    
+    # replace removed batches with random batches
+    for i in range(sum(mask), len(mask)):
+        random_index = random.randint(0, sum(mask))
+        new_data    = np.append(new_data, [new_data[random_index]], axis=0)
+        new_targets = np.append(new_targets, [new_targets[random_index]], axis=0)
+    #the time series generator's final batches tend to be blank, causing the first for loop to skip them, it is best to just transfer these directly
+    for i in range(len(new_data), training_generator.data.shape[0]):
+        new_data    = np.append(new_data, [training_generator.data[i]], axis=0)
+        new_targets = np.append(new_targets, [training_generator.targets[i]], axis=0)
+
+    training_generator.data     = new_data
+    training_generator.targets  = new_targets
+    return training_generator
+
+
+
+## Filter batches that cross two days
+#filtered_batches = [batch for batch in generator if not batch_crosses_two_days(batch)]
+
+filtered_training_generator_batch_list = return_filtered_batches_that_dont_cross_two_days(training_generator, datetime_generator)
+
+
 
 model = Sequential([
     LSTM(units=50, activation='relu', return_sequences=True, input_shape=input_shape),
@@ -71,6 +121,10 @@ model = Sequential([
     Dense(units=1, activation='linear')
 ])
 model.compile(optimizer='adam', loss='mae')
+
+model.fit(filtered_training_generator_batch_list, epochs=5)
+
+
 model.fit(training_generator, epochs=5)
 
 #training 

@@ -35,53 +35,19 @@ if not sys.warnoptions:
     os.environ["PYTHONWARNINGS"] = "ignore"
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import matplotlib.pyplot as plt
-
-
-#%% Standard Parameters
-
-
-#GLOBAL PARAMETERS
-global_input_cols_to_include_list = ["<CLOSE>", "<HIGH>"]
-global_index_cols_list = ["<DATE>","<TIME>"]
-global_index_col_str = "datetime"
-global_target_file_folder_path = ""
-global_feature_qty = 6
-global_outputs_folder_path = ".\\outputs\\"
-global_financial_history_folder_path = "FG action, do I need to update this?"
-global_df_stocks_list_file           = pd.read_csv(r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\support data\stock_info.csv")
-global_start_time = datetime.now()
-global_error_str_1 = "the input {} is wrong for the input training_or_testing"
-global_random_state = 1
-global_scores_database = r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\scores_database.csv"
-global_strptime_str = '%d/%m/%y %H:%M:%S'
-global_strptime_str_filename = '%d_%m_%y %H:%M:%S'
-global_precalculated_assets_locations_dict = {
-    "root" : "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\precalculated_assets\\",
-    "topic_models"              : "topic_models\\",
-    "annotated_tweets"          : "annotated_tweets\\",
-    "predictive_model"          : "predictive_model\\",
-    "sentimental_data"          : "sentimental_data\\",
-    "technical_indicators"      : "technical_indicators\\",
-    "experiment_records"        : "experiment_records\\",
-    "clean_tweets"              : "cleaned_tweets_ready_for_subject_discovery\\"
-    }
-global_outputs_folder = "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\outputs\\"
-global_designs_record_final_columns_list = ["experiment_timestamp", "training_r2", "training_mse", "training_mae", "validation_r2", "validation_mse", "validation_mae", "testing_r2", "testing_mse", "testing_mae", "profitability", "predictor_names"]
-
-
-SECS_IN_A_DAY = 60*60*24
-SECS_IN_AN_HOUR = 60*60
-FIVE_MIN_TIME_STEPS_IN_A_DAY = SECS_IN_A_DAY / (5*60)
+import random
+from config import global_general_folder, global_outputs_folder, global_exclusively_str, global_input_cols_to_include_list, global_index_cols_list, global_index_col_str, global_target_file_folder_path, global_feature_qty, global_outputs_folder_path, global_financial_history_folder_path, global_df_stocks_list_file          , global_start_time, global_error_str_1, global_random_state, global_scores_database, global_strptime_str, global_strptime_str_2, global_strptime_str_filename, global_precalculated_assets_locations_dict, global_designs_record_final_columns_list, SECS_IN_A_DAY, SECS_IN_AN_HOUR, FIVE_MIN_TIME_STEPS_IN_A_DAY
+import hashlib
 
 
 #%% Default Input Parameters
 
-default_temporal_params_dict    = {
-    "train_period_start"    : datetime.strptime('01/01/15 00:00:00', global_strptime_str),
-    "train_period_end"      : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
+default_temporal_params_dict        = {
+    "train_period_start"    : datetime.strptime('01/01/16 00:00:00', global_strptime_str),
+    "train_period_end"      : datetime.strptime('01/07/19 00:00:00', global_strptime_str),
     "time_step_seconds"     : 5*60, #5 mins,
-    "test_period_start"     : datetime.strptime('01/06/19 00:00:00', global_strptime_str),
-    "test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str),
+    "test_period_start"     : datetime.strptime('01/07/19 00:00:00', global_strptime_str),
+    "test_period_end"       : datetime.strptime('01/01/20 00:00:00', global_strptime_str)
 }
 default_fin_inputs_params_dict      = {
     "index_cols"        : "date",    
@@ -90,13 +56,12 @@ default_fin_inputs_params_dict      = {
         "sma" : [5, 20, 50, int(FIVE_MIN_TIME_STEPS_IN_A_DAY), int(5 * FIVE_MIN_TIME_STEPS_IN_A_DAY)],
         "ema" : [5, 20, 50, int(FIVE_MIN_TIME_STEPS_IN_A_DAY), int(5 * FIVE_MIN_TIME_STEPS_IN_A_DAY)],
         "macd" : [[12, 26, 9]],
-        "BollingerBands" : [[20, 2]],
-        "PivotPoints" : [0]}, 
-    "fin_match"         :{
-        "Doji" : True},
+        "BollingerBands" : [[20, 2]]}, 
+    "fin_match"         : {"Doji" : True},
     "index_col_str"     : "datetime",
     #"historical_file"   : "C:\\Users\\Fabio\\OneDrive\\Documents\\Studies\\Final Project\\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\\data\\financial data\\tiingo\\aapl.csv",
-    "historical_file"   : r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\financial data\firstratedata\AAPL_full_5min_adjsplit.txt"
+    "historical_file"   : os.path.join(global_general_folder,r"data/financial_data/firstratedata/AAPL_full_5min_adjsplit.txt"),
+    "financial_value_scaling" : "day_scaled" # None, "day_scaled", "delta_scaled"
 }
 default_senti_inputs_params_dict    = {
     "topic_qty"             : 7,
@@ -104,46 +69,54 @@ default_senti_inputs_params_dict    = {
     "relative_lifetime"     : 60*60*24*7, # units are seconds
     "relative_halflife"     : 60*60*0.5, # units are seconds
     "topic_model_alpha"     : 1,
-    "weighted_topics"       : False,
     "apply_IDF"             : True,
     "enforced_topics_dict_name" : "None",
     "enforced_topics_dict"  : None,
     "sentiment_method"      : SentimentIntensityAnalyzer(),
-    "tweet_file_location"   : r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\data\twitter data\Tweets about the Top Companies from 2015 to 2020\Tweet.csv\apple.csv",
+    "tweet_file_location"   : os.path.join(global_general_folder,r"data/twitter_data/apple.csv"),
     "regenerate_cleaned_tweets_for_subject_discovery" : False,
     "inc_new_combined_stopwords_list" : True,
-    "topic_weight_square_factor" : 1
+    "topic_weight_square_factor" : 1,
+    "factor_tweet_attention" : False,
+    "factor_topic_volume" : False, 
 }
 default_outputs_params_dict         = {
     "output_symbol_indicators_tuple"    : ("aapl", "close"), 
     "pred_steps_ahead"                  : 1
 }
-default_cohort_retention_rate_dict = {
-            "£_close" : 1, #output value
-            "£_*": 1, #other OHLCV values
-            "$_*" : 0.4, # technical indicators
-            "match!_*" : 0.6, #pattern matchs
-            "~senti_*" : 0.6, #sentiment analysis
-            "*": 0.5} # other missed values
+default_cohort_retention_rate_dict  = {
+    "£_close" : 1, #output value
+    "£_*": 1, #other OHLCV values
+    "$_*" : 0.6, # technical indicators
+    "match!_*" : 0.6, #pattern matchs
+    "~senti_*" : 0.6, #sentiment analysis
+    "*": 0.5} # other missed values
 default_model_hyper_params          = {
-    "name" : "RandomSubspace_MLPRegressor", #Multi-layer Perceptron regressor
-    #"name" : "RandomSubspace_RNN_Regressor", #Multi-layer Perceptron regressor
+    "name" : "RandomSubspace_RNN_Regressor", #Multi-layer Perceptron regressor
         #general hyperparameters
-    "n_estimators_per_time_series_blocking" : 2,
-    "training_error_measure_main"   : 'neg_mean_squared_error',
-    "testing_scoring"               : ["r2", "mse", "mae"],
-    "time_series_split_qty"         : 5,
-        #model specific rows
+    "n_estimators_per_time_series_blocking" : 1,
+    "testing_scoring"               : "mse", #["r2", "mse", "mae"],
     "estimator__alpha"                 : 0.05,
-    "estimator__hidden_layer_sizes"    : (100,10), 
-    "estimator__activation"            : 'relu',
-    "cohort_retention_rate_dict"       : default_cohort_retention_rate_dict}
+    "estimator__activation"            : 'softmax',
+    "cohort_retention_rate_dict"       : default_cohort_retention_rate_dict,
+    "general_adjusting_square_factor" : 1,
+    "epochs" : 40,
+    "lookbacks" : 10,
+    "batch_ratio" : 1,
+    "shuffle_fit" : False,
+    "K_fold_splits" : 5,
+    "scaler_cat" : 3,  # 0:no scaling, 1: standard scaling (only from the MinMaxScaler object), 2: custom scaling, 3: individual scaling
+    "early_stopping" : 3, #this marks the patience value, if zero, feature is off
+    "learning_rate" : 0.001
+    }
 default_reporting_dict              = {
-    "confidence_thresholds" : [0, 0.01, 0.02, 0.035, 0.05, 0.1],
-    "confidence_thresholds_inserted_to_df" : {
-        "PC_confindence" : [0.02],
-        "score_confidence" : [0.02],
-        "score_confidence_weighted" : [0.02]}}
+    "confidence_thresholds" : [0, 0.2, 0.50, 0.70, 0.90],
+#    "confidence_thresholds_inserted_to_df" : {
+#        "PC_confindence" : [0.02],
+#        "score_confidence" : [0.02],
+#        "score_confidence_weighted" : [0.02]}
+        }
+
 default_input_dict = {
     "temporal_params_dict"      : default_temporal_params_dict,
     "fin_inputs_params_dict"    : default_fin_inputs_params_dict,
@@ -184,19 +157,29 @@ def return_keys_within_2_level_dict(input_dict):
             output_list = output_list + [key]
     return output_list
     
-def save_designs_record_csv_and_dict(records_path_list, df_designs_record=None, design_history_dict=None, optim_run_name=None):
+def save_designs_record_csv_and_dict(records_path_list_input, df_designs_record=None, design_history_dict=None, optim_run_name=None):
+    records_path_list = records_path_list_input.copy()
     if not type(records_path_list) == list:
         records_path_list = [records_path_list]
+
+    #remove items with weak predictors and add names of predictors
+    for id in design_history_dict.keys():
+        if "predictor_names" in design_history_dict[id].keys():
+            df_designs_record.loc[id, "predictor_names"] = design_history_dict[id]["predictor_names"]
+
     for path in records_path_list:
         file_path = os.path.join(path, optim_run_name)
         
         if type(df_designs_record) == pd.core.frame.DataFrame:
+            df_designs_record_T = df_designs_record.T
             try:
                 df_designs_record.to_csv(file_path + ".csv", index=False)
                 df_designs_record.to_csv(file_path + ".csvBACKUP", index=False)
+                df_designs_record_T.to_csv(file_path + "_T" + ".csv", index=False)
             except:
                 df_designs_record.to_csv(file_path + ".csvBACKUP", index=False)
                 print("please close the csv")
+        
         if design_history_dict != None:
             with open(file_path + ".py_dict", "wb") as file:
                 pickle.dump(design_history_dict, file)
@@ -221,7 +204,7 @@ def update_df_designs_record(df_designs_record, design_history_dict, design_spac
                 for result_type in design_history_dict[ID][additional_results_dict].keys():
                     for steps_back in design_history_dict[ID][additional_results_dict][result_type].keys():
                         for confidence in design_history_dict[ID][additional_results_dict][result_type][steps_back]:
-                            df_designs_record.loc[ID, return_name_of_additional_reporting_col(prefix, result_type, confidence)] = design_history_dict[ID][additional_results_dict][result_type][steps_back][confidence]
+                            df_designs_record.loc[ID, return_name_of_additional_reporting_col(prefix, result_type, confidence)] = float(design_history_dict[ID][additional_results_dict][result_type][steps_back][confidence])
                 
     return df_designs_record
 
@@ -235,7 +218,7 @@ def return_cols_for_additional_reporting(input_dict):
     confidences = input_dict["reporting_dict"]["confidence_thresholds"]
     pred_steps_ahead_list = input_dict["outputs_params_dict"]["pred_steps_ahead"]
     
-    template = FG_additional_reporting.run_additional_reporting(y_testing=pd.DataFrame(), pred_steps_list=[])
+    template = FG_additional_reporting.run_additional_reporting(y_testing=pd.DataFrame(), pred_steps_list=[], financial_value_scaling="no value needed")
     
     if type(pred_steps_ahead_list) == int:
         pred_steps_ahead_list = [pred_steps_ahead_list]
@@ -275,8 +258,8 @@ def return_scenario_name_str(topic_qty, pred_steps, ratio_removed):
         output = "no_sentiment_steps_"
     else:
         raise ValueError("topic_qty value of: " + str(topic_qty) + " not recognised")
-    if not pred_steps in [1, 3, 5, 15]:
-        raise ValueError("double check value " + str(pred_steps) + " desired for pred steps input")
+    #if not pred_steps in [1, 3, 5, 15]:
+    #    raise ValueError("double check value " + str(pred_steps) + " desired for pred steps input")
     
     valstr = "{0:e}".format(ratio_removed)
     epos = valstr.rfind('e')
@@ -286,7 +269,12 @@ def return_scenario_name_str(topic_qty, pred_steps, ratio_removed):
     return output + str(pred_steps) + "_" + removal_str
 
 def update_design_hist_dict_post_training(design_history_dict_single, predictor, training_scores_dict, validation_scores_dict, additional_validation_dict):
-    design_history_dict_single["predictor"] = predictor
+    #design_history_dict_single["predictor"] = FG_model_training.custom_hash(FG_model_training.return_predictor_names(predictor.input_dict))
+    #design_history_dict_single["predictor"] = predictor
+    if hasattr(predictor, "name"):
+        design_history_dict_single["predictor_names"] = predictor.name
+    else:
+        design_history_dict_single["predictor_names"] = "Not Recorded"
     design_history_dict_single["training_r2"], design_history_dict_single["training_mse"], design_history_dict_single["training_mae"] = training_scores_dict["r2"], training_scores_dict["mse"], training_scores_dict["mae"]
     design_history_dict_single["validation_r2"], design_history_dict_single["validation_mse"], design_history_dict_single["validation_mae"] = validation_scores_dict["r2"], validation_scores_dict["mse"], validation_scores_dict["mae"]
     design_history_dict_single["validation_results_dict"] = additional_validation_dict
@@ -362,17 +350,10 @@ def template_experiment_requester(GPyOpt_input, design_space_dict, default_input
     prepped_model_hyper_params        = prepped_input_dict["model_hyper_params"]
     reporting_dict                    = prepped_input_dict["reporting_dict"]
     
-    if type(prepped_input_dict["model_hyper_params"]["estimator__hidden_layer_sizes"]) == str or type(prepped_input_dict["model_hyper_params"]["estimator__hidden_layer_sizes"]) == np.str_:
-        original_value = prepped_input_dict["model_hyper_params"]["estimator__hidden_layer_sizes"]
-        updated_val = []
-        for x in original_value.split("_"):
-            updated_val = updated_val + [x]
-        prepped_input_dict["model_hyper_params"]["estimator__hidden_layer_sizes"] = tuple(updated_val)
-    
     global global_run_count
     
-    print("xxxxxxxxxxxxxx" + str(global_run_count))
-    print(GPyOpt_input)
+    #print("xxxxxxxxxxxxxx" + str(global_run_count))
+    #print(GPyOpt_input)
     global_run_count += 1
     
     predictor, training_scores_dict, validation_scores_dict, additional_validation_dict = experiment_method(prepped_temporal_params_dict, prepped_fin_inputs_params_dict, prepped_senti_inputs_params_dict, prepped_outputs_params_dict, prepped_model_hyper_params, reporting_dict)
@@ -399,19 +380,24 @@ def define_DoE(bounds, DoE_size):
             DoE = np.hstack((DoE, values_for_params))
     return DoE
 
-def return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, opt_obj, inverse_for_minimise, objective_function_name="testing_mae"):
+def return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, inverse_for_maximise, objective_function_name="testing_mae", DoE=2):
     # please note this has been converted to a multi-objective function, it will cycle through the objective_function_name variable if list
     # this functionality can be removed by entering a non-iterable as objective_function_name
     output_X, output_Y = [], []
-    
+
+    if isinstance(DoE, list):
+        DoE_len = len(DoE)
+    else:
+        DoE_len = DoE
+
     if type(objective_function_name) == list:
-        if not type(inverse_for_minimise) == list or not len(inverse_for_minimise) == len(objective_function_name):
-            raise ValueError("if objective_function_name is a list, then inverse_for_minimise must also be a list of the same length")
-        temp_index = len(design_history_dict) % len(objective_function_name)
+        if not type(inverse_for_maximise) == list or not len(inverse_for_maximise) == len(objective_function_name):
+            raise ValueError("if objective_function_name is a list, then inverse_for_maximise must also be a list of the same length")
+        temp_index = (len(design_history_dict) - DoE_len) % len(objective_function_name)
         objective_function_name = objective_function_name[temp_index]
-        inverse_for_minimise    = inverse_for_minimise[temp_index]
+        inverse_for_maximise    = inverse_for_maximise[temp_index]
     
-    if inverse_for_minimise == True:
+    if inverse_for_maximise == True:
         coff = -1
     else:
         coff = 1
@@ -446,20 +432,67 @@ def run_experiment_and_return_updated_design_history_dict(design_history_dict_si
     
     if design_history_dict_single[col_testing_str] == None:
         temp_input_dict = return_edited_input_dict(design_history_dict_single["X"], design_space_dict, default_input_dict)
-        testing_scores, X_testing, y_testing, Y_preds = model_testing_method(design_history_dict_single["predictor"], temp_input_dict)
-        del temp_input_dict
+        testing_scores, X_testing, y_testing, Y_preds = model_testing_method(predictor, temp_input_dict)
+        #del temp_input_dict
         testing_results_dict = FG_additional_reporting.run_additional_reporting(preds=Y_preds,
                 y_testing = y_testing, 
                 pred_steps_list = default_input_dict["outputs_params_dict"]["pred_steps_ahead"],
-                confidences_before_betting_PC = confidences_before_betting_PC
+                confidences_before_betting_PC = confidences_before_betting_PC,
+                financial_value_scaling=temp_input_dict["fin_inputs_params_dict"]["financial_value_scaling"],
+                seconds_per_time_steps=temp_input_dict["temporal_params_dict"]["time_step_seconds"]
                 )
+        del temp_input_dict
         design_history_dict_single = update_design_hist_dict_post_testing(design_history_dict_single, testing_scores, testing_results_dict)
         
     return design_history_dict_single
 
+def trim_design_space_and_DoE(scope_indicator, DoE, design_space, design_space_scope):
+    if isinstance(scope_indicator,dict):
+        scope_indicator = scope_indicator["topics"]
+    
+    #check that the design_space variable, fits within the design_space_scope variable
+    global full, no_topics, no_sentiment
+    for key in design_space:
+        for subkey in design_space[key]:
+            if not subkey in design_space_scope[key].keys():
+                raise ValueError ("[{}][{}] missing from design space scope doc")
+    index = 0
+    del_indexes = []
+    #establish the markers for deletion
+    if scope_indicator in [full, None]:
+        del_indicators = []
+    elif scope_indicator in [no_topics, 1]:
+        del_indicators = [full]
+    elif scope_indicator in [no_sentiment, 0]:
+        del_indicators = [full, no_topics]
+    else:
+        raise ValueError("scope indicator {}, not found".format(scope_indicator))
+    del_indexes_list = []
+    for key in design_space:
+        list_subkeys = copy.copy(list(design_space[key].keys())) 
+        for subkey in list_subkeys:
+            if design_space_scope[key][subkey] in del_indicators and not subkey in ["topic_qty", "factor_topic_volume"]:
+                # delete values
+                del_indexes_list += [index]
+                del design_space[key][subkey]
+            index += 1
+    del_indexes_list.reverse()
+    for del_index in del_indexes_list:
+        for design_ID in range(len(DoE)):
+            del DoE[design_ID][del_index]
+
+    return DoE, design_space
+        
 
 
-#%% Module - Experiment Handlerk
+
+
+
+
+
+
+
+#%% Module - Experiment Handler
 
 def PLACEHOLDER_objective_function(x1, x2, x3, x4, x5):
     #return (x[:, 0] - 2)**2 + (x[:, 1] - 3)**2
@@ -491,7 +524,7 @@ def trim_string_from_substring(string, substring="_params_"):
     x = string.find(substring) + len(substring)
     return string[x:]
 
-def print_desired_scores(design_history, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_minimise_vec, optim_run_name):
+def print_desired_scores(design_history, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_maximise_vec, optim_run_name):
     # this method produces the desired output at the end of a run, informing the user of:
     # number of design runs, last score, best scores of each high-lighted score and best run with each score in question
     # last score info
@@ -521,7 +554,7 @@ def print_desired_scores(design_history, df_designs_record, design_space_dict, o
     print(output_string_3[:-2])
     # pareto designs
     print("pareto designs")
-    for objective, polarity in zip(optim_scores_vec, inverse_for_minimise_vec):
+    for objective, polarity in zip(optim_scores_vec, inverse_for_maximise_vec):
         if type(objective) == str:
             temp_str = objective
         else:
@@ -543,7 +576,9 @@ def print_desired_scores(design_history, df_designs_record, design_space_dict, o
         
         
         
-def return_if_design_unique(x_next, design_history_dict):
+def return_if_design_unique(x_next_input, design_history_dict):
+
+    x_next = x_next_input.copy()
     try:
         x_next = x_next[0][0]
     except:
@@ -557,7 +592,8 @@ def return_if_design_unique(x_next, design_history_dict):
     return unique
     
 
-def check_if_experiment_already_ran_if_so_return_random_unique_design(x_next, design_history_dict, bounds):
+def check_if_experiment_already_ran_if_so_return_random_unique_design(x_next_input, design_history_dict, bounds):
+    x_next = x_next_input.copy()
     unique = return_if_design_unique(x_next, design_history_dict)
     if unique == False:
         x_next = define_DoE(bounds, 1)
@@ -610,8 +646,10 @@ def update_global_record(pred_steps, df_designs_record, experi_params_list, run_
     try:
         df_global_record.to_csv(global_record_path)
         df_global_record.to_csv(global_record_path + "DONTTOUCH")
+        df_global_record_t = df_global_record.T
+        df_global_record_t.to_csv(global_record_path[:-4] + "T.csv")
     except:
-        df_global_record.to_csv(global_record_path + "DONTTOUCH")    
+        df_global_record.to_csv(global_record_path + "DONTTOUCH")
     
 def experiment_manager(
     optim_run_name,
@@ -620,13 +658,12 @@ def experiment_manager(
     model_training_method=FG_model_training.retrieve_or_generate_model_and_training_scores,
     model_testing_method=FG_model_training.return_testing_scores_and_testing_time_series,
     initial_doe_size_or_DoE=5,
-    max_iter=5,
+    max_iter=0,
     optimisation_method=None,
     default_input_dict = default_input_dict,
-    minimise=True,
     force_restart_run = False,
     testing_measure = "mae",
-    inverse_for_minimise_vec = None,
+    inverse_for_maximise_vec = None,
     optim_scores_vec = None,
     global_record_path=""
     ):
@@ -699,14 +736,14 @@ def experiment_manager(
     for ID in range(find_largest_number(design_history_dict.keys()) + 1):
         design_history_dict[ID]["X"] = convert_floats_to_int_if_whole(design_history_dict[ID]["X"])#[:len(design_history_dict[ID-1]["X"])]
         # only run value if testing measure missing
-        if design_history_dict[ID]["testing_" + testing_measure] == None:
-            print(return_keys_within_2_level_dict(design_space_dict))
+        if design_history_dict[ID]["testing_" + testing_measure] == None: #not "testing_" + testing_measure in design_history_dict[ID].keys() or 
+            #print(return_keys_within_2_level_dict(design_space_dict))
             print(str(design_history_dict[ID]["X"]) + " running ID:" + str(ID))
             design_history_dict[ID] = run_experiment_and_return_updated_design_history_dict(design_history_dict[ID], experiment_requester, model_testing_method, testing_measure="mae", confidences_before_betting_PC=default_input_dict["reporting_dict"]["confidence_thresholds"])
             # save
             df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
             save_designs_record_csv_and_dict(list_of_save_locations, df_designs_record=df_designs_record, design_history_dict=design_history_dict, optim_run_name=optim_run_name)
-            print_desired_scores(design_history_dict, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_minimise_vec, optim_run_name)
+            print_desired_scores(design_history_dict, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_maximise_vec, optim_run_name)
         update_global_record(pred_steps, df_designs_record, experi_params_list, optim_run_name, global_record_path)
             
             
@@ -723,13 +760,13 @@ def experiment_manager(
         continue_optimisation = False
     
     while continue_optimisation == True:
-        X, Y = return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, bo, inverse_for_minimise=inverse_for_minimise_vec, objective_function_name=optim_scores_vec)
+        X, Y = return_X_and_Y_for_GPyOpt_optimisation(design_history_dict, inverse_for_maximise=inverse_for_maximise_vec, objective_function_name=optim_scores_vec, DoE=DoE)
         bo.X = np.array(X)
         bo.Y = np.array(Y).reshape(-1,1)
         bo.run_optimization()
         # find next design
         dice_roll = random.random()
-        print("dice_roll: " + str(dice_roll))
+        #print("dice_roll: " + str(dice_roll))
         if  dice_roll < 0.0:#25:
             x_next = define_DoE(bounds, 1)
             x_next = x_next[0]
@@ -737,16 +774,20 @@ def experiment_manager(
             x_next = bo.acquisition.optimize()
             x_next = x_next[0][0]
         x_next = check_if_experiment_already_ran_if_so_return_random_unique_design(x_next, design_history_dict, bounds)
-        # save and run design
+        # save selected run parameters in case of interuption, design is continued later
         ID = find_largest_number(design_history_dict.keys()) + 1
         design_history_dict[ID] = dict()
         design_history_dict[ID]["X"] = convert_floats_to_int_if_whole(list(x_next))#[:len(design_history_dict[ID-1]["X"])]
         print(str(design_history_dict[ID]["X"]) + " running ID:" + str(ID))
+        design_history_dict[ID]["testing_" + testing_measure] = None
+        df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
+        save_designs_record_csv_and_dict(list_of_save_locations, df_designs_record=df_designs_record, design_history_dict=design_history_dict, optim_run_name=optim_run_name)
+        # run design
         design_history_dict[ID] = run_experiment_and_return_updated_design_history_dict(design_history_dict[ID], experiment_requester, model_testing_method, testing_measure="mae", confidences_before_betting_PC=default_input_dict["reporting_dict"]["confidence_thresholds"])
         # save
         df_designs_record = update_df_designs_record(df_designs_record, design_history_dict, design_space_dict)
         save_designs_record_csv_and_dict(list_of_save_locations, df_designs_record=df_designs_record, design_history_dict=design_history_dict, optim_run_name=optim_run_name)
-        print_desired_scores(design_history_dict, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_minimise_vec, optim_run_name)
+        print_desired_scores(design_history_dict, df_designs_record, design_space_dict, optim_scores_vec, inverse_for_maximise_vec, optim_run_name)
         # check loop
         
         if len(df_designs_record.index) >= overall_max_runs:
@@ -754,10 +795,6 @@ def experiment_manager(
     print(datetime.now().strftime("%H:%M:%S") + "   normal termination")
         
 
-        
-
-    
-    
 
 #%% main line
 
@@ -766,36 +803,75 @@ model_start_time = now.strftime(global_strptime_str_filename)
     
 design_space_dict = {
     "senti_inputs_params_dict" : {
-        "topic_qty" : [5, 9, 13, 17],
-        "topic_model_alpha" : [0.3, 0.7, 1, 2, 3, 5],
-        "weighted_topics" : [False, True],
-        "relative_halflife" : [0.25 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR], 
+        "topic_qty" : [5, 9, 13, 17, 25],
+        "topic_model_alpha" : [0.3, 0.7, 1, 2, 3, 5, 7, 13],
+        "relative_halflife" : [3*60, 0.25 * SECS_IN_AN_HOUR, 2*SECS_IN_AN_HOUR, 7*SECS_IN_AN_HOUR], 
         "apply_IDF" : [False, True],
-        "topic_weight_square_factor" : [1, 2, 4]
-        #,
-        #"enforced_topics_dict"  : {
-        #    0: None,
-        #    1 : [['investment', 'financing', 'losses'], ['risk', 'exposure', 'liability'], ["financial",  "forces" , "growth", "interest",  "rates"]]}
+        "topic_weight_square_factor" : [1, 2, 4],
+        "factor_tweet_attention" : [False, True],
+        "factor_topic_volume" : {0 : False, 1 : True, 2 : global_exclusively_str}
     },
     "model_hyper_params" : {
         "estimator__hidden_layer_sizes" : {
-            0 : [("simple", 50)],
-            1 : [("simple", 40), ("simple", 30)],
-            2 : [("GRU", 50)],
-            3 : [("GRU", 40), ("GRU", 30)],
-            4 : [("LSTM", 50)],
-            5 : [("LSTM", 50), ("LSTM", 30)],
-            7 : [("LSTM", 50), ("GRU", 50), ("simple", 50)],
-            8 : [("simple", 50), ("GRU", 50), ("LSTM", 50)]
+            0 : [("GRU", 50)],
+            1 : [("GRU", 40), ("GRU", 30)],
+            2 : [("LSTM", 50)],
+            3 : [("LSTM", 50), ("LSTM", 30)],
+            4 : [("LSTM", 50), ("GRU", 30), ("GRU", 20)],
+            5 : [("LSTM", 60), ("GRU", 30), ("LSTM", 8)]
             },
-        "estimator__alpha"                 : [1e-5, 1e-4, 1e-3, 1e-2, 5e-2, 1e-1]
+        "general_adjusting_square_factor" : [3, 2, 1, 0],
+        "estimator__alpha"                : [1e-14, 1e-13, 1e-12, 1e-11, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5], 
+        "lookbacks"                       : [8, 10, 15, 20, 25, 50],
+        "early_stopping" : [0, 5, 7, 9, 12]
+        }
+}
+
+full, no_topics, no_sentiment = "full", "no_topics", "no_sentiment"
+design_space_scope_dict = {
+        "senti_inputs_params_dict" : {
+        "topic_qty" : full,
+        "topic_model_alpha" : full,
+        "relative_halflife" : no_topics,
+        "apply_IDF" : no_topics,
+        "topic_weight_square_factor" : full,
+        "factor_tweet_attention" : no_topics,
+        "factor_topic_volume" : no_topics
     },
-    "string_key" : {}
+    "model_hyper_params" : {
+        "estimator__hidden_layer_sizes"   : no_sentiment,
+        "general_adjusting_square_factor" : no_sentiment,
+        "estimator__alpha"                : no_sentiment,
+        "lookbacks"                       : no_sentiment,
+        "early_stopping"                  : no_sentiment
+        }
 }
 
 global_run_count = 0
 
-init_doe = 40
+init_doe = [
+    [25, 7,   25200, 0, 1, 1, 2, 3, 2, 1e-11, 10, 5],
+    [17, 1,   7200,  0, 1, 1, 0, 5, 1, 1e-14, 25, 9],
+    [13, 5,   7200,  0, 2, 0, 1, 2, 1, 1e-06, 10, 7],
+    [17, 7,   25200, 0, 4, 0, 1, 3, 2, 1e-06, 20, 9],
+    [5,  0.7, 900,   1, 2, 0, 0, 5, 2, 1e-09, 8,  9],
+    [17, 7,   25200, 0, 1, 1, 2, 3, 2, 1e-11, 15, 9],
+    [9,  0.3, 180,   1, 1, 0, 1, 5, 1, 1e-05, 8,  5],
+    [9,  3,   25200, 1, 1, 0, 1, 5, 1, 1e-05, 15, 5],
+    [13, 0.3, 900,	 1, 4, 1, 0, 0, 3, 1e-07, 50, 0],
+    [5,  13,  25200, 1, 4, 0, 2, 5, 1, 1e-08, 20, 5],
+    [25, 3,   25200, 1, 1, 0, 2, 4, 3, 1e-13, 15, 7],
+    [9,  5,   180,   0, 4, 1, 1, 4, 3, 1e-08, 15, 9],
+    [13, 13,  180,   1, 1, 1, 0, 0, 3, 1e-07, 20, 12],
+    [13, 2,   7200,  0, 1, 0, 0, 5, 1, 1e-11, 50, 12],
+    [5,  13,  180,   0, 4, 0, 2, 0, 2, 1e-11, 10, 0],
+    [5,  2,   180,   0, 2, 1, 1, 3, 3, 1e-07, 8,  7],
+    [9,  0.3, 900,   1, 2, 1, 2, 1, 1, 1e-12, 20, 12],
+    [25, 0.7, 7200,  0, 1, 1, 2, 4, 3, 1e-11, 20, 0],
+    [5,  2,   25200, 0, 1, 0, 1, 1, 2, 1e-13, 50, 7],
+    [17, 7,   7200,  1, 1, 0, 0, 5, 1, 1e-07, 25, 9]
+    ]
+
 
 """ experiment checklist:
 1. ensure that the value for steps ahead is updated on the dictionary line below
@@ -807,37 +883,70 @@ checklist for restarting the experiment
 2. the excels in [\outputs\]
 """
 
-## SETTING THE RUN VARIABLES, READ ABOVE CHECK LIST
-
-# definition of different scenarios is set by this dict, to access a different scenario, please change the scenario variable
+## SETTING THE RUN VARIABLES, READ ABOVE CHECK LISTdefinition of different scenarios is set by this dict, to access a different scenario, please change the scenario variable
 
 # scenario parameters: topic_qty, pred_steps
 
-scenario_ID = 0
-removal_ratio = int(2e2)
+
+
+removal_ratio = int(1e0)
 scenario_dict = {
-        0 : {"topics" : None, "pred_steps" : 1},
-        1 : {"topics" : None, "pred_steps" : 3},
-        2 : {"topics" : None, "pred_steps" : 5},
-        3 : {"topics" : None, "pred_steps" : 15},
-        4 : {"topics" : 1, "pred_steps" : 1},
-        5 : {"topics" : 1, "pred_steps" : 3},
-        6 : {"topics" : 1, "pred_steps" : 5},
-        7 : {"topics" : 1, "pred_steps" : 15},
-        8 : {"topics" : 0, "pred_steps" : 1},
-        9 : {"topics" : 0, "pred_steps" : 3},
-        10: {"topics" : 0, "pred_steps" : 5},
-        11: {"topics" : 0, "pred_steps" : 15}
+        #0 : {"topics" : None, "pred_steps" : 15},
+        #1 : {"topics" : 1, "pred_steps"    : 15},
+        #2 : {"topics" : 0, "pred_steps"    : 15},
+        3 : {"topics" : None, "pred_steps" : 6},
+        4 : {"topics" : 1, "pred_steps"    : 6},
+        5 : {"topics" : 0, "pred_steps"    : 6},
+        #6 : {"topics" : None, "pred_steps" : 3},
+        #7 : {"topics" : 1, "pred_steps"    : 3},
+        #8 : {"topics" : 0, "pred_steps"    : 3},
+        9 : {"topics" : None, "pred_steps" : 1},
+        10: {"topics" : 1, "pred_steps"    : 1},
+        11: {"topics" : 0, "pred_steps"    : 1},
     }
 
-for scenario_ID in [1,9,2,10]:#scenario_dict.keys():
+loop = [3, 11]
+loop = [4, 10]
+#loop = [9, 5]
+        
+reverse_DoE = False
+max_iter = 16
+
+#init_doe = init_doe[shard::6]
+if reverse_DoE == True:
+    init_doe.reverse()
+    init_doe = [init_doe[1], init_doe[2]]
+    max_iter = 0
+    #max_iter = 0
+
+print("shard: {}".format(str(loop)))
+enable_GPU = False
+if enable_GPU == False:
+    import tensorflow as tf
+    tf.config.set_visible_devices([], 'GPU')
+if loop == None:
+    loop = scenario_dict.keys()
+    init_doe = [init_doe[0]]
     
-    #editing topic quantity values for scenario, 2 lines
+
+
+for scenario_ID in loop:
+
+    DoE, new_design_space_dict = trim_design_space_and_DoE(scenario_dict[scenario_ID], init_doe, design_space_dict, design_space_scope_dict)
+
+    index_of_topic_qty = return_keys_within_2_level_dict(new_design_space_dict).index("senti_inputs_params_dict_topic_qty")
+    index_of_factor_topic_volume = return_keys_within_2_level_dict(new_design_space_dict).index("senti_inputs_params_dict_factor_topic_volume")
+
+    # editing topic quantity values for scenario, 2 lines
     topic_qty = scenario_dict[scenario_ID]["topics"]
-    if isinstance(init_doe, list) and topic_qty != None:
-            for i in range(len(init_doe)): init_doe[i][0] = 1
-            design_space_dict["senti_inputs_params_dict"]["topic_qty"] = [1]
-            default_input_dict["senti_inputs_params_dict"]["topic_qty"] = 1
+    if isinstance(DoE, list) and topic_qty != None:
+            for i in range(len(DoE)): 
+                DoE[i][index_of_topic_qty] = topic_qty; DoE[i][index_of_factor_topic_volume] = 0
+            new_design_space_dict["senti_inputs_params_dict"]["topic_qty"] = [topic_qty]
+            default_input_dict["senti_inputs_params_dict"]["topic_qty"] = topic_qty;0 
+            new_design_space_dict["senti_inputs_params_dict"]["factor_topic_volume"] = [0]
+            default_input_dict["senti_inputs_params_dict"]["factor_topic_volume"] = 0
+            
 
     # setting various optimisation variabls
     pred_steps = scenario_dict[scenario_ID]["pred_steps"]
@@ -846,27 +955,35 @@ for scenario_ID in [1,9,2,10]:#scenario_dict.keys():
     default_input_dict["senti_inputs_params_dict"]["topic_training_tweet_ratio_removed"] = removal_ratio
 
     # setting the optimisation objective functions
-    confidence_scoring_measure_tuple_1 = ("validation","results_x_mins_weighted",pred_steps,0.02)
-    confidence_scoring_measure_tuple_2 = ("validation","results_x_mins_PC",pred_steps,0.02)
-    confidence_scoring_measure_tuple_3 = ("validation","results_x_mins_score",pred_steps,0.02)
-    
-    
-    optim_scores_vec = ["validation_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2, confidence_scoring_measure_tuple_3]
-    
-    inverse_for_minimise_vec = [True, False, False, False]
-    
-    optim_scores_vec = ["validation_" + testing_measure]
-    inverse_for_minimise_vec = [True]
-    
+    confidence_scoring_measure_tuple_1 = ("validation","results_x_mins_weighted",pred_steps,0.9)
+    confidence_scoring_measure_tuple_2 = ("validation","results_x_mins_PC",pred_steps,0.9)
+    confidence_scoring_measure_tuple_3 = ("validation","results_x_mins_score",pred_steps,0.9)
 
-    #what around to ensure that single topic sentimental data in more used in the model
+    #optim_scores_vec = ["validation_" + testing_measure, confidence_scoring_measure_tuple_1, confidence_scoring_measure_tuple_2, confidence_scoring_measure_tuple_3]
+    #inverse_for_maximise_vec = [False, True, True, True]
+    #optim_scores_vec = ["validation_" + testing_measure]
+    #inverse_for_maximise_vec = [False]
+
+    optim_scores_vec = ["validation_" + testing_measure, confidence_scoring_measure_tuple_1]
+    inverse_for_maximise_vec = [False, True]
+
+    #what around to ensure that single topic sentiment data in more used in the model
     if default_senti_inputs_params_dict["topic_qty"] == 1:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 1
     elif default_senti_inputs_params_dict["topic_qty"] == 0:
             default_model_hyper_params["cohort_retention_rate_dict"]["~senti_*"] = 0
 
     scenario_name_str = return_scenario_name_str(topic_qty, pred_steps, removal_ratio)
-    scenario_name_str = "intergration_of_new_data_and_RNN"
+    if reverse_DoE == True:
+        final_str = "_reversed"
+    else:
+        final_str = ""
+
+    run_name_str = "run_61_{}{}.csv".format(str(scenario_ID),final_str)
+
+
+    #run_name_str = "DoE_Gen_{}.csv".format(str(scenario_ID))
+    scenario_name_str = scenario_name_str + run_name_str
 
 
     if __name__ == '__main__':
@@ -874,20 +991,14 @@ for scenario_ID in [1,9,2,10]:#scenario_dict.keys():
         print("running scenario " + str(scenario_ID) + ": " + scenario_name_str + " - " + datetime.now().strftime("%H:%M:%S"))
         experiment_manager(
             scenario_name_str,
-            design_space_dict,
-            initial_doe_size_or_DoE=init_doe,
-            max_iter=0,
+            new_design_space_dict,
+            initial_doe_size_or_DoE=DoE,
+            max_iter=max_iter,
             model_start_time = model_start_time,
             force_restart_run = False,
-            inverse_for_minimise_vec = inverse_for_minimise_vec,
+            inverse_for_maximise_vec = inverse_for_maximise_vec,
             optim_scores_vec = optim_scores_vec,
             testing_measure = testing_measure,
-            global_record_path=r"C:\Users\Fabio\OneDrive\Documents\Studies\Final Project\Social-Media-and-News-Article-Sentiment-Analysis-for-Stock-Market-Autotrading\outputs\intergration_of_new_data_and_RNN.csv"
+            global_record_path=os.path.join(global_general_folder,r"outputs/{}".format(run_name_str))
             )
         print(str(scenario_ID) + " - complete" + " - " + datetime.now().strftime("%H:%M:%S"))
-
-
-
-
-
-
