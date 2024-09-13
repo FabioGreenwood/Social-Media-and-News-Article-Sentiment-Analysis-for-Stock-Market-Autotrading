@@ -28,7 +28,7 @@ The following sections of the Fabio_James_Greenwood_MSc_Thesis.pdf will provide 
    - Calculations (sentiment quantification)
  - Model training -> 5.5
    - Bit more interesting post section 5.5.1 (a straightforward explanation of RNNs)
-   - Manual implementation of the deep random subspace ensembles implementation -> 5.5.2
+   - Manual implementation of the deep random subspace ensembles method (not native to sci-kit learn and other packages used) -> 5.5.2
 
 I would note this is an academic document, I’m sure a technical document starting with a to-the-point introduction, followed closely by a technical specification and system overview would have been more interesting for any prospective employers, however this was the document I was requested to produce. Though in hindsight I admit that I should have produced more coding documentation. The PDF was produced in overleaf.
 
