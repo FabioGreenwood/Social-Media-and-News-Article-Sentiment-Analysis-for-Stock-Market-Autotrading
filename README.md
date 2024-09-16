@@ -6,13 +6,13 @@ This is the source code for my master’s thesis.
 ## Intro
 
 The project was to perform A/B testing on the potential profitability improvements to a stock trading bot with added:
- - sentiment analysis of twitter data
- - sentiment analysis of twitter data with topic clustering
+ - Sentiment analysis of twitter data
+ - Sentiment analysis of twitter data with topic clustering
 
 To achieve this the model was made to run with any of the following scopes:
- - multi-topics (sentiment with topic clustering, plus financial data)
- - no-topics (linear sentiment, no clustering, plus financial data)
- - no-sentiment (financial data only) 
+ - Multi-topics (sentiment with topic clustering, plus financial data)
+ - No-topics (linear sentiment, no clustering, plus financial data)
+ - No-sentiment (financial data only) 
 
 On top of this each model scope was also optimising its own hyperparameters. At the end, the top ("optimal") sets of parameters from each of the 3 scopes, were re-ran in their originating scenario and the other scenarios, multiple times. This was to produce a set of linked pairs for paired t-testing. This was done for a 5-mins and 30-mins prediction horizon.
 
